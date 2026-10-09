@@ -3,6 +3,7 @@ import postgres from "postgres";
 import { createHash, timingSafeEqual } from "node:crypto";
 
 let client: ReturnType<typeof postgres> | undefined;
+let adminClient: ReturnType<typeof postgres> | undefined;
 
 export function licenseDb() {
   const url = process.env.MO_BISTRO_POSTGRES_URL || process.env.DATABASE_URL;
@@ -18,6 +19,22 @@ export function licenseDb() {
   });
 
   return client;
+}
+
+export function licenseAdminDb() {
+  const url = process.env.LICENSE_ADMIN_DATABASE_URL;
+
+  if (!url) {
+    throw new Error("LICENSE_ADMIN_DATABASE_URL is not configured");
+  }
+
+  adminClient ??= postgres(url, {
+    max: 2,
+    connect_timeout: 10,
+    ssl: "require",
+  });
+
+  return adminClient;
 }
 
 export function authorizedOwner(request: Request) {

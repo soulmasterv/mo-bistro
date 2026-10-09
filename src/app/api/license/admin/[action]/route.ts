@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   authorizedOwner,
-  licenseDb,
+  licenseAdminDb,
 } from "@/lib/licensing/core";
 
 export const runtime = "nodejs";
@@ -34,7 +34,7 @@ export async function POST(request: Request, context: Context) {
   }
 
   try {
-    const sql = licenseDb();
+    const sql = licenseAdminDb();
 
     const result = await sql.begin(async tx => {
       await tx`SELECT pg_advisory_xact_lock(741109)`;
@@ -128,7 +128,7 @@ export async function GET(request: Request, context: Context) {
   }
 
   try {
-    const sql = licenseDb();
+    const sql = licenseAdminDb();
 
     const entries = await sql`
       SELECT *
