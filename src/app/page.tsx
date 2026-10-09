@@ -86,10 +86,28 @@ export default function Home() {
       .catch(() => window.location.replace("/login"));
   }, []);
 
-  function openQR() {
-    setRegistrationUrl(`${window.location.protocol}//${window.location.host}/join`);
-    setShowQR(true);
+  async function refreshQR() {
+    try {
+      const response = await fetch("/api/qr", { cache: "no-store" });
+      if (!response.ok) throw new Error("Unable to load QR code");
+      const data = await response.json();
+      setRegistrationUrl(data.url);
+    } catch {
+      setRegistrationUrl("");
+    }
   }
+
+  async function openQR() {
+    setRegistrationUrl("");
+    setShowQR(true);
+    await refreshQR();
+  }
+
+  useEffect(() => {
+    if (!showQR) return;
+    const timer = window.setInterval(refreshQR, 15000);
+    return () => window.clearInterval(timer);
+  }, [showQR]);
 
   async function performAction(id: number, action: Action) {
     if (action === "seat") {
@@ -199,10 +217,7 @@ export default function Home() {
             
 <button
   type="button"
-  onClick={() => {
-    setRegistrationUrl(window.location.origin + "/join");
-    setShowQR(true);
-  }}
+  onClick={openQR}
   className="flex items-center gap-2 rounded-xl bg-[#C5A77B] px-5 py-3 font-semibold text-[#101820] hover:bg-[#D8BC91]"
 >
   <QrCode size={18} /> QR Code
@@ -365,12 +380,18 @@ export default function Home() {
             </p>
 
             <div className="mx-auto my-7 w-fit rounded-2xl bg-white p-5">
-              <QRCodeSVG
-                value={registrationUrl}
-                size={220}
-                level="M"
-                marginSize={0}
-              />
+              {registrationUrl ? (
+                <QRCodeSVG
+                  value={registrationUrl}
+                  size={220}
+                  level="M"
+                  marginSize={0}
+                />
+              ) : (
+                <div className="flex h-[220px] w-[220px] items-center justify-center text-center text-sm text-slate-600">
+                  Loading QR code... If it does not appear, close and reopen.
+                </div>
+              )}
             </div>
 
             <p className="break-all text-xs text-slate-400">
