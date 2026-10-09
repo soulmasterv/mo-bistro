@@ -1,9 +1,15 @@
+import { checkRateLimit } from "@/lib/api-rate-limit";
 import { NextResponse } from "next/server";
 import { verifyQR } from "@/lib/rotating-qr";
 import { getSettingPostgres } from "@/lib/staff-auth-postgres";
 import { getSetting } from "@/lib/staff-auth";
 
 export async function POST(request: Request) {
+  const limited = await checkRateLimit(
+    request, "verify", 30, 60
+  );
+  if (limited) return limited;
+
   try {
     const { qr_code } = await request.json();
 
