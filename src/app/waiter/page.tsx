@@ -146,7 +146,7 @@ export default function WaiterPage() {
   async function markReady(table: RestaurantTable) {
     if (busyId !== null || table.status !== "occupied") return;
 
-    if (!window.confirm(`Mark ${table.name} as ready for new guests?`)) {
+    if (!window.confirm(`Send a table-ready request for ${table.name} to reception?`)) {
       return;
     }
 
@@ -156,7 +156,7 @@ export default function WaiterPage() {
 
     try {
       const response = await fetch(
-        `/api/waiter/tables/${table.id}/free`,
+        `/api/waiter/tables/${table.id}/request-ready`,
         {
           method: "POST",
           credentials: "same-origin",
@@ -166,10 +166,10 @@ export default function WaiterPage() {
       const result = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(result.error || "Unable to release table.");
+        throw new Error(result.error || "Unable to request table approval.");
       }
 
-      setNotice(`${table.name} is now available.`);
+      setNotice(`${table.name}: request sent to reception. Awaiting approval.`);
       await refresh();
     } catch (err) {
       setError(
@@ -384,9 +384,9 @@ export default function WaiterPage() {
                     }`}
                   >
                     {busyId === table.id
-                      ? "Updating..."
+                      ? "Sending request..."
                       : isOccupied
-                        ? "Mark table ready"
+                        ? "Request table ready"
                         : "Already ready"}
                   </button>
                 </article>

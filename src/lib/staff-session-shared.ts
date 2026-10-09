@@ -1,4 +1,4 @@
-export type StaffRole = "manager" | "reception";
+export type StaffRole = "manager" | "reception" | "waiter";
 
 export type StaffSession = {
   id: number;
