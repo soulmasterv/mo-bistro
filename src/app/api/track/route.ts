@@ -1,0 +1,145 @@
+import { getPostgres } from "@/lib/postgres-db";
+import { NextResponse } from "next/server";
+import db from "@/lib/db";
+import {
+  initializeTracking,
+  hashTrackingToken,
+  validTrackingToken,
+} from "@/lib/guest-tracking";
+
+type Guest = {
+  id: number;
+  name: string;
+  party_size: number;
+  status: string;
+  confirmed: number;
+  created_at: string;
+};
+
+function findGuest(token: string): Guest | undefined {
+  return db.prepare(`
+    SELECT id, name, party_size, status, confirmed, created_at
+    FROM guests
+    WHERE tracking_token_hash = ?
+  `).get(hashTrackingToken(token)) as Guest | undefined;
+}
+
+function json(data: unknown, status = 200) {
+  return NextResponse.json(data, {
+    status,
+    headers: { "Cache-Control": "no-store" },
+  });
+}
+
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const token = url.searchParams.get("token");
+
+  if (!validTrackingToken(token)) {
+    return json({ error: "Invalid tracking link." }, 400);
+  }
+
+  if (process.env.MO_BISTRO_DB === "postgres") {
+    const sql = getPostgres();
+    const guests = await sql<Guest[]>`
+      SELECT id, name, party_size, status, confirmed, created_at
+      FROM guests WHERE tracking_token_hash = ${hashTrackingToken(token)} LIMIT 1
+    `;
+    const guest = guests[0];
+    if (!guest) return json({ error: "Tracking link not found." }, 404);
+    const ahead = guest.status === "waiting" ? Number((await sql`
+      SELECT COUNT(*)::integer AS count FROM guests
+      WHERE status IN ('waiting', 'called')
+      AND (created_at < ${guest.created_at}
+           OR (created_at = ${guest.created_at} AND id < ${guest.id}))
+    `)[0].count) : null;
+    return json({
+      guest: { name: guest.name, party_size: guest.party_size,
+        status: guest.status, confirmed: Boolean(guest.confirmed),
+        created_at: guest.created_at },
+      queue_position: ahead === null ? null : ahead + 1,
+      guests_ahead: ahead,
+    });
+  }
+
+  initializeTracking();
+
+  const guest = findGuest(token);
+
+  if (!guest) {
+    return json({ error: "Tracking link not found." }, 404);
+  }
+
+  const ahead = guest.status === "waiting"
+    ? (
+        db.prepare(`
+          SELECT COUNT(*) AS count
+          FROM guests
+          WHERE status IN ('waiting', 'called')
+          AND (
+            created_at < ?
+            OR (created_at = ? AND id < ?)
+          )
+        `).get(guest.created_at, guest.created_at, guest.id) as {
+          count: number;
+        }
+      ).count
+    : null;
+
+  return json({
+    guest: {
+      name: guest.name,
+      party_size: guest.party_size,
+      status: guest.status,
+      confirmed: Boolean(guest.confirmed),
+      created_at: guest.created_at,
+    },
+    queue_position: ahead === null ? null : ahead + 1,
+    guests_ahead: ahead,
+  });
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+
+    if (
+      !validTrackingToken(body.token) ||
+      body.action !== "cancel"
+    ) {
+      return json({ error: "Invalid request." }, 400);
+    }
+
+    if (process.env.MO_BISTRO_DB === "postgres") {
+      const sql = getPostgres();
+      const rows = await sql`
+        UPDATE guests SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+        WHERE tracking_token_hash = ${hashTrackingToken(body.token)}
+        AND status IN ('waiting', 'called') RETURNING id
+      `;
+      return rows.length ? json({ success: true })
+        : json({ error: "This registration cannot be cancelled." }, 409);
+    }
+
+    initializeTracking();
+
+    const result = db.prepare(`
+      UPDATE guests
+      SET status = 'cancelled',
+          updated_at = CURRENT_TIMESTAMP
+      WHERE tracking_token_hash = ?
+      AND status IN ('waiting', 'called')
+    `).run(hashTrackingToken(body.token));
+
+    if (result.changes === 0) {
+      return json(
+        { error: "This registration cannot be cancelled." },
+        409
+      );
+    }
+
+    return json({ success: true });
+  } catch {
+    return json({ error: "Unable to update registration." }, 500);
+  }
+}
