@@ -1,5 +1,7 @@
 import { getPostgres } from "@/lib/postgres-db";
 import { NextResponse } from "next/server";
+import { checkRateLimit } from "@/lib/api-rate-limit";
+import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import db from "@/lib/db";
 import {
   initializeTracking,
@@ -32,6 +34,9 @@ function json(data: unknown, status = 200) {
 }
 
 export async function GET(request: Request) {
+  const limited = await checkRateLimit(request, "guest-track", 30, 60);
+  if (limited) return limited;
+
   const url = new URL(request.url);
   const token = url.searchParams.get("token");
 
@@ -100,6 +105,12 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const limited = await checkRateLimit(request, "guest-cancel", 5, 600);
+  if (limited) return limited;
+
+  const badOrigin = rejectCrossOrigin(request);
+  if (badOrigin) return badOrigin;
+
   try {
     const body = await request.json();
 
