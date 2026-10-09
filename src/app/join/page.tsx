@@ -292,11 +292,12 @@ export default function JoinPage() {
               {qrState === "invalid" && (
                 <div className="rounded-2xl border border-[#E4DCD0] bg-[#FFFDF9] p-6 text-center">
                   <h3 className="font-serif text-2xl text-[#2C3028]">
-                    This QR code has expired
+                    {qrCode ? "Let's try a fresh QR code" : "Your seat is waiting."}
                   </h3>
                   <p className="mt-3 text-sm leading-6 text-[#807B71]">
-                    To join our waitlist, please scan the current QR code
-                    displayed at Mo Bistro.
+                    {qrCode
+                      ? "This code is no longer active. Please scan the latest QR code at reception."
+                      : "To join our waitlist, scan the QR code at reception. We look forward to welcoming you."}
                   </p>
                 </div>
               )}

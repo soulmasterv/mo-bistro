@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   }
 
   const limited = await checkRateLimit(
-    request, "join", 100, 600
+    request, "join", 20, 600
   );
   if (limited) return limited;
 
