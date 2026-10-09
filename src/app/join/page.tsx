@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -22,6 +22,27 @@ export default function JoinPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const [qrCode, setQrCode] = useState("");
+  const [qrState, setQrState] = useState<"checking" | "valid" | "invalid">("checking");
+
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("qr") || "";
+    setQrCode(code);
+
+    fetch("/api/qr/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ qr_code: code }),
+      cache: "no-store",
+    })
+      .then(async response => {
+        const data = await response.json();
+        setQrState(response.ok && data.valid ? "valid" : "invalid");
+      })
+      .catch(() => setQrState("invalid"));
+  }, []);
+
+
   async function joinWaitlist(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (loading) return;
@@ -38,6 +59,7 @@ export default function JoinPage() {
           phone: phone.trim(),
           party_size: partySize,
           seating_preference: seatingPreference,
+          qr_code: qrCode,
         }),
       });
 
@@ -177,6 +199,23 @@ export default function JoinPage() {
                 </p>
               </div>
 
+              {qrState === "checking" && (
+                <p className="text-[#807B71]">Verifying your QR code...</p>
+              )}
+
+              {qrState === "invalid" && (
+                <div className="rounded-2xl border border-[#E4DCD0] bg-[#FFFDF9] p-6 text-center">
+                  <h3 className="font-serif text-2xl text-[#2C3028]">
+                    Scan the QR code at reception
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-[#807B71]">
+                    To join our waitlist, please scan the current QR code
+                    displayed at Mo Bistro.
+                  </p>
+                </div>
+              )}
+
+              {qrState === "valid" && (
               <form onSubmit={joinWaitlist} className="space-y-5">
                 <div>
                   <label
@@ -305,6 +344,7 @@ export default function JoinPage() {
                   )}
                 </button>
               </form>
+              )}
 
               <div className="mt-7 text-center">
                 <a

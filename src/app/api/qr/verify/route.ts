@@ -1,0 +1,30 @@
+import { NextResponse } from "next/server";
+import { verifyQR } from "@/lib/rotating-qr";
+import { getSettingPostgres } from "@/lib/staff-auth-postgres";
+import { getSetting } from "@/lib/staff-auth";
+
+export async function POST(request: Request) {
+  try {
+    const { qr_code } = await request.json();
+
+    const required = process.env.MO_BISTRO_DB === "postgres"
+      ? await getSettingPostgres("qr_required", "false")
+      : getSetting("qr_required", "false");
+
+    if (required !== "true") {
+      return NextResponse.json({ valid: true });
+    }
+
+    const valid = await verifyQR(qr_code);
+
+    return NextResponse.json(
+      { valid },
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  } catch {
+    return NextResponse.json(
+      { valid: false },
+      { status: 503, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+}
