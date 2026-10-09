@@ -192,10 +192,12 @@ export default function JoinPage() {
                 </div>
 
                 <h2 className="font-serif text-[39px] leading-tight tracking-[-0.035em] text-[#2C3028] sm:text-[45px]">
-                  Join our waitlist
+                  {qrState === "valid" ? "Join our waitlist" : "Welcome to Mo Bistro"}
                 </h2>
                 <p className="mt-3 text-[14px] leading-6 text-[#807B71]">
-                  Just a few details and we&apos;ll take care of the rest.
+                  {qrState === "valid"
+                    ? "Just a few details and we'll take care of the rest."
+                    : "Our waitlist is available through the QR code at reception."}
                 </p>
               </div>
 
