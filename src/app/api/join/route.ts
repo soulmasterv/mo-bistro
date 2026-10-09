@@ -17,7 +17,17 @@ import {
 } from "@/lib/guest-tracking";
 
 const schema = z.object({
-  name: z.string().trim().min(2).max(100),
+  name: z.string().trim().min(2).max(100).refine(
+    value => {
+      const parts = value.split(/\s+/);
+      return parts.length >= 2 &&
+        parts.every(part =>
+          /^[\p{L}\p{M}][\p{L}\p{M}'’-]*$/u.test(part) &&
+          [...part].filter(char => /\p{L}/u.test(char)).length >= 2
+        );
+    },
+    "Please enter your first and last name."
+  ),
   phone: z.string().trim().regex(
     /^01[0125][0-9]{8}$/,
     "Enter a valid 11-digit Egyptian mobile number."

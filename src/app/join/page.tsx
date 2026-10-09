@@ -14,8 +14,18 @@ import {
 
 type Seating = "any" | "indoor" | "outdoor";
 
+function isValidFullName(value: string) {
+  const parts = value.trim().split(/\s+/);
+  return parts.length >= 2 &&
+    parts.every(part =>
+      /^[\p{L}\p{M}][\p{L}\p{M}'’-]*$/u.test(part) &&
+      [...part].filter(char => /\p{L}/u.test(char)).length >= 2
+    );
+}
+
 export default function JoinPage() {
   const [name, setName] = useState("");
+  const [nameTouched, setNameTouched] = useState(false);
   const [phone, setPhone] = useState("");
   const [partySize, setPartySize] = useState(2);
   const [seatingPreference, setSeatingPreference] = useState<Seating>("any");
@@ -114,6 +124,12 @@ export default function JoinPage() {
   async function joinWaitlist(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (loading) return;
+
+    setNameTouched(true);
+    if (!isValidFullName(name)) {
+      setError("Please enter your first and last name.");
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -301,9 +317,16 @@ export default function JoinPage() {
                     maxLength={100}
                     value={name}
                     onChange={e => setName(e.target.value)}
+                    onBlur={() => setNameTouched(true)}
+                    aria-invalid={nameTouched && !isValidFullName(name)}
                     placeholder="Full name"
                     className={inputClass}
                   />
+                  {nameTouched && !isValidFullName(name) && (
+                    <p role="alert" className="mt-2 text-sm text-red-600">
+                      Please enter your first and last name.
+                    </p>
+                  )}
                 </div>
 
                 <div>
