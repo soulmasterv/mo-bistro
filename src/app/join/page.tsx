@@ -26,20 +26,88 @@ export default function JoinPage() {
   const [qrState, setQrState] = useState<"checking" | "valid" | "invalid">("checking");
 
   useEffect(() => {
+    let cancelled = false;
+    let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+
     const code = new URLSearchParams(window.location.search).get("code") || "";
     setQrCode(code);
 
-    fetch("/api/qr/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ qr_code: code }),
-      cache: "no-store",
-    })
-      .then(async response => {
-        const data = await response.json();
-        setQrState(response.ok && data.valid ? "valid" : "invalid");
-      })
-      .catch(() => setQrState("invalid"));
+    async function checkQR() {
+      try {
+        // Existing permits survive refreshes, including after QR rotation.
+        const permitResponse = await fetch(`/api/qr/permit?code=${encodeURIComponent(code)}`, {
+          cache: "no-store",
+          credentials: "same-origin",
+        });
+
+        const permit = await permitResponse.json();
+
+        if (cancelled) return;
+
+        let valid = permitResponse.ok && permit.valid;
+        let expiresAt: number | null = permit.expiresAt ?? null;
+
+        if (!valid && code) {
+          const response = await fetch("/api/qr/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ qr_code: code }),
+            cache: "no-store",
+          });
+
+          const data = await response.json();
+
+          if (cancelled) return;
+
+          valid = response.ok && data.valid;
+
+          if (valid) {
+            const statusResponse = await fetch(`/api/qr/permit?code=${encodeURIComponent(code)}`, {
+              cache: "no-store",
+              credentials: "same-origin",
+            });
+
+            const status = await statusResponse.json();
+
+            if (cancelled) return;
+
+            valid = statusResponse.ok && status.valid;
+            expiresAt = status.expiresAt ?? null;
+          }
+        }
+
+        if (!valid) {
+          setQrState("invalid");
+          return;
+        }
+
+        if (expiresAt !== null) {
+          const remaining = expiresAt - Date.now();
+
+          if (remaining <= 0) {
+            setQrState("invalid");
+            return;
+          }
+
+          expiryTimer = setTimeout(() => {
+            setQrState("invalid");
+            setError("Your registration time has expired. Please scan the current QR code.");
+          }, remaining);
+        }
+
+        setQrState("valid");
+      } catch {
+        if (!cancelled) setQrState("invalid");
+      }
+    }
+
+    void checkQR();
+
+    return () => {
+      cancelled = true;
+      if (expiryTimer) clearTimeout(expiryTimer);
+    };
   }, []);
 
 
@@ -208,7 +276,7 @@ export default function JoinPage() {
               {qrState === "invalid" && (
                 <div className="rounded-2xl border border-[#E4DCD0] bg-[#FFFDF9] p-6 text-center">
                   <h3 className="font-serif text-2xl text-[#2C3028]">
-                    Scan the QR code at reception
+                    This QR code has expired
                   </h3>
                   <p className="mt-3 text-sm leading-6 text-[#807B71]">
                     To join our waitlist, please scan the current QR code
