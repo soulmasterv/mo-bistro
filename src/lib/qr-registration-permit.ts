@@ -22,6 +22,10 @@ export async function issueQRPermit(code: unknown) {
     return false;
   }
 
+  // Reuse a valid permit for this exact QR instead of replacing it.
+  const existing = await getQRPermit(code);
+  if (existing) return true;
+
   const token = randomBytes(32).toString("hex");
   const expiresAt = qr.expiresAt + GRACE_MS;
 
