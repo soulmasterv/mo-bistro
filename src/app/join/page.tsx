@@ -26,7 +26,7 @@ export default function JoinPage() {
   const [qrState, setQrState] = useState<"checking" | "valid" | "invalid">("checking");
 
   useEffect(() => {
-    const code = new URLSearchParams(window.location.search).get("qr") || "";
+    const code = new URLSearchParams(window.location.search).get("code") || "";
     setQrCode(code);
 
     fetch("/api/qr/verify", {
