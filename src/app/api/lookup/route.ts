@@ -1,3 +1,4 @@
+import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getPostgres } from "@/lib/postgres-db";
 import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
@@ -5,6 +6,11 @@ import db from "@/lib/db";
 import { initStaff } from "@/lib/staff-auth";
 
 export async function POST(request: Request) {
+  const limited = await checkRateLimit(
+    request, "booking-lookup", 10, 900
+  );
+  if (limited) return limited;
+
   try {
     const { query } = await request.json();
 

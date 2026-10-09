@@ -1,3 +1,4 @@
+import { checkRateLimit } from "@/lib/api-rate-limit";
 import "server-only";
 
 import { createHash } from "node:crypto";
@@ -21,6 +22,11 @@ function response(error: string, status: number) {
 }
 
 export async function loginPostgres(request: Request) {
+  const limited = await checkRateLimit(
+    request, "staff-login", 10, 900
+  );
+  if (limited) return limited;
+
   try {
     const origin = request.headers.get("origin");
     const host = request.headers.get("host");
