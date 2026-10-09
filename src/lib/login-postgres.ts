@@ -100,29 +100,36 @@ export async function loginPostgres(request: Request) {
       : false;
 
     if (!user || !valid) {
-      const failures =
-        attempt && now - Number(attempt.updated_at) < WINDOW_MS
-          ? attempt.failures + 1
-          : 1;
-
-      const lockedUntil =
-        failures >= MAX_FAILURES ? now + WINDOW_MS : 0;
-
-      await sql`
+      const result = await sql<{ failures: number; locked_until: number }[]>`
         INSERT INTO staff_login_attempts
           (username_hash, failures, locked_until, updated_at)
-        VALUES (${key}, ${failures}, ${lockedUntil}, ${now})
+        VALUES (${key}, 1, 0, ${now})
         ON CONFLICT (username_hash) DO UPDATE SET
-          failures = EXCLUDED.failures,
-          locked_until = EXCLUDED.locked_until,
-          updated_at = EXCLUDED.updated_at
+          failures = CASE
+            WHEN staff_login_attempts.updated_at < ${now - WINDOW_MS}
+              THEN 1
+            ELSE staff_login_attempts.failures + 1
+          END,
+          updated_at = ${now},
+          locked_until = CASE
+            WHEN staff_login_attempts.locked_until > ${now}
+              THEN staff_login_attempts.locked_until
+            WHEN staff_login_attempts.updated_at < ${now - WINDOW_MS}
+              THEN 0
+            WHEN staff_login_attempts.failures + 1 >= ${MAX_FAILURES}
+              THEN ${now + WINDOW_MS}
+            ELSE 0
+          END
+        RETURNING failures, locked_until
       `;
 
+      const locked = Number(result[0].locked_until) > now;
+
       return response(
-        failures >= MAX_FAILURES
+        locked
           ? "Too many login attempts. Try again in 15 minutes."
           : "Incorrect username or credentials.",
-        failures >= MAX_FAILURES ? 429 : 401
+        locked ? 429 : 401
       );
     }
 
