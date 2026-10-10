@@ -1,18 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { LockKeyhole, ShieldCheck } from "lucide-react";
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  ShieldCheck,
+  UtensilsCrossed,
+} from "lucide-react";
+
+type StaffRole = "manager" | "reception" | "waiter";
+
+const destinations: Record<StaffRole, string> = {
+  manager: "/manager",
+  reception: "/",
+  waiter: "/waiter",
+};
 
 export default function LoginPage() {
   const router = useRouter();
+
   const [username, setUsername] = useState("");
   const [credential, setCredential] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (loading) return;
+
     setLoading(true);
     setError("");
 
@@ -20,16 +40,23 @@ export default function LoginPage() {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ username, credential }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Login failed.");
+        throw new Error(result.error || "Unable to sign in.");
       }
 
-      router.replace("/");
+      const role = result.role as StaffRole;
+
+      if (!Object.prototype.hasOwnProperty.call(destinations, role)) {
+        throw new Error("Your account has an unsupported role.");
+      }
+
+      router.replace(destinations[role]);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
@@ -39,55 +66,89 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#0D1218] px-5 text-white">
+    <main className="flex min-h-screen items-center justify-center bg-[#EDECE5] px-4 py-10">
       <form
         onSubmit={submit}
-        noValidate
-        className="w-full max-w-sm rounded-3xl border border-white/10 bg-[#17202A] p-8 shadow-2xl"
+        className="w-full max-w-md rounded-3xl bg-[#2D352A] p-7 text-[#F5F0E7] shadow-2xl sm:p-10"
       >
-        <ShieldCheck className="mb-5 text-[#C5A77B]" size={38} />
-        <p className="text-xs uppercase tracking-[0.3em] text-[#C5A77B]">
-          Restaurant Concierge
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold">Staff Login</h1>
-        <p className="mt-2 text-sm text-slate-400">
-          Managers use their password. Reception staff use their PIN.
-        </p>
+        <div className="mb-8 flex flex-col items-center text-center">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#46513F]">
+            <UtensilsCrossed size={27} className="text-[#D6B681]" />
+          </div>
 
-        <label className="mt-8 block text-sm">
+          <p className="text-xs font-semibold tracking-[0.35em] text-[#D6B681]">
+            MO BISTRO
+          </p>
+
+          <h1 className="mt-5 text-3xl font-semibold">
+            Staff sign in.
+          </h1>
+
+          <p className="mt-3 text-sm text-[#D0D3C9]">
+            Welcome back. Enter your staff credentials.
+          </p>
+        </div>
+
+        <label className="block text-sm font-medium">
           Username
           <input
+            required
+            autoFocus
             value={username}
-            onChange={e => setUsername(e.target.value)}
+            onChange={(event) => setUsername(event.target.value)}
             autoComplete="username"
-            className="mt-2 w-full rounded-xl border border-white/10 bg-[#0D1218] p-3 outline-none focus:border-[#C5A77B]"
+            placeholder="Your username"
+            className="mt-2 min-h-12 w-full rounded-xl border border-transparent bg-[#F5F1E9] px-4 text-[#293126] outline-none placeholder:text-[#81877D] focus:border-[#D6B681]"
           />
         </label>
 
-        <label className="mt-5 block text-sm">
-          Password or PIN
-          <input
-            type="password"
-            value={credential}
-            onChange={e => setCredential(e.target.value)}
-            autoComplete="current-password"
-            className="mt-2 w-full rounded-xl border border-white/10 bg-[#0D1218] p-3 outline-none focus:border-[#C5A77B]"
-          />
+        <label className="mt-5 block text-sm font-medium">
+          Password
+          <div className="relative mt-2">
+            <input
+              required
+              type={showPassword ? "text" : "password"}
+              value={credential}
+              onChange={(event) => setCredential(event.target.value)}
+              autoComplete="current-password"
+              placeholder="Enter your password"
+              className="min-h-12 w-full rounded-xl border border-transparent bg-[#F5F1E9] px-4 pr-14 text-[#293126] outline-none placeholder:text-[#81877D] focus:border-[#D6B681]"
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-[#697366]"
+            >
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+          </div>
         </label>
 
         {error && (
-          <p role="alert" className="mt-4 text-sm text-red-400">
+          <p
+            role="alert"
+            className="mt-5 rounded-xl bg-red-950/40 p-3 text-sm text-red-200"
+          >
             {error}
           </p>
         )}
 
         <button
+          type="submit"
           disabled={loading}
-          className="mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-[#C5A77B] p-4 font-semibold text-[#101820] disabled:opacity-50"
+          className="mt-7 flex min-h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#D6B681] px-5 py-4 font-semibold text-[#293126] transition hover:bg-[#E6C99A] disabled:opacity-60"
         >
-          <LockKeyhole size={17} />
           {loading ? "Signing in..." : "Sign in"}
+          {!loading && <ArrowRight size={19} />}
         </button>
+
+        <div className="mt-7 flex items-center justify-center gap-2 text-xs text-[#D0D3C9]">
+          <ShieldCheck size={15} />
+          Authorized staff only
+          <LockKeyhole size={13} />
+        </div>
       </form>
     </main>
   );

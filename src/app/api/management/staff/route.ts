@@ -12,7 +12,7 @@ import {
 
 const createSchema = z.object({
   username: z.string().regex(/^[a-zA-Z0-9_.-]{3,32}$/),
-  role: z.enum(["manager", "reception", "waiter"]),
+  role: z.enum(["reception", "waiter"]),
   credential: z.string().min(4).max(256),
 });
 
