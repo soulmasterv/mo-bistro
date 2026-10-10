@@ -1,3 +1,4 @@
+import { hasGuestEtaColumn } from "@/lib/guest-eta-support";
 import { getPostgres } from "@/lib/postgres-db";
 import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/api-rate-limit";
@@ -16,6 +17,7 @@ type Guest = {
   status: string;
   confirmed: number;
   created_at: string;
+  eta_at?: string | null;
 };
 
 function findGuest(token: string): Guest | undefined {
@@ -46,8 +48,12 @@ export async function GET(request: Request) {
 
   if (process.env.MO_BISTRO_DB === "postgres") {
     const sql = getPostgres();
-    const guests = await sql<Guest[]>`
-      SELECT id, name, party_size, status, confirmed, created_at
+    const hasEta = await hasGuestEtaColumn();
+    const guests = hasEta ? await sql<Guest[]>`
+      SELECT id, name, party_size, status, confirmed, created_at, eta_at
+      FROM guests WHERE tracking_token_hash = ${hashTrackingToken(token)} LIMIT 1
+    ` : await sql<Guest[]>`
+      SELECT id, name, party_size, status, confirmed, created_at, NULL AS eta_at
       FROM guests WHERE tracking_token_hash = ${hashTrackingToken(token)} LIMIT 1
     `;
     const guest = guests[0];
@@ -98,6 +104,9 @@ export async function GET(request: Request) {
       status: guest.status,
       confirmed: Boolean(guest.confirmed),
       created_at: guest.created_at,
+        eta_at: ["waiting", "called"].includes(guest.status)
+          ? guest.eta_at ?? null
+          : null,
     },
     queue_position: ahead === null ? null : ahead + 1,
     guests_ahead: ahead,

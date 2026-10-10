@@ -1,10 +1,9 @@
 "use client";
+import Link from "next/link";
 import WaiterRequestNotifications from "@/components/waiter-request-notifications";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import {
-  ArrowLeft,
   CheckCircle2,
   Clock3,
   RefreshCw,
@@ -23,6 +22,8 @@ type Filter = "all" | "occupied" | "free";
 
 export default function WaiterPage() {
   const [tables, setTables] = useState<RestaurantTable[]>([]);
+  const [pendingTableIds, setPendingTableIds] = useState<number[]>([]);
+  const [viewMode, setViewMode] = useState<"simple" | "detailed">("detailed");
   const [filter, setFilter] = useState<Filter>("all");
   const [areaFilter, setAreaFilter] = useState<"all" | "indoor" | "outdoor">("all");
   const [loading, setLoading] = useState(true);
@@ -82,6 +83,17 @@ export default function WaiterPage() {
         .filter((table) => Number.isSafeInteger(table.id));
 
       setTables(normalized);
+      const requestResponse = await fetch("/api/waiter/table-requests", {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      if (requestResponse.ok) {
+        const requestData = await requestResponse.json();
+        const pendingIds = (Array.isArray(requestData.requests) ? requestData.requests : [])
+          .filter((request: { status: string }) => request.status === "pending")
+          .map((request: { table_id: number }) => Number(request.table_id));
+        setPendingTableIds(pendingIds);
+      }
       setError("");
       setUnauthorized(false);
     } catch (err) {
@@ -185,13 +197,21 @@ export default function WaiterPage() {
       <header className="bg-[#30362B] px-5 pb-8 pt-6 text-[#F9F4E9] sm:px-8">
         <div className="mx-auto max-w-6xl">
           <div className="flex items-center justify-between gap-3">
-            <Link
-              href="/"
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const response = await fetch("/api/auth/logout", { method: "POST" });
+                  if (!response.ok) throw new Error("Logout failed.");
+                  window.location.href = "/login";
+                } catch {
+                  setError("Could not log out. Please try again.");
+                }
+              }}
               className="flex min-h-11 items-center gap-2 text-sm text-[#E4DDCD]"
             >
-              <ArrowLeft size={18} />
-              Reception
-            </Link>
+              Log Out
+            </button>
 
             <span className="rounded-full border border-[#777D6B] px-3 py-2 text-[10px] font-semibold tracking-[0.2em]">
               DISTRICT 5
@@ -253,6 +273,16 @@ export default function WaiterPage() {
             <RefreshCw size={16} />
             Refresh
           </button>
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center gap-2" role="group" aria-label="Table view mode">
+          {(["simple", "detailed"] as const).map((mode) => (
+            <button key={mode} type="button" onClick={() => setViewMode(mode)}
+              aria-pressed={viewMode === mode}
+              className={`min-h-11 rounded-full px-5 text-sm font-semibold ${viewMode === mode ? "bg-[#30362B] text-white" : "border border-[#D7D3C8] bg-white text-[#30362B]"}`}>
+              {mode === "simple" ? "Simple view" : "Detailed view"}
+            </button>
+          ))}
         </div>
 
         <div className="mt-6 flex gap-2 overflow-x-auto pb-2">
@@ -330,10 +360,23 @@ export default function WaiterPage() {
           <p className="py-12 text-center text-sm text-[#77796F]">
             No tables in this category.
           </p>
+        ) : viewMode === "simple" ? (
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {visible.map((table) => {
+              const pending = table.status === "occupied" && pendingTableIds.includes(table.id);
+              return (
+                <article key={table.id} className={`rounded-xl border p-4 text-center ${pending ? "border-amber-300 bg-amber-50" : table.status === "occupied" ? "border-[#E4CBA8] bg-[#F5E9D8]" : "border-[#CBD8BE] bg-[#E9F0E3]"}`}>
+                  <h3 className="break-words font-semibold">{table.name}</h3>
+                  <p className="mt-2 text-xs">{pending ? "Awaiting approval" : table.status === "occupied" ? "Occupied" : "Available"}</p>
+                </article>
+              );
+            })}
+          </div>
         ) : (
           <div className="mt-5 grid grid-cols-1 gap-3 min-[390px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {visible.map((table) => {
               const isOccupied = table.status === "occupied";
+              const isPending = isOccupied && pendingTableIds.includes(table.id);
 
               return (
                 <article
@@ -370,12 +413,12 @@ export default function WaiterPage() {
                         : "bg-[#E9F0E3] text-[#55704B]"
                     }`}
                   >
-                    {isOccupied ? "Occupied" : "Available"}
+                    {isPending ? "Awaiting reception approval" : isOccupied ? "Occupied" : "Available"}
                   </div>
 
                   <button
                     type="button"
-                    disabled={!isOccupied || busyId !== null}
+                    disabled={!isOccupied || isPending || busyId !== null}
                     onClick={() => setConfirmTable(table)}
                     className={`mt-3 min-h-12 w-full rounded-xl text-sm font-semibold ${
                       isOccupied
@@ -385,6 +428,8 @@ export default function WaiterPage() {
                   >
                     {busyId === table.id
                       ? "Sending request..."
+                      : isPending
+                        ? "Awaiting approval"
                       : isOccupied
                         ? "Request table ready"
                         : "Already ready"}
@@ -407,7 +452,6 @@ export default function WaiterPage() {
           </div>
         </div>
       )}
-      <WaiterRequestNotifications />
       <WaiterRequestNotifications />
     </main>
   );

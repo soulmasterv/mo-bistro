@@ -28,6 +28,7 @@ type Guest = {
   confirmed: number;
   source: string;
   created_at: string;
+  eta_at?: string | null;
 };
 
 type Action = "call" | "seat" | "no_show" | "cancel" | "confirm";
@@ -55,6 +56,73 @@ export default function Home() {
     useState<"indoor" | "outdoor" | "any">("any");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [etaBusy, setEtaBusy] = useState<number | null>(null);
+  const [editingEtaId, setEditingEtaId] = useState<number | null>(null);
+  const [etaMinutes, setEtaMinutes] = useState("20");
+
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  async function updateEta(guest: Guest, minutes: number | null) {
+    setEtaBusy(guest.id);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/guests/${guest.id}/eta`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ minutes }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Unable to update ETA");
+      }
+
+      await loadGuests();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Unable to update ETA");
+    } finally {
+      setEtaBusy(null);
+    }
+  }
+
+  function editEta(guest: Guest) {
+    const remaining = guest.eta_at
+      ? Math.max(
+          1,
+          Math.ceil(
+            (new Date(guest.eta_at).getTime() - Date.now()) / 60000
+          )
+        )
+      : 20;
+
+    setEtaMinutes(String(remaining));
+    setEditingEtaId(guest.id);
+    setError("");
+  }
+
+  function saveEta(guest: Guest) {
+    const value = Number(etaMinutes.trim());
+
+    if (
+      !/^\\d+$/.test(etaMinutes.trim()) ||
+      !Number.isInteger(value) ||
+      value < 1 ||
+      value > 240
+    ) {
+      setError("ETA must be a whole number between 1 and 240 minutes.");
+      return;
+    }
+
+    setEditingEtaId(null);
+    void updateEta(guest, value);
+  }
 
   const loadGuests = useCallback(async () => {
     try {
@@ -294,7 +362,22 @@ export default function Home() {
                           {guest.seating_preference || "any"} seating
                         </span>
                       <span className="flex items-center gap-1"><Clock3 size={13} /> {guest.created_at} UTC</span>
-                      <span>{guest.phone}</span>
+                      <a
+                        href={`tel:${guest.phone.replace(/[^+\d]/g, "")}`}
+                        className="text-[#C5A77B] underline-offset-2 hover:underline"
+                        title={`Call ${guest.name}`}
+                      >
+                        {guest.phone}
+                      </a>
+                      {guest.eta_at && (
+                        <span className="font-medium text-[#C5A77B]">
+                          {new Date(guest.eta_at).getTime() <= now
+                            ? "ETA overdue"
+                            : `ETA: ${Math.ceil(
+                                (new Date(guest.eta_at).getTime() - now) / 60000
+                              )} min remaining`}
+                        </span>
+                      )}
                       {guest.confirmed === 1 && (
                         <span className="text-emerald-300">Confirmed</span>
                       )}
@@ -303,6 +386,75 @@ export default function Home() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  {(guest.status === "waiting" || guest.status === "called") && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={etaBusy !== null}
+                        onClick={() => editEta(guest)}
+                        className="rounded-lg border border-[#C5A77B]/40 px-3 py-2 text-xs text-[#C5A77B] hover:bg-white/10 disabled:opacity-40"
+                      >
+                        {etaBusy === guest.id ? "Saving..." : guest.eta_at ? "Edit ETA" : "Set ETA"}
+                      </button>
+                      {editingEtaId === guest.id && (
+                        <div className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-[#C5A77B]/30 bg-black/20 p-3">
+                          <span className="text-xs text-[#C5A77B]">
+                            Estimated wait:
+                          </span>
+                          {[5, 10, 15, 20, 30, 45].map((minutes) => (
+                            <button
+                              key={minutes}
+                              type="button"
+                              disabled={etaBusy !== null}
+                              onClick={() => {
+                                setEtaMinutes(String(minutes));
+                                setEditingEtaId(null);
+                                void updateEta(guest, minutes);
+                              }}
+                              className="rounded-lg border border-white/20 px-3 py-2 text-xs hover:bg-white/10 disabled:opacity-40"
+                            >
+                              {minutes}m
+                            </button>
+                          ))}
+                          <input
+                            type="number"
+                            min={1}
+                            max={240}
+                            step={1}
+                            value={etaMinutes}
+                            onChange={(event) => setEtaMinutes(event.target.value)}
+                            aria-label="Custom ETA in minutes"
+                            className="w-20 rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm text-white"
+                          />
+                          <button
+                            type="button"
+                            disabled={etaBusy !== null}
+                            onClick={() => saveEta(guest)}
+                            className="rounded-lg bg-[#C5A77B] px-3 py-2 text-xs font-semibold text-black disabled:opacity-40"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingEtaId(null)}
+                            className="rounded-lg border border-white/20 px-3 py-2 text-xs"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                      {guest.eta_at && (
+                        <button
+                          type="button"
+                          disabled={etaBusy !== null}
+                          onClick={() => void updateEta(guest, null)}
+                          className="rounded-lg border border-white/10 px-3 py-2 text-xs hover:bg-white/10 disabled:opacity-40"
+                        >
+                          Clear ETA
+                        </button>
+                      )}
+                    </>
+                  )}
                   <span className={`rounded-full px-3 py-1 text-xs font-medium ${
                     guest.status === "waiting"
                       ? "bg-amber-500/10 text-amber-300"
@@ -316,7 +468,7 @@ export default function Home() {
                       onClick={() => void performAction(guest.id, "call")}
                       className="rounded-lg border border-white/10 px-3 py-2 text-xs hover:bg-white/10 disabled:opacity-40"
                     >
-                      <Phone size={14} className="mr-1 inline" /> Call
+                      <Phone size={14} className="mr-1 inline" /> Mark Called
                     </button>
                   )}
                   <button

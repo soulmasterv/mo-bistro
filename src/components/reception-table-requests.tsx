@@ -36,7 +36,7 @@ export default function ReceptionTableRequests() {
       oscillator.frequency.value = frequency;
       oscillator.type = "sine";
       gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.12, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.3, start + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.25);
       oscillator.connect(gain).connect(ctx.destination);
       oscillator.start(start);
@@ -51,6 +51,7 @@ export default function ReceptionTableRequests() {
       audio.current = ctx;
       soundRef.current = true;
       setSoundEnabled(true);
+      localStorage.setItem("mo-bistro-reception-sound", "on");
       chime();
     } catch {
       setError("Audio is unavailable in this browser.");
@@ -60,6 +61,7 @@ export default function ReceptionTableRequests() {
   function mute() {
     soundRef.current = false;
     setSoundEnabled(false);
+    localStorage.setItem("mo-bistro-reception-sound", "off");
   }
 
   const refresh = useCallback(async () => {
@@ -91,6 +93,31 @@ export default function ReceptionTableRequests() {
     }, 3000);
     return () => clearInterval(timer);
   }, [refresh]);
+
+  useEffect(() => {
+    if (localStorage.getItem("mo-bistro-reception-sound") !== "on") return;
+    let active = true;
+    async function unlock() {
+      try {
+        const ctx = audio.current ?? new AudioContext();
+        await ctx.resume();
+        if (!active) { if (!audio.current) void ctx.close(); return; }
+        audio.current = ctx;
+        soundRef.current = true;
+        setSoundEnabled(true);
+        cleanup();
+      } catch {
+        // A later user interaction can retry.
+      }
+    }
+    function cleanup() {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    }
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    return () => { active = false; cleanup(); };
+  }, []);
 
   useEffect(() => () => { void audio.current?.close(); }, []);
 

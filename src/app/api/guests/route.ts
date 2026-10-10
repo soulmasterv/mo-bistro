@@ -1,3 +1,4 @@
+import { hasGuestEtaColumn } from "@/lib/guest-eta-support";
 import { getPostgres } from "@/lib/postgres-db";
 import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { NextResponse } from "next/server";
@@ -21,9 +22,14 @@ export async function GET() {
   if (denied) return denied;
   if (process.env.MO_BISTRO_DB === "postgres") {
     const sql = getPostgres();
-    const guests = await sql`
+    const hasEta = await hasGuestEtaColumn();
+    const guests = hasEta ? await sql`
       SELECT id, name, phone, party_size, seating_preference, status,
-        confirmed, table_id, created_at, updated_at FROM guests
+        confirmed, table_id, created_at, updated_at, eta_at FROM guests
+      ORDER BY created_at ASC, id ASC
+    ` : await sql`
+      SELECT id, name, phone, party_size, seating_preference, status,
+        confirmed, table_id, created_at, updated_at, NULL AS eta_at FROM guests
       ORDER BY created_at ASC, id ASC
     `;
     return NextResponse.json(guests, { headers: { "Cache-Control": "no-store" } });

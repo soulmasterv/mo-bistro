@@ -112,7 +112,7 @@ export default function TableReadyNotifications() {
   return (
     <div
       aria-live="polite"
-      className="fixed bottom-4 left-4 right-4 z-[110] flex flex-col gap-3 sm:left-auto sm:right-6 sm:w-96"
+      className="mx-auto my-4 flex w-full max-w-6xl flex-col gap-3 px-4 sm:px-8"
     >
       {notices.map((notice) => (
         <div

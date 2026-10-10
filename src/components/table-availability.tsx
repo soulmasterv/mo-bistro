@@ -13,6 +13,7 @@ type Table = {
 
 export default function TableAvailability() {
   const [tables, setTables] = useState<Table[]>([]);
+  const [viewMode, setViewMode] = useState<"simple" | "detailed">("detailed");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<number | null>(null);
 
@@ -38,6 +39,7 @@ export default function TableAvailability() {
 
     try {
       const isOccupied = table.status === "occupied";
+      if (isOccupied) throw new Error("Approve the waiter request to release this table.");
 
       const response = await fetch(
         isOccupied
@@ -87,6 +89,26 @@ export default function TableAvailability() {
         </p>
       )}
 
+      <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Table view mode">
+        {(["simple", "detailed"] as const).map(mode => (
+          <button key={mode} type="button" onClick={() => setViewMode(mode)}
+            aria-pressed={viewMode === mode}
+            className={`min-h-11 rounded-xl px-4 text-sm font-semibold ${viewMode === mode ? "bg-[#C5A77B] text-[#17202A]" : "border border-white/20 text-white"}`}>
+            {mode === "simple" ? "Simple view" : "Detailed view"}
+          </button>
+        ))}
+      </div>
+
+      {viewMode === "simple" ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {tables.map(table => (
+            <div key={table.id} className={`rounded-xl border p-4 text-center ${table.status === "free" ? "border-emerald-700 bg-emerald-950/40" : "border-amber-700 bg-amber-950/40"}`}>
+              <p className="font-semibold">{table.name}</p>
+              <p className="mt-2 text-xs text-slate-300">{table.status === "free" ? "Available" : "Occupied"}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {tables.map(table => (
           <div
@@ -110,7 +132,7 @@ export default function TableAvailability() {
             <p className="text-xs text-slate-400">{table.seats} seats · {table.area}</p>
 
             <button
-              disabled={busy !== null}
+              disabled={busy !== null || table.status === "occupied"}
               onClick={() => void change(table)}
               className="mt-4 w-full rounded-lg border border-white/10 px-3 py-2 text-xs hover:bg-white/10 disabled:opacity-40"
             >
@@ -118,11 +140,13 @@ export default function TableAvailability() {
                 ? "Updating..."
                 : table.status === "free"
                   ? "Mark occupied"
-                  : "Table is free"}
+                  : "Awaiting waiter request"}
             </button>
           </div>
         ))}
       </div>
+
+      )}
 
       {tables.length === 0 && (
         <p className="text-sm text-slate-400">

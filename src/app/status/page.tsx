@@ -22,10 +22,25 @@ type Tracking = {
     status: string;
     confirmed: boolean;
     created_at: string;
+    eta_at?: string | null;
   };
   queue_position: number | null;
   guests_ahead: number | null;
 };
+
+function formatEstimatedWait(minutes: number): string {
+  const total = Math.ceil(Math.max(0, minutes) / 15) * 15;
+  const hours = Math.floor(total / 60);
+  const remaining = total % 60;
+
+  if (hours === 0) return `${remaining} mins`;
+
+  const hourText = `${hours} ${hours === 1 ? "hour" : "hours"}`;
+
+  return remaining === 0
+    ? hourText
+    : `${hourText} ${remaining} mins`;
+}
 
 function StatusContent() {
   const router = useRouter();
@@ -36,6 +51,7 @@ function StatusContent() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
 
   const refresh = useCallback(async () => {
     if (!token) {
@@ -77,6 +93,14 @@ function StatusContent() {
     return () => clearInterval(timer);
   }, [refresh]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
   async function cancel() {
     if (!token || busy) return;
 
@@ -111,6 +135,16 @@ function StatusContent() {
 
   const status = data?.guest.status;
   const active = status === "waiting" || status === "called";
+
+  const etaDeadline = data?.guest.eta_at
+    ? new Date(data.guest.eta_at).getTime()
+    : null;
+
+  const etaRemainingMinutes =
+    etaDeadline !== null && Number.isFinite(etaDeadline)
+      ? Math.ceil((etaDeadline - now) / 60000)
+      : null;
+
 
   const statusText: Record<string, string> = {
     waiting: "You're on the waitlist",
@@ -216,6 +250,25 @@ function StatusContent() {
                     : data.guests_ahead}
                 </strong>
               </div>
+
+              {active && etaRemainingMinutes !== null && (
+                <div className="flex items-center justify-between gap-4 border-b border-[#EAE4D9] pb-3">
+                  <span className="flex items-center gap-2 text-[#77716A]">
+                    <Clock3 size={16} /> Estimated wait
+                  </span>
+                  <strong
+                    className={
+                      etaRemainingMinutes <= 0
+                        ? "text-amber-700"
+                        : "text-[#A78A60]"
+                    }
+                  >
+                    {etaRemainingMinutes <= 0
+                      ? "Estimated wait exceeded"
+                      : formatEstimatedWait(etaRemainingMinutes)}
+                  </strong>
+                </div>
+              )}
 
               <div className="flex justify-between">
                 <span className="text-[#77716A]">

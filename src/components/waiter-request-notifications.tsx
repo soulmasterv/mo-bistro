@@ -20,6 +20,7 @@ export default function WaiterRequestNotifications() {
     if (soundEnabled.current) {
       soundEnabled.current = false;
       setSoundOn(false);
+      localStorage.setItem("mo-bistro-waiter-sound", "off");
       return;
     }
     try {
@@ -28,10 +29,36 @@ export default function WaiterRequestNotifications() {
       audio.current = ctx;
       soundEnabled.current = true;
       setSoundOn(true);
+      localStorage.setItem("mo-bistro-waiter-sound", "on");
     } catch {
       setMessage("Sound is unavailable in this browser.");
     }
   }
+
+  useEffect(() => {
+    if (localStorage.getItem("mo-bistro-waiter-sound") !== "on") return;
+    let active = true;
+    async function unlock() {
+      try {
+        const ctx = audio.current ?? new AudioContext();
+        await ctx.resume();
+        if (!active) { if (!audio.current) void ctx.close(); return; }
+        audio.current = ctx;
+        soundEnabled.current = true;
+        setSoundOn(true);
+        cleanup();
+      } catch {
+        // Retry on the next interaction.
+      }
+    }
+    function cleanup() {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    }
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    return () => { active = false; cleanup(); };
+  }, []);
 
   function chime() {
     const ctx = audio.current;
@@ -42,7 +69,7 @@ export default function WaiterRequestNotifications() {
       const start = ctx.currentTime + index * 0.17;
       oscillator.frequency.value = frequency;
       gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.12, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.3, start + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.25);
       oscillator.connect(gain).connect(ctx.destination);
       oscillator.start(start);
@@ -98,7 +125,7 @@ export default function WaiterRequestNotifications() {
   const pending = requests.filter(item => item.status === "pending");
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 w-[min(360px,calc(100vw-32px))] rounded-2xl border border-[#D6B681] bg-[#30362B] p-4 text-white shadow-xl">
+    <div className="mx-auto my-6 w-full max-w-6xl rounded-2xl border border-[#D6B681] bg-[#30362B] p-4 text-white shadow-xl">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold">My table requests</h2>
         <div className="flex items-center gap-2">
