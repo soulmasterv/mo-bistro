@@ -16,10 +16,11 @@ export async function GET() {
 
   try {
     const requests = await getPostgres()`
-      SELECT r.id, r.table_id, t.name AS table_name,
+      SELECT r.id, r.table_id, r.area,
+             COALESCE(t.name, INITCAP(r.area) || ' area') AS table_name,
              r.status, r.requested_at, r.reviewed_at
       FROM table_ready_requests r
-      JOIN restaurant_tables t ON t.id = r.table_id
+      LEFT JOIN restaurant_tables t ON t.id = r.table_id
       WHERE r.requested_by = ${staff.id}
         AND r.requested_at > NOW() - INTERVAL '24 hours'
       ORDER BY r.requested_at DESC, r.id DESC

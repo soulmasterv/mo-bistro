@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import RestaurantWaitDisplay from "@/components/restaurant-wait-display";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -300,6 +301,10 @@ export default function JoinPage() {
                       : "To join our waitlist, scan the QR code at reception. We look forward to welcoming you."}
                   </p>
                 </div>
+              )}
+
+              {qrState === "valid" && (
+              <RestaurantWaitDisplay />
               )}
 
               {qrState === "valid" && (

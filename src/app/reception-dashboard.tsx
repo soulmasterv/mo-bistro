@@ -6,14 +6,15 @@ import SeatGuestModal from "@/components/seat-guest-modal";
 
 import { Cog } from "lucide-react";
 import TableAvailability from "@/components/table-availability";
+import RestaurantWaitSlider from "@/components/restaurant-wait-slider";
 
 
 import { useCallback, useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Users, Clock3, CheckCircle2, Plus, Phone,
-  Bell, Utensils, Search, QrCode, Settings2,
-  ArrowUpRight, XCircle, UserCheck, RefreshCw
+  Bell, Search, QrCode,
+  ArrowUpRight, XCircle, RefreshCw
 } from "lucide-react";
 
 type GuestStatus = "waiting" | "called" | "seated" | "no_show" | "cancelled";
@@ -56,74 +57,7 @@ export default function Home() {
     useState<"indoor" | "outdoor" | "any">("any");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [etaBusy, setEtaBusy] = useState<number | null>(null);
-  const [editingEtaId, setEditingEtaId] = useState<number | null>(null);
-  const [etaMinutes, setEtaMinutes] = useState("20");
-
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  async function updateEta(guest: Guest, minutes: number | null) {
-    setEtaBusy(guest.id);
-    setError("");
-
-    try {
-      const response = await fetch(`/api/guests/${guest.id}/eta`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ minutes }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Unable to update ETA");
-      }
-
-      await loadGuests();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Unable to update ETA");
-    } finally {
-      setEtaBusy(null);
-    }
-  }
-
-  function editEta(guest: Guest) {
-    const remaining = guest.eta_at
-      ? Math.max(
-          1,
-          Math.ceil(
-            (new Date(guest.eta_at).getTime() - Date.now()) / 60000
-          )
-        )
-      : 20;
-
-    setEtaMinutes(String(remaining));
-    setEditingEtaId(guest.id);
-    setError("");
-  }
-
-  function saveEta(guest: Guest) {
-    const value = Number(etaMinutes.trim());
-
-    if (
-      !/^\\d+$/.test(etaMinutes.trim()) ||
-      !Number.isInteger(value) ||
-      value < 1 ||
-      value > 240
-    ) {
-      setError("ETA must be a whole number between 1 and 240 minutes.");
-      return;
-    }
-
-    setEditingEtaId(null);
-    void updateEta(guest, value);
-  }
-
+  const [addError, setAddError] = useState("");
   const loadGuests = useCallback(async () => {
     try {
       const response = await fetch("/api/guests", { cache: "no-store" });
@@ -186,6 +120,13 @@ export default function Home() {
       }
       return;
     }
+    if (action === "no_show" || action === "cancel") {
+      const guest = guests.find(g => g.id === id);
+      const message = action === "no_show"
+        ? `Mark ${guest?.name || "this guest"} as no-show? They will leave the active queue.`
+        : `Cancel ${guest?.name || "this guest"}'s booking? They will leave the active queue.`;
+      if (!window.confirm(message)) return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -207,7 +148,7 @@ export default function Home() {
   async function addGuest(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
-    setError("");
+    setAddError("");
     try {
       const response = await fetch("/api/guests", {
         method: "POST",
@@ -228,7 +169,7 @@ export default function Home() {
       setShowAdd(false);
       await loadGuests();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to add guest");
+      setAddError(err instanceof Error ? err.message : "Unable to add guest");
     } finally {
       setBusy(false);
     }
@@ -317,7 +258,6 @@ export default function Home() {
           </div>
         )}
 
-        <TableAvailability />
 
         <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#17202A]">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 p-6">
@@ -328,7 +268,7 @@ export default function Home() {
               </p>
             </div>
             <button
-              onClick={() => setShowAdd(true)}
+              onClick={() => { setAddError(""); setShowAdd(true); }}
               className="flex items-center gap-2 rounded-xl bg-[#C5A77B] px-4 py-3 text-sm font-semibold text-[#101820] hover:bg-[#D8BC91]"
             >
               <Plus size={18} /> Add guest
@@ -348,162 +288,130 @@ export default function Home() {
           </div>
 
           <div className="divide-y divide-white/10">
-            {filtered.map((guest) => (
-              <div key={guest.id} className="flex flex-wrap items-center justify-between gap-4 p-5 hover:bg-white/[0.02]">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#C5A77B]/10 font-semibold text-[#C5A77B]">
-                    {guest.name.split(" ").map(s => s[0]).slice(0, 2).join("")}
-                  </div>
-                  <div>
-                    <div className="font-semibold">{guest.name}</div>
-                    <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-400">
-                      <span className="flex items-center gap-1"><Users size={13} /> {guest.party_size} guests</span>
-                        <span className="capitalize text-[#C5A77B]">
-                          {guest.seating_preference || "any"} seating
-                        </span>
-                      <span className="flex items-center gap-1"><Clock3 size={13} /> {guest.created_at} UTC</span>
-                      <a
-                        href={`tel:${guest.phone.replace(/[^+\d]/g, "")}`}
-                        className="text-[#C5A77B] underline-offset-2 hover:underline"
-                        title={`Call ${guest.name}`}
-                      >
-                        {guest.phone}
-                      </a>
-                      {guest.eta_at && (
-                        <span className="font-medium text-[#C5A77B]">
-                          {new Date(guest.eta_at).getTime() <= now
-                            ? "ETA overdue"
-                            : `ETA: ${Math.ceil(
-                                (new Date(guest.eta_at).getTime() - now) / 60000
-                              )} min remaining`}
-                        </span>
-                      )}
-                      {guest.confirmed === 1 && (
-                        <span className="text-emerald-300">Confirmed</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+            {filtered.map((guest) => {
+              const position = active.findIndex(g => g.id === guest.id) + 1;
+              const dialNumber = guest.phone.replace(/[^+\\d]/g, "");
 
-                <div className="flex flex-wrap items-center gap-2">
-                  {(guest.status === "waiting" || guest.status === "called") && (
-                    <>
+              return (
+                <div
+                  key={guest.id}
+                  className="p-4 sm:p-5 hover:bg-white/[0.025]"
+                >
+                  <div className="flex flex-col gap-4">
+
+                    <div className="flex items-start gap-3 sm:gap-4">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#C5A77B] font-bold text-[#101820]">
+                        #{position}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold text-white">
+                            {guest.name}
+                          </h3>
+
+                          <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-slate-300">
+                            {labels[guest.status]}
+                          </span>
+
+                          {guest.confirmed === 1 && (
+                            <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-300">
+                              Confirmed
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="mt-2 text-sm text-slate-400">
+                          {guest.party_size} {guest.party_size === 1 ? "guest" : "guests"}
+                          {" · "}
+                          <span className="capitalize">
+                            {guest.seating_preference || "any"} seating
+                          </span>
+                        </p>
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          Queue position #{position}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                      <a
+                        href={`tel:${dialNumber}`}
+                        aria-label={`Call ${guest.name}`}
+                        className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#C5A77B]/40 px-4 py-2.5 text-sm font-medium text-[#C5A77B] hover:bg-[#C5A77B]/10"
+                      >
+                        <Phone size={16} />
+                        Call Guest
+                      </a>
+
                       <button
                         type="button"
-                        disabled={etaBusy !== null}
-                        onClick={() => editEta(guest)}
-                        className="rounded-lg border border-[#C5A77B]/40 px-3 py-2 text-xs text-[#C5A77B] hover:bg-white/10 disabled:opacity-40"
+                        disabled={busy}
+                        onClick={() => void performAction(guest.id, "seat")}
+                        className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#C5A77B] px-4 py-2.5 text-sm font-semibold text-[#101820] hover:bg-[#D8BC91] disabled:opacity-40"
                       >
-                        {etaBusy === guest.id ? "Saving..." : guest.eta_at ? "Edit ETA" : "Set ETA"}
+                        Seat Guest
                       </button>
-                      {editingEtaId === guest.id && (
-                        <div className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-[#C5A77B]/30 bg-black/20 p-3">
-                          <span className="text-xs text-[#C5A77B]">
-                            Estimated wait:
+                    </div>
+
+                    <details className="group rounded-xl border border-white/10 bg-[#0D1218]/60">
+                      <summary className="cursor-pointer list-none px-4 py-3 text-sm text-slate-300 hover:text-white [&::-webkit-details-marker]:hidden">
+                        <span className="flex items-center justify-between">
+                          More actions
+                          <span className="text-[#C5A77B] group-open:rotate-180">
+                            &#9662;
                           </span>
-                          {[5, 10, 15, 20, 30, 45].map((minutes) => (
-                            <button
-                              key={minutes}
-                              type="button"
-                              disabled={etaBusy !== null}
-                              onClick={() => {
-                                setEtaMinutes(String(minutes));
-                                setEditingEtaId(null);
-                                void updateEta(guest, minutes);
-                              }}
-                              className="rounded-lg border border-white/20 px-3 py-2 text-xs hover:bg-white/10 disabled:opacity-40"
-                            >
-                              {minutes}m
-                            </button>
-                          ))}
-                          <input
-                            type="number"
-                            min={1}
-                            max={240}
-                            step={1}
-                            value={etaMinutes}
-                            onChange={(event) => setEtaMinutes(event.target.value)}
-                            aria-label="Custom ETA in minutes"
-                            className="w-20 rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm text-white"
-                          />
+                        </span>
+                      </summary>
+
+                      <div className="flex flex-wrap gap-2 border-t border-white/10 p-3">
+                        {guest.status === "waiting" && (
                           <button
                             type="button"
-                            disabled={etaBusy !== null}
-                            onClick={() => saveEta(guest)}
-                            className="rounded-lg bg-[#C5A77B] px-3 py-2 text-xs font-semibold text-black disabled:opacity-40"
+                            disabled={busy}
+                            onClick={() => void performAction(guest.id, "call")}
+                            className="rounded-lg border border-white/15 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-40"
                           >
-                            Save
+                            Mark Called
                           </button>
+                        )}
+
+                        {guest.confirmed !== 1 && (
                           <button
                             type="button"
-                            onClick={() => setEditingEtaId(null)}
-                            className="rounded-lg border border-white/20 px-3 py-2 text-xs"
+                            disabled={busy}
+                            onClick={() => void performAction(guest.id, "confirm")}
+                            className="rounded-lg border border-white/15 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-40"
                           >
-                            Cancel
+                            Confirm Booking
                           </button>
-                        </div>
-                      )}
-                      {guest.eta_at && (
+                        )}
+
                         <button
                           type="button"
-                          disabled={etaBusy !== null}
-                          onClick={() => void updateEta(guest, null)}
-                          className="rounded-lg border border-white/10 px-3 py-2 text-xs hover:bg-white/10 disabled:opacity-40"
+                          disabled={busy}
+                          onClick={() => void performAction(guest.id, "no_show")}
+                          className="rounded-lg border border-amber-500/25 px-3 py-2 text-sm text-amber-200 hover:bg-amber-500/10 disabled:opacity-40"
                         >
-                          Clear ETA
+                          No-show
                         </button>
-                      )}
-                    </>
-                  )}
-                  <span className={`rounded-full px-3 py-1 text-xs font-medium ${
-                    guest.status === "waiting"
-                      ? "bg-amber-500/10 text-amber-300"
-                      : "bg-blue-500/10 text-blue-300"
-                  }`}>
-                    {labels[guest.status]}
-                  </span>
-                  {guest.status === "waiting" && (
-                    <button
-                      disabled={busy}
-                      onClick={() => void performAction(guest.id, "call")}
-                      className="rounded-lg border border-white/10 px-3 py-2 text-xs hover:bg-white/10 disabled:opacity-40"
-                    >
-                      <Phone size={14} className="mr-1 inline" /> Mark Called
-                    </button>
-                  )}
-                  <button
-                    disabled={busy}
-                    onClick={() => void performAction(guest.id, "seat")}
-                    className="rounded-lg border border-white/10 px-3 py-2 text-xs hover:bg-white/10 disabled:opacity-40"
-                  >
-                    <Utensils size={14} className="mr-1 inline" /> Seat
-                  </button>
-                  {!guest.confirmed && (
-                    <button
-                      disabled={busy}
-                      onClick={() => void performAction(guest.id, "confirm")}
-                      className="rounded-lg border border-white/10 px-3 py-2 text-xs hover:bg-white/10 disabled:opacity-40"
-                    >
-                      <UserCheck size={14} className="mr-1 inline" /> Confirm
-                    </button>
-                  )}
-                  <button
-                    disabled={busy}
-                    onClick={() => void performAction(guest.id, "no_show")}
-                    className="rounded-lg border border-white/10 px-3 py-2 text-xs hover:bg-white/10 disabled:opacity-40"
-                  >
-                    No-show
-                  </button>
-                  <button
-                    disabled={busy}
-                    onClick={() => void performAction(guest.id, "cancel")}
-                    className="rounded-lg border border-red-500/20 px-3 py-2 text-xs text-red-300 hover:bg-red-500/10 disabled:opacity-40"
-                  >
-                    <XCircle size={14} className="mr-1 inline" /> Cancel
-                  </button>
+
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void performAction(guest.id, "cancel")}
+                          className="rounded-lg border border-red-500/25 px-3 py-2 text-sm text-red-300 hover:bg-red-500/10 disabled:opacity-40"
+                        >
+                          Cancel Booking
+                        </button>
+                      </div>
+                    </details>
+
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {filtered.length === 0 && (
               <p className="p-8 text-center text-sm text-slate-400">
@@ -513,10 +421,15 @@ export default function Home() {
           </div>
         </section>
 
+        <div className="mt-8">
+          <RestaurantWaitSlider />
+        <TableAvailability />
+        </div>
+
         <footer className="mt-8 flex items-center justify-between text-xs text-slate-500">
-          <span>Restaurant Waitlist · Local prototype</span>
+          <span>Mo Bistro · Reception</span>
           <span className="flex items-center gap-1">
-            <ArrowUpRight size={13} /> SQLite connected · Auto-refresh 5s
+            <ArrowUpRight size={13} /> Auto-refresh every 5s
           </span>
         </footer>
       </div>
@@ -588,6 +501,11 @@ export default function Home() {
               </button>
             </div>
             <form onSubmit={addGuest} className="space-y-4">
+              {addError && (
+                <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+                  {addError}
+                </div>
+              )}
               <label className="block text-sm">
                 Full name
                 <input

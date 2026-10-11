@@ -23,6 +23,8 @@ type Filter = "all" | "occupied" | "free";
 export default function WaiterPage() {
   const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [pendingTableIds, setPendingTableIds] = useState<number[]>([]);
+  const [pendingAreas, setPendingAreas] = useState<string[]>([]);
+  const [busyArea, setBusyArea] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"simple" | "detailed">("detailed");
   const [filter, setFilter] = useState<Filter>("all");
   const [areaFilter, setAreaFilter] = useState<"all" | "indoor" | "outdoor">("all");
@@ -83,6 +85,18 @@ export default function WaiterPage() {
         .filter((table) => Number.isSafeInteger(table.id));
 
       setTables(normalized);
+
+      const modeResponse = await fetch("/api/table-view-mode", {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+
+      if (!modeResponse.ok) {
+        throw new Error("Could not load manager table-view setting.");
+      }
+
+      const modeData = await modeResponse.json();
+      setViewMode(modeData.mode === "simple" ? "simple" : "detailed");
       const requestResponse = await fetch("/api/waiter/table-requests", {
         cache: "no-store",
         credentials: "same-origin",
@@ -93,6 +107,13 @@ export default function WaiterPage() {
           .filter((request: { status: string }) => request.status === "pending")
           .map((request: { table_id: number }) => Number(request.table_id));
         setPendingTableIds(pendingIds);
+        setPendingAreas(
+          (Array.isArray(requestData.requests) ? requestData.requests : [])
+            .filter((request: { status: string; area?: string }) =>
+              request.status === "pending" && !!request.area
+            )
+            .map((request: { area: string }) => request.area)
+        );
       }
       setError("");
       setUnauthorized(false);
@@ -156,6 +177,36 @@ export default function WaiterPage() {
       ),
     [tables, filter, areaFilter]
   );
+
+  async function requestAreaReady(area: "indoor" | "outdoor") {
+    if (busyArea || pendingAreas.includes(area)) return;
+
+    setBusyArea(area);
+    setError("");
+    setNotice("");
+
+    try {
+      const response = await fetch("/api/waiter/area-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ area }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result.error || "Unable to send area request.");
+      }
+
+      setNotice(`${area === "indoor" ? "Indoor" : "Outdoor"} request sent to Reception.`);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Request failed.");
+    } finally {
+      setBusyArea(null);
+    }
+  }
 
   async function markReady(table: RestaurantTable) {
     if (busyId !== null || table.status !== "occupied") return;
@@ -275,15 +326,10 @@ export default function WaiterPage() {
           </button>
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center gap-2" role="group" aria-label="Table view mode">
-          {(["simple", "detailed"] as const).map((mode) => (
-            <button key={mode} type="button" onClick={() => setViewMode(mode)}
-              aria-pressed={viewMode === mode}
-              className={`min-h-11 rounded-full px-5 text-sm font-semibold ${viewMode === mode ? "bg-[#30362B] text-white" : "border border-[#D7D3C8] bg-white text-[#30362B]"}`}>
-              {mode === "simple" ? "Simple view" : "Detailed view"}
-            </button>
-          ))}
-        </div>
+        <p className="mt-5 text-xs text-[#77796F]">
+          {viewMode === "simple" ? "Simple view" : "Detailed view"}
+          {" · "}Controlled by management
+        </p>
 
         <div className="mt-6 flex gap-2 overflow-x-auto pb-2">
           {(
@@ -361,13 +407,43 @@ export default function WaiterPage() {
             No tables in this category.
           </p>
         ) : viewMode === "simple" ? (
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {visible.map((table) => {
-              const pending = table.status === "occupied" && pendingTableIds.includes(table.id);
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            {(["indoor", "outdoor"] as const).map(area => {
+              const areaTables = tables.filter(table => table.area === area);
+              const areaFree = areaTables.filter(table => table.status === "free").length;
+              const areaOccupied = areaTables.filter(table => table.status === "occupied").length;
+
               return (
-                <article key={table.id} className={`rounded-xl border p-4 text-center ${pending ? "border-amber-300 bg-amber-50" : table.status === "occupied" ? "border-[#E4CBA8] bg-[#F5E9D8]" : "border-[#CBD8BE] bg-[#E9F0E3]"}`}>
-                  <h3 className="break-words font-semibold">{table.name}</h3>
-                  <p className="mt-2 text-xs">{pending ? "Awaiting approval" : table.status === "occupied" ? "Occupied" : "Available"}</p>
+                <article
+                  key={area}
+                  className="rounded-2xl border border-[#DDD8CB] bg-[#FFFCF7] p-5 shadow-sm"
+                >
+                  <h3 className="font-serif text-2xl capitalize">{area}</h3>
+                  <p className="mt-4 text-3xl font-semibold text-[#55704B]">
+                    {areaFree}
+                    <span className="ml-2 text-sm font-normal text-[#77796F]">
+                      available
+                    </span>
+                  </p>
+                  <p className="mt-2 text-sm text-[#77796F]">
+                    {areaOccupied} occupied · {areaTables.length} total
+                  </p>
+                  <button
+                    type="button"
+                    disabled={
+                      areaOccupied === 0 ||
+                      busyArea !== null ||
+                      pendingAreas.includes(area)
+                    }
+                    onClick={() => void requestAreaReady(area)}
+                    className="mt-5 min-h-12 w-full rounded-xl bg-[#30362B] px-3 text-sm font-semibold text-white disabled:opacity-40"
+                  >
+                    {busyArea === area
+                      ? "Sending..."
+                      : pendingAreas.includes(area)
+                        ? "Awaiting Reception approval"
+                        : `Table empty — ${area === "indoor" ? "Indoor" : "Outdoor"}`}
+                  </button>
                 </article>
               );
             })}

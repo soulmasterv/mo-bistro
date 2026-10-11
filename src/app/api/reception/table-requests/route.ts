@@ -20,14 +20,15 @@ export async function GET() {
       SELECT
         r.id,
         r.table_id,
+        r.area AS request_area,
         r.status,
         r.requested_at,
-        t.name AS table_name,
-        t.area,
+        COALESCE(t.name, INITCAP(r.area) || ' area') AS table_name,
+        COALESCE(t.area, r.area) AS area,
         t.seats,
         u.username AS requested_by
       FROM table_ready_requests r
-      JOIN restaurant_tables t ON t.id = r.table_id
+      LEFT JOIN restaurant_tables t ON t.id = r.table_id
       JOIN staff_users u ON u.id = r.requested_by
       WHERE r.status = 'pending'
       ORDER BY r.requested_at ASC

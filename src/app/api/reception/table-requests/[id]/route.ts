@@ -59,7 +59,7 @@ export async function PATCH(
       await tx`SELECT pg_advisory_xact_lock(741122)`;
 
       const [pending] = await tx`
-        SELECT id, table_id, status
+        SELECT id, table_id, area, status
         FROM table_ready_requests
         WHERE id = ${requestId}
         FOR UPDATE
@@ -74,10 +74,22 @@ export async function PATCH(
       }
 
       if (action === "approve") {
+        let selectedTableId = pending.table_id;
+
+        if (pending.area) {
+          const supplied = Number(body?.table_id);
+
+          if (!Number.isSafeInteger(supplied) || supplied < 1) {
+            return { error: "Select an occupied table before approving", status: 400 };
+          }
+
+          selectedTableId = supplied;
+        }
+
         const [table] = await tx`
-          SELECT id, status
+          SELECT id, status, area
           FROM restaurant_tables
-          WHERE id = ${pending.table_id}
+          WHERE id = ${selectedTableId}
           FOR UPDATE
         `;
 
@@ -85,25 +97,29 @@ export async function PATCH(
           return { error: "Table is no longer occupied", status: 409 };
         }
 
+        if (pending.area && String(table.area).toLowerCase() !== pending.area) {
+          return { error: "Selected table is in the wrong area", status: 409 };
+        }
+
         // Preserve the existing releaseTablePostgres behavior.
         await tx`
           UPDATE seating_history
           SET released_at = CURRENT_TIMESTAMP
-          WHERE table_id = ${pending.table_id}
+          WHERE table_id = ${selectedTableId}
             AND released_at IS NULL
         `;
 
         await tx`
           UPDATE guests
           SET table_id = NULL, updated_at = CURRENT_TIMESTAMP
-          WHERE table_id = ${pending.table_id}
+          WHERE table_id = ${selectedTableId}
             AND status = 'seated'
         `;
 
         await tx`
           UPDATE restaurant_tables
           SET status = 'free', updated_at = CURRENT_TIMESTAMP
-          WHERE id = ${pending.table_id}
+          WHERE id = ${selectedTableId}
         `;
       }
 
@@ -120,7 +136,8 @@ export async function PATCH(
       return {
         success: true,
         request_id: requestId,
-        status: newStatus
+        status: newStatus,
+        table_id: action === "approve" ? Number(body?.table_id || pending.table_id) : pending.table_id
       };
     });
 

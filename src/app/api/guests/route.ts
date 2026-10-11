@@ -75,8 +75,8 @@ export async function POST(request: Request) {
         `;
         if (existing.length) return null;
         const created = await tx`
-          INSERT INTO guests (name, phone, party_size, seating_preference)
-          VALUES (${name}, ${phone}, ${party_size}, ${seating_preference})
+          INSERT INTO guests (name, phone, party_size, seating_preference, confirmed)
+          VALUES (${name}, ${phone}, ${party_size}, ${seating_preference}, 1)
           RETURNING id
         `;
         return created[0];
@@ -100,8 +100,8 @@ export async function POST(request: Request) {
     }
 
     const result = db.prepare(`
-      INSERT INTO guests (name, phone, party_size, seating_preference)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO guests (name, phone, party_size, seating_preference, confirmed)
+      VALUES (?, ?, ?, ?, 1)
     `).run(name, phone, party_size, seating_preference);
 
     return NextResponse.json(

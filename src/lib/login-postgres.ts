@@ -68,90 +68,113 @@ export async function loginPostgres(request: Request) {
 
     const now = Date.now();
 
-    const attempts = await sql<{
-      failures: number;
-      locked_until: number;
-      updated_at: number;
-    }[]>`
-      SELECT failures, locked_until, updated_at
-      FROM staff_login_attempts
-      WHERE username_hash = ${key}
-    `;
 
-    const attempt = attempts[0];
-
-    if (attempt && Number(attempt.locked_until) > now) {
-      return response(
-        "Too many login attempts. Try again in 15 minutes.",
-        429
-      );
-    }
-
-    const users = await sql<{
-      id: number;
-      username: string;
-      role: StaffRole;
-      credential_hash: string;
-    }[]>`
-      SELECT id, username, role, credential_hash
-      FROM staff_users
-      WHERE LOWER(username) = ${normalized}
-        AND active = 1
-      LIMIT 1
-    `;
-
-    const user = users[0];
-    const valid = user
-      ? verifyCredential(credential, user.credential_hash)
-      : false;
-
-    if (!user || !valid) {
-      const result = await sql<{ failures: number; locked_until: number }[]>`
-        INSERT INTO staff_login_attempts
-          (username_hash, failures, locked_until, updated_at)
-        VALUES (${key}, 1, 0, ${now})
-        ON CONFLICT (username_hash) DO UPDATE SET
-          failures = CASE
-            WHEN staff_login_attempts.updated_at < ${now - WINDOW_MS}
-              THEN 1
-            ELSE staff_login_attempts.failures + 1
-          END,
-          updated_at = ${now},
-          locked_until = CASE
-            WHEN staff_login_attempts.locked_until > ${now}
-              THEN staff_login_attempts.locked_until
-            WHEN staff_login_attempts.updated_at < ${now - WINDOW_MS}
-              THEN 0
-            WHEN staff_login_attempts.failures + 1 >= ${MAX_FAILURES}
-              THEN ${now + WINDOW_MS}
-            ELSE 0
-          END
-        RETURNING failures, locked_until
+    const outcome = await sql.begin(async tx => {
+      await tx`
+        SELECT pg_advisory_xact_lock(
+          hashtext(${`staff-pin:${key}`})::bigint
+        )
       `;
 
-      const locked = Number(result[0].locked_until) > now;
+      const attempts = await tx<{
+        failures: number;
+        locked_until: number;
+        updated_at: number;
+      }[]>`
+        SELECT failures, locked_until, updated_at
+        FROM staff_login_attempts
+        WHERE username_hash = ${key}
+      `;
 
-      return response(
-        locked
-          ? "Too many login attempts. Try again in 15 minutes."
-          : "Incorrect username or credentials.",
-        locked ? 429 : 401
-      );
+      const attempt = attempts[0];
+
+      if (attempt && Number(attempt.locked_until) > now) {
+        return {
+          ok: false as const,
+          status: 429,
+          message: "Too many login attempts. Try again in 15 minutes.",
+        };
+      }
+
+      const users = await tx<{
+        id: number;
+        username: string;
+        role: StaffRole;
+        credential_hash: string;
+      }[]>`
+        SELECT id, username, role, credential_hash
+        FROM staff_users
+        WHERE LOWER(username) = ${normalized}
+          AND active = 1
+        LIMIT 1
+      `;
+
+      const user = users[0];
+
+      const valid = user
+        ? verifyCredential(credential, user.credential_hash)
+        : false;
+
+      if (!user || !valid) {
+        const result = await tx<{
+          locked_until: number;
+        }[]>`
+          INSERT INTO staff_login_attempts
+            (username_hash, failures, locked_until, updated_at)
+          VALUES (${key}, 1, 0, ${now})
+          ON CONFLICT (username_hash) DO UPDATE SET
+            failures = CASE
+              WHEN staff_login_attempts.updated_at < ${now - WINDOW_MS}
+                THEN 1
+              ELSE staff_login_attempts.failures + 1
+            END,
+            updated_at = ${now},
+            locked_until = CASE
+              WHEN staff_login_attempts.locked_until > ${now}
+                THEN staff_login_attempts.locked_until
+              WHEN staff_login_attempts.updated_at < ${now - WINDOW_MS}
+                THEN 0
+              WHEN staff_login_attempts.failures + 1 >= ${MAX_FAILURES}
+                THEN ${now + WINDOW_MS}
+              ELSE 0
+            END
+          RETURNING locked_until
+        `;
+
+        const locked = Number(result[0].locked_until) > now;
+
+        return {
+          ok: false as const,
+          status: locked ? 429 : 401,
+          message: locked
+            ? "Too many login attempts. Try again in 15 minutes."
+            : "Incorrect username or credentials.",
+        };
+      }
+
+      await tx`
+        DELETE FROM staff_login_attempts
+        WHERE username_hash = ${key}
+      `;
+
+      return {
+        ok: true as const,
+        user,
+      };
+    });
+
+    if (!outcome.ok) {
+      return response(outcome.message, outcome.status);
     }
 
-    await sql`
-      DELETE FROM staff_login_attempts
-      WHERE username_hash = ${key}
-    `;
-
-    const session = await createSessionPostgres(user.id);
+    const session = await createSessionPostgres(outcome.user.id);
     await setSessionCookie(session.token, session.expiresAt);
 
     return NextResponse.json(
       {
         success: true,
-        role: user.role,
-        username: user.username,
+        role: outcome.user.role,
+        username: outcome.user.username,
       },
       { headers: { "Cache-Control": "no-store" } }
     );

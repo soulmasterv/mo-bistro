@@ -5,7 +5,8 @@ import SeatGuestModal from "@/components/seat-guest-modal";
 
 type RequestItem = {
   id: number;
-  table_id: number;
+  table_id: number | null;
+  request_area?: "indoor" | "outdoor" | null;
   table_name?: string;
   requested_by?: string;
   requested_at?: string;
@@ -16,6 +17,17 @@ type ApprovedTable = { name: string; guest: SuggestedGuest | null };
 
 export default function ReceptionTableRequests() {
   const [requests, setRequests] = useState<RequestItem[]>([]);
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
+  const [unreadRequestCount, setUnreadRequestCount] = useState(0);
+  const knownRequestIds = useRef<Set<number> | null>(null);
+  const notificationPanelOpenRef = useRef(false);
+  const [tables, setTables] = useState<Array<{
+    id: number;
+    name: string;
+    area: string;
+    status: string;
+  }>>([]);
+  const [selectedTables, setSelectedTables] = useState<Record<number, number>>({});
   const [approved, setApproved] = useState<ApprovedTable | null>(null);
   const [seatingGuest, setSeatingGuest] = useState<SuggestedGuest | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(false);
@@ -79,7 +91,34 @@ export default function ReceptionTableRequests() {
         chime();
       }
       seen.current = ids;
+      const currentIds = new Set<number>(
+        list.map((item: RequestItem) => Number(item.id))
+      );
+
+      if (knownRequestIds.current !== null) {
+        const newCount = [...currentIds].filter(
+          id => !knownRequestIds.current!.has(id)
+        ).length;
+
+        if (newCount > 0) {
+          setNotificationPanelOpen(true);
+          notificationPanelOpenRef.current = true;
+          setUnreadRequestCount(previous => previous + newCount);
+        }
+      }
+
+      knownRequestIds.current = currentIds;
       setRequests(list);
+
+      const tablesResponse = await fetch("/api/tables", {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+
+      if (tablesResponse.ok) {
+        const tableData = await tablesResponse.json();
+        setTables(Array.isArray(tableData) ? tableData : tableData.tables ?? []);
+      }
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to refresh requests.");
@@ -123,26 +162,83 @@ export default function ReceptionTableRequests() {
 
   async function review(id: number, decision: "approve" | "reject") {
     if (busyId !== null) return;
+    const item = requests.find(entry => entry.id === id);
+
+    if (decision === "approve" && item?.request_area && !selectedTables[id]) {
+      setError("Select the occupied table to release.");
+      return;
+    }
+
     setBusyId(id);
     try {
+      if (decision === "approve" && item?.request_area) {
+        const latestResponse = await fetch("/api/tables", {
+          cache: "no-store",
+          credentials: "same-origin",
+        });
+
+        if (!latestResponse.ok) {
+          throw new Error("Unable to verify current table availability.");
+        }
+
+        const latestData = await latestResponse.json();
+        const latestTables = Array.isArray(latestData)
+          ? latestData
+          : Array.isArray(latestData.tables)
+            ? latestData.tables
+            : [];
+
+        const selected = latestTables.find(
+          (table: { id: number; status: string; area: string }) =>
+            Number(table.id) === selectedTables[id]
+        );
+
+        if (
+          !selected ||
+          selected.status !== "occupied" ||
+          String(selected.area).toLowerCase() !== item.request_area
+        ) {
+          setTables(latestTables);
+          setSelectedTables(previous => {
+            const next = { ...previous };
+            delete next[id];
+            return next;
+          });
+          throw new Error(
+            "That table is no longer occupied. Select another occupied table."
+          );
+        }
+      }
+
       const response = await fetch(`/api/reception/table-requests/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ action: decision }),
+        body: JSON.stringify({
+          action: decision,
+          ...(item?.request_area
+            ? { table_id: selectedTables[id] }
+            : {}),
+        }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Request update failed.");
       await refresh();
       if (decision === "approve") {
-        const item = requests.find(entry => entry.id === id);
         if (item) {
-          setApproved({ name: item.table_name || `Table ${item.table_id}`, guest: null });
+          const actualId = item.request_area
+            ? selectedTables[id]
+            : item.table_id;
+
+          const actualTable = tables.find(table => table.id === actualId);
+          const actualName = actualTable?.name || item.table_name || `Table ${actualId}`;
+
+          setApproved({ name: actualName, guest: null });
           try {
-            const next = await fetch(`/api/reception/next-guest?table_id=${item.table_id}`, { cache: "no-store" });
+            const next = await fetch(`/api/reception/next-guest?table_id=${actualId}`, { cache: "no-store" });
             if (!next.ok) throw new Error("Unable to check the guest queue.");
             const data = await next.json();
-            setApproved({ name: item.table_name || `Table ${item.table_id}`, guest: data.guest ?? null });
+            setApproved({ name: actualName, guest: data.guest ?? null });
           } catch {
             setError("Table approved, but the next guest could not be checked. Use the regular reception queue.");
           }
@@ -158,26 +254,97 @@ export default function ReceptionTableRequests() {
   return (
     <>
     {approved && (
-      <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
-        <div role="dialog" aria-modal="true" aria-label="Table approved" className="w-full max-w-sm rounded-2xl bg-[#FFFCF7] p-6 text-[#293126] shadow-2xl">
-          <h2 className="font-serif text-3xl">Table is free!</h2>
-          <p className="mt-2 text-sm">{approved.name} is available for the next guest.</p>
-          {approved.guest ? (
-            <div className="mt-5 rounded-xl bg-[#F1EBDF] p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider">Next eligible guest</p>
-              <p className="mt-2 text-xl font-semibold">{approved.guest.name}</p>
-              <p className="text-sm">{approved.guest.party_size} guests · {approved.guest.seating_preference}</p>
-              <button onClick={() => { setSeatingGuest(approved.guest); setApproved(null); }} className="mt-4 w-full rounded-xl bg-[#293126] p-3 font-semibold text-white">Seat Guest</button>
-            </div>
-          ) : (
-            <p className="mt-4 text-sm">No eligible guests currently waiting for this table.</p>
-          )}
-          <button onClick={() => setApproved(null)} className="mt-4 w-full rounded-xl border border-[#C9C8BD] p-3 font-semibold">Close</button>
+      <aside
+        role="status"
+        aria-live="polite"
+        className="fixed right-4 top-4 z-[90] w-[min(380px,calc(100vw-32px))] rounded-2xl border border-[#D6B681] bg-[#FFFCF7] p-5 text-[#293126] shadow-2xl"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-serif text-2xl">Table is free!</h2>
+            <p className="mt-1 text-sm">
+              {approved.name} is available for the next guest.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setApproved(null)}
+            aria-label="Close confirmation"
+            className="rounded-lg border border-[#C9C8BD] px-3 py-1.5 text-sm"
+          >
+            ✕
+          </button>
         </div>
-      </div>
+
+        {approved.guest ? (
+          <div className="mt-4 rounded-xl bg-[#F1EBDF] p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider">
+              Next eligible guest
+            </p>
+
+            <p className="mt-2 text-lg font-semibold">
+              {approved.guest.name}
+            </p>
+
+            <p className="text-sm">
+              {approved.guest.party_size} guests ·{" "}
+              {approved.guest.seating_preference}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSeatingGuest(approved.guest);
+                setApproved(null);
+              }}
+              className="mt-4 min-h-11 w-full rounded-xl bg-[#293126] px-4 font-semibold text-white"
+            >
+              Seat Guest
+            </button>
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-[#666A60]">
+            No eligible guests currently waiting for this table.
+          </p>
+        )}
+      </aside>
     )}
     {seatingGuest && <SeatGuestModal guest={seatingGuest} onClose={() => setSeatingGuest(null)} onSuccess={() => { setSeatingGuest(null); window.dispatchEvent(new Event("guest-seated")); }} />}
-    <section className="fixed bottom-4 right-4 z-50 w-[min(420px,calc(100vw-32px))] rounded-2xl border border-[#D6B681] bg-[#293126] p-5 text-white shadow-2xl">
+
+    <div className="fixed bottom-4 right-4 z-[60] flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => {
+          const next = !notificationPanelOpenRef.current;
+          notificationPanelOpenRef.current = next;
+          setNotificationPanelOpen(next);
+
+          if (next) setUnreadRequestCount(0);
+        }}
+        aria-label="Toggle table-ready notifications"
+        aria-controls="table-request-notifications"
+        aria-expanded={notificationPanelOpen}
+        className="flex min-h-12 items-center gap-2 rounded-full bg-[#293126] px-5 py-3 text-sm font-semibold text-white shadow-xl"
+      >
+        <span className="relative" aria-hidden="true">
+          🔔
+          {unreadRequestCount > 0 && (
+            <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              {unreadRequestCount > 9 ? "9+" : unreadRequestCount}
+            </span>
+          )}
+        </span>
+        <span>
+          {requests.length > 0
+            ? `${requests.length} pending`
+            : "Requests"}
+        </span>
+      </button>
+    </div>
+
+    {notificationPanelOpen && (
+    <section id="table-request-notifications" className="fixed bottom-20 right-4 z-50 w-[min(420px,calc(100vw-32px))] rounded-2xl border border-[#D6B681] bg-[#293126] p-5 text-white shadow-2xl">
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-semibold">Table-ready requests ({requests.length})</h2>
         <button onClick={soundEnabled ? mute : () => void enableSound()} className="rounded-lg border border-white/20 px-3 py-2 text-xs">
@@ -193,6 +360,32 @@ export default function ReceptionTableRequests() {
             <div key={item.id} className="rounded-xl bg-white/10 p-4">
               <p className="font-semibold">{item.table_name || `Table ${item.table_id}`}</p>
               <p className="mt-1 text-xs text-slate-300">Requested by {item.requested_by || "staff"}</p>
+
+              {item.request_area && (
+                <label className="mt-3 block text-xs text-white">
+                  Select the occupied {item.request_area} table
+                  <select
+                    value={selectedTables[item.id] || ""}
+                    onChange={event => setSelectedTables(previous => ({
+                      ...previous,
+                      [item.id]: Number(event.target.value),
+                    }))}
+                    className="mt-2 w-full rounded-lg bg-white p-3 text-sm text-[#293126]"
+                  >
+                    <option value="">Choose table...</option>
+                    {tables
+                      .filter(table =>
+                        table.area?.toLowerCase() === item.request_area &&
+                        table.status === "occupied"
+                      )
+                      .map(table => (
+                        <option key={table.id} value={table.id}>
+                          {table.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              )}
               <div className="mt-3 flex gap-2">
                 <button disabled={busyId !== null} onClick={() => void review(item.id, "approve")} className="flex-1 rounded-lg bg-[#D6B681] p-3 font-semibold text-[#293126] disabled:opacity-50">Approve</button>
                 <button disabled={busyId !== null} onClick={() => void review(item.id, "reject")} className="flex-1 rounded-lg border border-white/30 p-3 disabled:opacity-50">Reject</button>
@@ -202,6 +395,8 @@ export default function ReceptionTableRequests() {
         </div>
       )}
     </section>
+    )}
+
     </>
   );
 }
