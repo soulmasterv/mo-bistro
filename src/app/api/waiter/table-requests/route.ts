@@ -16,9 +16,14 @@ export async function GET() {
 
   try {
     const requests = await getPostgres()`
-      SELECT r.id, r.table_id, r.area,
-             COALESCE(t.name, INITCAP(r.area) || ' area') AS table_name,
-             r.status, r.requested_at, r.reviewed_at
+      SELECT
+        r.id,
+        r.table_id,
+        COALESCE(t.area, NULLIF(to_jsonb(r)->>'area', '')) AS area,
+        COALESCE(t.name, INITCAP(NULLIF(to_jsonb(r)->>'area', '')) || ' area') AS table_name,
+        r.status,
+        r.requested_at,
+        r.reviewed_at
       FROM table_ready_requests r
       LEFT JOIN restaurant_tables t ON t.id = r.table_id
       WHERE r.requested_by = ${staff.id}

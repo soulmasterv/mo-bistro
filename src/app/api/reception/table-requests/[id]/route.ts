@@ -59,7 +59,7 @@ export async function PATCH(
       await tx`SELECT pg_advisory_xact_lock(741122)`;
 
       const [pending] = await tx`
-        SELECT id, table_id, area, status
+        SELECT id, table_id, NULLIF(to_jsonb(table_ready_requests)->>'area', '') AS area, status
         FROM table_ready_requests
         WHERE id = ${requestId}
         FOR UPDATE

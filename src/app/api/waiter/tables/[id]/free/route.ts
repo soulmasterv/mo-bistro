@@ -9,7 +9,7 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   const staff = await currentStaff();
-  if (!staff || !["manager","reception"].includes(staff.role)) {
+  if (!staff || !["manager","reception","waiter"].includes(staff.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const licenseError = await requireActiveLicense();

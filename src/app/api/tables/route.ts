@@ -78,29 +78,6 @@ export async function PATCH(request: Request) {
     );
   }
 
-  if (process.env.MO_BISTRO_DB === "postgres") {
-    const rows = await getPostgres()`
-      UPDATE restaurant_tables
-      SET status='occupied', updated_at=CURRENT_TIMESTAMP
-      WHERE id=${body.id}
-      RETURNING id
-    `;
-    return NextResponse.json(
-      rows.length ? { success: true, status: "occupied" } : { error: "Table not found" },
-      { status: rows.length ? 200 : 404 }
-    );
-  }
-
-  if (process.env.MO_BISTRO_DB === "postgres") {
-    const rows = await getPostgres()`
-      UPDATE restaurant_tables SET status='occupied',updated_at=CURRENT_TIMESTAMP
-      WHERE id=${body.id} RETURNING id
-    `;
-    return NextResponse.json(rows.length
-      ? { success: true, status: "occupied" }
-      : { error: "Table not found" }, { status: rows.length ? 200 : 404 });
-  }
-
   initializeTables();
 
   const result = db.prepare(`

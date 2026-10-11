@@ -20,16 +20,16 @@ export async function GET() {
       SELECT
         r.id,
         r.table_id,
-        r.area AS request_area,
+        NULLIF(to_jsonb(r)->>'area', '') AS request_area,
         r.status,
         r.requested_at,
-        COALESCE(t.name, INITCAP(r.area) || ' area') AS table_name,
-        COALESCE(t.area, r.area) AS area,
+        COALESCE(t.name, INITCAP(NULLIF(to_jsonb(r)->>'area', '')) || ' area') AS table_name,
+        COALESCE(t.area, NULLIF(to_jsonb(r)->>'area', '')) AS area,
         t.seats,
-        u.username AS requested_by
+        COALESCE(u.username, 'Staff') AS requested_by
       FROM table_ready_requests r
       LEFT JOIN restaurant_tables t ON t.id = r.table_id
-      JOIN staff_users u ON u.id = r.requested_by
+      LEFT JOIN staff_users u ON u.id = r.requested_by
       WHERE r.status = 'pending'
       ORDER BY r.requested_at ASC
     `;

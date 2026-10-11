@@ -8,9 +8,9 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const staff = await currentStaff();
-  if (!staff || staff.role !== "waiter") {
+  if (!staff || !["waiter", "manager"].includes(staff.role)) {
     return NextResponse.json(
-      { error: "Waiter access required" },
+      { error: "Waiter or manager access required" },
       { status: 403 }
     );
   }

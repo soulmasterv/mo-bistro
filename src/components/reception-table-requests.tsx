@@ -82,7 +82,10 @@ export default function ReceptionTableRequests() {
         cache: "no-store",
         credentials: "same-origin",
       });
-      if (!response.ok) throw new Error("Unable to load table requests.");
+      if (!response.ok) {
+        const failure = await response.json().catch(() => ({}));
+        throw new Error(failure.error || "Unable to load table requests.");
+      }
       const data = await response.json();
       const list: RequestItem[] = Array.isArray(data) ? data :
         Array.isArray(data.requests) ? data.requests : [];
@@ -222,7 +225,12 @@ export default function ReceptionTableRequests() {
         }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Request update failed.");
+      if (!response.ok) {
+        await refresh();
+        setSelectedTables(previous => { const next = { ...previous }; delete next[id]; return next; });
+        throw new Error(result.error || "Request update failed.");
+      }
+      window.dispatchEvent(new Event("mo-bistro-tables-changed"));
       await refresh();
       if (decision === "approve") {
         if (item) {
@@ -355,11 +363,11 @@ export default function ReceptionTableRequests() {
       {requests.length === 0 ? (
         <p className="mt-3 text-sm text-slate-300">No pending table requests.</p>
       ) : (
-        <div className="mt-4 max-h-72 space-y-3 overflow-y-auto">
+        <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">
           {requests.map(item => (
-            <div key={item.id} className="rounded-xl bg-white/10 p-4">
+            <div key={item.id} className="rounded-lg border border-white/10 p-3">
               <p className="font-semibold">{item.table_name || `Table ${item.table_id}`}</p>
-              <p className="mt-1 text-xs text-slate-300">Requested by {item.requested_by || "staff"}</p>
+              <p className="mt-1 text-xs text-slate-300">Ready to release · {item.requested_by || "staff"}</p>
 
               {item.request_area && (
                 <label className="mt-3 block text-xs text-white">

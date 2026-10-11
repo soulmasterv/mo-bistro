@@ -30,7 +30,6 @@ export default function WaiterPage() {
   const [areaFilter, setAreaFilter] = useState<"all" | "indoor" | "outdoor">("all");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
-  const [confirmTable, setConfirmTable] = useState<RestaurantTable | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [unauthorized, setUnauthorized] = useState(false);
@@ -211,7 +210,7 @@ export default function WaiterPage() {
   async function markReady(table: RestaurantTable) {
     if (busyId !== null || table.status !== "occupied") return;
 
-    setConfirmTable(null);
+
 
     setBusyId(table.id);
     setError("");
@@ -245,7 +244,7 @@ export default function WaiterPage() {
 
   return (
     <main className="min-h-screen bg-[#F4F0E9] text-[#30362B]">
-      <header className="bg-[#30362B] px-5 pb-8 pt-6 text-[#F9F4E9] sm:px-8">
+      <header className="bg-[#30362B] px-4 pb-4 pt-4 text-[#F9F4E9] sm:px-8">
         <div className="mx-auto max-w-6xl">
           <div className="flex items-center justify-between gap-3">
             <button
@@ -331,7 +330,8 @@ export default function WaiterPage() {
           {" · "}Controlled by management
         </p>
 
-        <div className="mt-6 flex gap-2 overflow-x-auto pb-2">
+        {viewMode === "detailed" && <>
+      <div className="mt-3 flex flex-wrap gap-2">
           {(
             [
               ["all", "All tables"],
@@ -354,7 +354,7 @@ export default function WaiterPage() {
           ))}
         </div>
 
-        <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
+        <div className="mt-2 flex flex-wrap gap-2">
           {(
             [
               ["all", "All areas"],
@@ -377,7 +377,8 @@ export default function WaiterPage() {
           ))}
         </div>
 
-        {error && (
+        </>}
+      {error && (
           <div
             role="alert"
             className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
@@ -402,12 +403,12 @@ export default function WaiterPage() {
 
         {loading ? (
           <p className="py-12 text-center text-sm">Loading tables...</p>
-        ) : visible.length === 0 ? (
+        ) : (viewMode === "detailed" ? visible.length === 0 : tables.length === 0) ? (
           <p className="py-12 text-center text-sm text-[#77796F]">
             No tables in this category.
           </p>
         ) : viewMode === "simple" ? (
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {(["indoor", "outdoor"] as const).map(area => {
               const areaTables = tables.filter(table => table.area === area);
               const areaFree = areaTables.filter(table => table.status === "free").length;
@@ -416,10 +417,10 @@ export default function WaiterPage() {
               return (
                 <article
                   key={area}
-                  className="rounded-2xl border border-[#DDD8CB] bg-[#FFFCF7] p-5 shadow-sm"
+                  className="rounded-2xl border border-[#DDD8CB] bg-[#FFFCF7] p-3 shadow-sm"
                 >
                   <h3 className="font-serif text-2xl capitalize">{area}</h3>
-                  <p className="mt-4 text-3xl font-semibold text-[#55704B]">
+                  <p className="mt-2 text-2xl font-semibold text-[#55704B]">
                     {areaFree}
                     <span className="ml-2 text-sm font-normal text-[#77796F]">
                       available
@@ -436,7 +437,7 @@ export default function WaiterPage() {
                       pendingAreas.includes(area)
                     }
                     onClick={() => void requestAreaReady(area)}
-                    className="mt-5 min-h-12 w-full rounded-xl bg-[#30362B] px-3 text-sm font-semibold text-white disabled:opacity-40"
+                    className="mt-3 min-h-12 w-full rounded-xl bg-[#30362B] px-3 text-sm font-semibold text-white disabled:opacity-40"
                   >
                     {busyArea === area
                       ? "Sending..."
@@ -495,7 +496,7 @@ export default function WaiterPage() {
                   <button
                     type="button"
                     disabled={!isOccupied || isPending || busyId !== null}
-                    onClick={() => setConfirmTable(table)}
+                    onClick={() => void markReady(table)}
                     className={`mt-3 min-h-12 w-full rounded-xl text-sm font-semibold ${
                       isOccupied
                         ? "bg-[#30362B] text-white disabled:opacity-50"
@@ -516,19 +517,7 @@ export default function WaiterPage() {
           </div>
         )}
       </section>
-      {confirmTable && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="presentation">
-          <div role="dialog" aria-modal="true" aria-labelledby="ready-confirm-title" className="w-full max-w-sm rounded-3xl bg-[#FFFCF7] p-7 text-[#30362B] shadow-2xl">
-            <h2 id="ready-confirm-title" className="font-serif text-3xl">Table ready?</h2>
-            <p className="mt-3 text-sm leading-6 text-[#666D5E]">Send a request to reception to mark <strong>{confirmTable.name}</strong> as available? The table will remain occupied until reception approves.</p>
-            <div className="mt-7 flex gap-3">
-              <button type="button" onClick={() => setConfirmTable(null)} className="min-h-12 flex-1 rounded-xl border border-[#C9C8BD] font-semibold">Cancel</button>
-              <button type="button" disabled={busyId !== null} onClick={() => void markReady(confirmTable)} className="min-h-12 flex-1 rounded-xl bg-[#30362B] px-3 font-semibold text-white disabled:opacity-50">Send request</button>
-            </div>
-          </div>
-        </div>
-      )}
-      <WaiterRequestNotifications />
+
     </main>
   );
 }

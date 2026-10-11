@@ -48,7 +48,9 @@ export default function TableAvailability() {
       void load().catch(() => {});
     }, 5000);
 
-    return () => window.clearInterval(timer);
+    const onTablesChanged = () => { void load().catch(() => {}); };
+    window.addEventListener("mo-bistro-tables-changed", onTablesChanged);
+    return () => { window.clearInterval(timer); window.removeEventListener("mo-bistro-tables-changed", onTablesChanged); };
   }, [load]);
 
   async function changeMode(next: Mode) {
@@ -80,6 +82,29 @@ export default function TableAvailability() {
     }
   }
 
+  const [releaseId, setReleaseId] = useState<number | null>(null);
+  const [selected, setSelected] = useState<Record<string, number>>({});
+  const [notice, setNotice] = useState("");
+  async function release(tableId: number) {
+    if (releaseId !== null) return;
+    setReleaseId(tableId);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/waiter/tables/" + tableId + "/free", { method: "POST", credentials: "same-origin" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to release table.");
+      setTables(previous => previous.map(table => table.id === tableId ? { ...table, status: "free" } : table));
+      setSelected({});
+      setNotice("Table is now free.");
+      window.dispatchEvent(new Event("mo-bistro-tables-changed"));
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to release table.");
+      void load().catch(() => {});
+    } finally { setReleaseId(null); }
+  }
+
   const free = tables.filter(t => t.status === "free").length;
 
   const summary = (area: "indoor" | "outdoor") => {
@@ -93,7 +118,7 @@ export default function TableAvailability() {
   };
 
   return (
-    <section className="mb-9 rounded-2xl border border-white/10 bg-[#17202A] p-6">
+    <section className="mb-5 rounded-xl border border-white/10 bg-[#17202A] p-3 sm:p-4">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold">Table availability</h2>
@@ -152,7 +177,7 @@ export default function TableAvailability() {
             return (
               <div
                 key={area}
-                className="rounded-2xl border border-white/10 bg-[#0D1218] p-5"
+                className="rounded-xl border border-white/10 bg-[#0D1218] p-3"
               >
                 <div className="flex items-center gap-3">
                   <Armchair size={22} className="text-[#C5A77B]" />
@@ -172,6 +197,14 @@ export default function TableAvailability() {
                   <span>{counts.occupied} occupied</span>
                   <span>{counts.total} total</span>
                 </div>
+                {counts.occupied > 0 && <div className="mt-3 flex gap-2">
+                  <select aria-label={"Occupied " + area + " table"} value={selected[area] || ""} onChange={event => setSelected(previous => ({ ...previous, [area]: Number(event.target.value) }))} className="min-h-11 min-w-0 flex-1 rounded-lg bg-[#17202A] px-2 text-sm">
+                    <option value="">Choose occupied table</option>
+                    {tables.filter(table => table.area === area && table.status === "occupied").map(table => <option key={table.id} value={table.id}>{table.name}</option>)}
+                  </select>
+                  <button type="button" disabled={!selected[area] || releaseId !== null} onClick={() => void release(selected[area])} className="min-h-11 rounded-lg bg-[#C5A77B] px-3 text-sm font-semibold text-[#101820] disabled:opacity-40">Free</button>
+                </div>}
+
               </div>
             );
           })}
@@ -203,16 +236,14 @@ export default function TableAvailability() {
                 {table.seats} seats · {table.area}
               </p>
 
-              <p className="mt-4 text-xs text-slate-400">
-                {table.status === "occupied"
-                  ? "Release requires Reception approval"
-                  : "Available for seating"}
-              </p>
+              {table.status === "occupied" && <button type="button" disabled={releaseId !== null} onClick={() => void release(table.id)} aria-label={"Mark " + table.name + " free"} className="mt-3 min-h-11 w-full rounded-lg bg-[#C5A77B] px-3 text-sm font-semibold text-[#101820] disabled:opacity-40">{releaseId === table.id ? "Releasing…" : "Mark free"}</button>}
+
             </div>
           ))}
         </div>
       )}
 
+      {notice && <p role="status" className="mt-3 text-sm text-emerald-300">{notice}</p>}
       {tables.length === 0 && (
         <p className="mt-4 text-sm text-slate-400">
           No tables yet. A manager can add tables in Settings.

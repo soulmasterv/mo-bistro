@@ -5,6 +5,7 @@ import TableReadyNotifications from "@/components/table-ready-notifications";
 import SeatGuestModal from "@/components/seat-guest-modal";
 
 import { Cog } from "lucide-react";
+import { guestDialHref } from "@/lib/guest-phone";
 import TableAvailability from "@/components/table-availability";
 import RestaurantWaitSlider from "@/components/restaurant-wait-slider";
 
@@ -71,7 +72,9 @@ export default function Home() {
   useEffect(() => {
     void loadGuests();
     const timer = setInterval(() => void loadGuests(), 5000);
-    return () => clearInterval(timer);
+    const onTablesChanged = () => { void loadGuests(); };
+    window.addEventListener("mo-bistro-tables-changed", onTablesChanged);
+    return () => { clearInterval(timer); window.removeEventListener("mo-bistro-tables-changed", onTablesChanged); };
   }, [loadGuests]);
 
   useEffect(() => {
@@ -185,8 +188,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#0D1218] text-white">
-      <div className="mx-auto max-w-7xl px-5 py-8 md:px-10">
-        <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
+      <div className="mx-auto max-w-7xl px-3 py-4 sm:px-5 md:px-10">
+        <header className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-[#C5A77B]">
               Restaurant Concierge
@@ -259,12 +262,12 @@ export default function Home() {
         )}
 
 
-        <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#17202A]">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 p-6">
+        <section className="min-w-0 rounded-xl border border-white/10 bg-[#17202A]">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 p-3">
             <div>
-              <h2 className="text-xl font-semibold">Current queue</h2>
+              <h2 className="text-xl font-semibold">Waiting queue</h2>
               <p className="mt-1 text-sm text-slate-400">
-                First come, first served · {active.length} active parties
+                {waiting} waiting · {called} called
               </p>
             </div>
             <button
@@ -275,7 +278,7 @@ export default function Home() {
             </button>
           </div>
 
-          <div className="border-b border-white/10 p-5">
+          <div className="border-b border-white/10 p-3">
             <div className="flex max-w-md items-center gap-3 rounded-xl border border-white/10 bg-[#0D1218] px-4 py-3">
               <Search size={18} className="text-slate-500" />
               <input
@@ -287,133 +290,45 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="divide-y divide-white/10">
-            {filtered.map((guest) => {
-              const position = active.findIndex(g => g.id === guest.id) + 1;
-              const dialNumber = guest.phone.replace(/[^+\\d]/g, "");
-
-              return (
-                <div
-                  key={guest.id}
-                  className="p-4 sm:p-5 hover:bg-white/[0.025]"
-                >
-                  <div className="flex flex-col gap-4">
-
-                    <div className="flex items-start gap-3 sm:gap-4">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#C5A77B] font-bold text-[#101820]">
-                        #{position}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-semibold text-white">
-                            {guest.name}
-                          </h3>
-
-                          <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-slate-300">
-                            {labels[guest.status]}
-                          </span>
-
-                          {guest.confirmed === 1 && (
-                            <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-300">
-                              Confirmed
-                            </span>
-                          )}
-                        </div>
-
-                        <p className="mt-2 text-sm text-slate-400">
-                          {guest.party_size} {guest.party_size === 1 ? "guest" : "guests"}
-                          {" · "}
-                          <span className="capitalize">
-                            {guest.seating_preference || "any"} seating
-                          </span>
-                        </p>
-
-                        <p className="mt-1 text-xs text-slate-500">
-                          Queue position #{position}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                      <a
-                        href={`tel:${dialNumber}`}
-                        aria-label={`Call ${guest.name}`}
-                        className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#C5A77B]/40 px-4 py-2.5 text-sm font-medium text-[#C5A77B] hover:bg-[#C5A77B]/10"
-                      >
-                        <Phone size={16} />
-                        Call Guest
-                      </a>
-
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void performAction(guest.id, "seat")}
-                        className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#C5A77B] px-4 py-2.5 text-sm font-semibold text-[#101820] hover:bg-[#D8BC91] disabled:opacity-40"
-                      >
-                        Seat Guest
-                      </button>
-                    </div>
-
-                    <details className="group rounded-xl border border-white/10 bg-[#0D1218]/60">
-                      <summary className="cursor-pointer list-none px-4 py-3 text-sm text-slate-300 hover:text-white [&::-webkit-details-marker]:hidden">
-                        <span className="flex items-center justify-between">
-                          More actions
-                          <span className="text-[#C5A77B] group-open:rotate-180">
-                            &#9662;
-                          </span>
-                        </span>
-                      </summary>
-
-                      <div className="flex flex-wrap gap-2 border-t border-white/10 p-3">
-                        {guest.status === "waiting" && (
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void performAction(guest.id, "call")}
-                            className="rounded-lg border border-white/15 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-40"
-                          >
-                            Mark Called
-                          </button>
-                        )}
-
-                        {guest.confirmed !== 1 && (
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void performAction(guest.id, "confirm")}
-                            className="rounded-lg border border-white/15 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-40"
-                          >
-                            Confirm Booking
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void performAction(guest.id, "no_show")}
-                          className="rounded-lg border border-amber-500/25 px-3 py-2 text-sm text-amber-200 hover:bg-amber-500/10 disabled:opacity-40"
-                        >
-                          No-show
-                        </button>
-
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void performAction(guest.id, "cancel")}
-                          className="rounded-lg border border-red-500/25 px-3 py-2 text-sm text-red-300 hover:bg-red-500/10 disabled:opacity-40"
-                        >
-                          Cancel Booking
-                        </button>
-                      </div>
-                    </details>
-
+          <div className="divide-y divide-white/10 px-3">
+      {filtered.map((guest) => {
+        const position = active.findIndex(g => g.id === guest.id) + 1;
+        const dialHref = guestDialHref(guest.phone);
+        return (
+          <div key={guest.id} className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2 py-3 sm:gap-3">
+            <span className="text-lg font-bold text-[#C5A77B]" aria-label={"Queue position " + position}>#{position}</span>
+            <div className="min-w-0">
+              <h3 className="break-words font-semibold leading-tight">{guest.name}</h3>
+              <p className="mt-1 text-xs text-slate-300">{guest.party_size} guests · {guest.seating_preference === "any" ? "Any seating" : guest.seating_preference === "indoor" ? "Indoor" : "Outdoor"}</p>
+              <p className="text-xs text-slate-400">{labels[guest.status]}{guest.confirmed === 1 ? " · Confirmed" : ""}</p>
+            </div>
+            <div className="flex items-center gap-1">
+              <button type="button" disabled={busy} onClick={() => void performAction(guest.id, "seat")} className="min-h-11 rounded-lg bg-[#C5A77B] px-3 text-sm font-semibold text-[#101820] disabled:opacity-40" aria-label={"Seat " + guest.name}>Seat</button>
+              <details className="relative">
+                  <summary className="flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center rounded-lg border border-white/10 text-xl hover:bg-white/10 [&::-webkit-details-marker]:hidden" aria-label={"More actions for " + guest.name}>···</summary>
+                  <div className="absolute right-0 top-full z-30 mt-1 w-48 rounded-xl border border-white/15 bg-[#17202A] p-1 shadow-xl">
+                    {dialHref ? (
+                      <a href={dialHref} className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm hover:bg-white/10"><Phone size={16} /> Call phone</a>
+                    ) : (
+                      <p className="px-3 py-3 text-sm text-slate-400">Call unavailable</p>
+                    )}
+                    {guest.status === "waiting" && (
+                      <button type="button" disabled={busy} onClick={() => void performAction(guest.id, "call")} className="block min-h-11 w-full rounded-lg px-3 text-left text-sm hover:bg-white/10 disabled:opacity-40">Mark called</button>
+                    )}
+                    {guest.confirmed !== 1 && (
+                      <button type="button" disabled={busy} onClick={() => void performAction(guest.id, "confirm")} className="block min-h-11 w-full rounded-lg px-3 text-left text-sm hover:bg-white/10 disabled:opacity-40">Confirm booking</button>
+                    )}
+                    <div className="my-1 border-t border-white/10" />
+                    <button type="button" disabled={busy} onClick={() => void performAction(guest.id, "no_show")} className="block min-h-11 w-full rounded-lg px-3 text-left text-sm text-amber-200 hover:bg-white/10 disabled:opacity-40">No-show</button>
+                    <button type="button" disabled={busy} onClick={() => void performAction(guest.id, "cancel")} className="block min-h-11 w-full rounded-lg px-3 text-left text-sm text-red-300 hover:bg-white/10 disabled:opacity-40">Cancel booking</button>
                   </div>
-                </div>
-              );
-            })}
+                </details>
+            </div>
+          </div>
+        );
+      })}
 
-            {filtered.length === 0 && (
+    {filtered.length === 0 && (
               <p className="p-8 text-center text-sm text-slate-400">
                 No active guests found.
               </p>
