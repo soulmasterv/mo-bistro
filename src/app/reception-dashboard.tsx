@@ -12,6 +12,7 @@ import RestaurantWaitSlider from "@/components/restaurant-wait-slider";
 
 import { useCallback, useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { createPortal } from "react-dom";
 import {
   Users, Clock3, CheckCircle2, Plus, Phone,
   Bell, Search, QrCode,
@@ -48,6 +49,7 @@ export default function Home() {
   const [isManager, setIsManager] = useState(false);
   const [seatingGuest, setSeatingGuest] = useState<Guest | null>(null);
   const [search, setSearch] = useState("");
+  const [openGuestMenu, setOpenGuestMenu] = useState<number | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [registrationUrl, setRegistrationUrl] = useState("");
@@ -114,6 +116,47 @@ export default function Home() {
     const timer = window.setInterval(refreshQR, 15000);
     return () => window.clearInterval(timer);
   }, [showQR]);
+
+  useEffect(() => {
+    if (!showQR) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowQR(false);
+    };
+
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [showQR]);
+
+  useEffect(() => {
+    if (openGuestMenu === null) return;
+
+    function dismiss(event: PointerEvent) {
+      const target = event.target;
+      if (target instanceof Element && !target.closest("[data-guest-menu]")) {
+        setOpenGuestMenu(null);
+      }
+    }
+
+    function escape(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpenGuestMenu(null);
+    }
+
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", escape);
+
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [openGuestMenu]);
 
   async function performAction(id: number, action: Action) {
     if (action === "seat") {
@@ -241,7 +284,7 @@ export default function Home() {
         <section className="mb-9 grid gap-4 md:grid-cols-3">
           {[
             { label: "Waiting guests", value: waiting, icon: Users },
-            { label: "Called guests", value: called, icon: Bell },
+            { label: "Pending requests", value: called, icon: Bell },
             { label: "Seated guests", value: seated, icon: CheckCircle2 }
           ].map(stat => (
             <div key={stat.label} className="rounded-2xl border border-white/10 bg-[#17202A] p-6">
@@ -290,7 +333,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="divide-y divide-white/10 px-3">
+          <div className="max-h-[min(52dvh,560px)] divide-y divide-white/10 overflow-y-auto overscroll-contain px-3">
       {filtered.map((guest) => {
         const position = active.findIndex(g => g.id === guest.id) + 1;
         const dialHref = guestDialHref(guest.phone);
@@ -303,26 +346,53 @@ export default function Home() {
               <p className="text-xs text-slate-400">{labels[guest.status]}{guest.confirmed === 1 ? " · Confirmed" : ""}</p>
             </div>
             <div className="flex items-center gap-1">
-              <button type="button" disabled={busy} onClick={() => void performAction(guest.id, "seat")} className="min-h-11 rounded-lg bg-[#C5A77B] px-3 text-sm font-semibold text-[#101820] disabled:opacity-40" aria-label={"Seat " + guest.name}>Seat</button>
-              <details className="relative">
-                  <summary className="flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center rounded-lg border border-white/10 text-xl hover:bg-white/10 [&::-webkit-details-marker]:hidden" aria-label={"More actions for " + guest.name}>···</summary>
-                  <div className="absolute right-0 top-full z-30 mt-1 w-48 rounded-xl border border-white/15 bg-[#17202A] p-1 shadow-xl">
-                    {dialHref ? (
-                      <a href={dialHref} className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm hover:bg-white/10"><Phone size={16} /> Call phone</a>
-                    ) : (
-                      <p className="px-3 py-3 text-sm text-slate-400">Call unavailable</p>
-                    )}
+              {dialHref ? (
+                <a
+                  href={dialHref}
+                  aria-label={"Call " + guest.name}
+                  className="flex min-h-9 items-center gap-1 rounded-lg border border-white/15 px-2 text-xs text-white hover:bg-white/10 sm:min-h-11 sm:px-3"
+                >
+                  <Phone size={14} />
+                  <span className="hidden min-[390px]:inline">Call</span>
+                </a>
+              ) : (
+                <span className="px-1 text-xs text-slate-500">No phone</span>
+              )}
+
+              <div className="relative" data-guest-menu>
+                <button
+                  type="button"
+                  aria-label={"More actions for " + guest.name}
+                  aria-expanded={openGuestMenu === guest.id}
+                  onClick={() => setOpenGuestMenu(current => current === guest.id ? null : guest.id)}
+                  className="flex min-h-11 min-w-10 items-center justify-center rounded-lg border border-white/10 text-xl hover:bg-white/10"
+                >
+                  ···
+                </button>
+                {openGuestMenu === guest.id && (
+                  <div className="absolute right-0 top-full z-30 mt-1 w-48 origin-top-right animate-in fade-in duration-150 rounded-xl border border-white/15 bg-[#17202A] p-1 shadow-xl">
                     {guest.status === "waiting" && (
-                      <button type="button" disabled={busy} onClick={() => void performAction(guest.id, "call")} className="block min-h-11 w-full rounded-lg px-3 text-left text-sm hover:bg-white/10 disabled:opacity-40">Mark called</button>
+                      <button type="button" disabled={busy} onClick={() => { setOpenGuestMenu(null); void performAction(guest.id, "call"); }} className="block min-h-11 w-full rounded-lg px-3 text-left text-sm hover:bg-white/10 disabled:opacity-40">Mark called</button>
                     )}
                     {guest.confirmed !== 1 && (
-                      <button type="button" disabled={busy} onClick={() => void performAction(guest.id, "confirm")} className="block min-h-11 w-full rounded-lg px-3 text-left text-sm hover:bg-white/10 disabled:opacity-40">Confirm booking</button>
+                      <button type="button" disabled={busy} onClick={() => { setOpenGuestMenu(null); void performAction(guest.id, "confirm"); }} className="block min-h-11 w-full rounded-lg px-3 text-left text-sm hover:bg-white/10 disabled:opacity-40">Confirm booking</button>
                     )}
                     <div className="my-1 border-t border-white/10" />
-                    <button type="button" disabled={busy} onClick={() => void performAction(guest.id, "no_show")} className="block min-h-11 w-full rounded-lg px-3 text-left text-sm text-amber-200 hover:bg-white/10 disabled:opacity-40">No-show</button>
-                    <button type="button" disabled={busy} onClick={() => void performAction(guest.id, "cancel")} className="block min-h-11 w-full rounded-lg px-3 text-left text-sm text-red-300 hover:bg-white/10 disabled:opacity-40">Cancel booking</button>
+                    <button type="button" disabled={busy} onClick={() => { setOpenGuestMenu(null); void performAction(guest.id, "no_show"); }} className="block min-h-11 w-full rounded-lg px-3 text-left text-sm text-amber-200 hover:bg-white/10 disabled:opacity-40">No-show</button>
+                    <button type="button" disabled={busy} onClick={() => { setOpenGuestMenu(null); void performAction(guest.id, "cancel"); }} className="block min-h-11 w-full rounded-lg px-3 text-left text-sm text-red-300 hover:bg-white/10 disabled:opacity-40">Cancel booking</button>
                   </div>
-                </details>
+                )}
+              </div>
+
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void performAction(guest.id, "seat")}
+                className="min-h-11 rounded-lg bg-[#C5A77B] px-3 text-sm font-semibold text-[#101820] disabled:opacity-40"
+                aria-label={"Seat " + guest.name}
+              >
+                Seat
+              </button>
             </div>
           </div>
         );
@@ -349,9 +419,14 @@ export default function Home() {
         </footer>
       </div>
 
-      {showQR && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#17202A] p-7 text-center shadow-2xl">
+      {showQR && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Guest registration QR code"
+          className="fixed inset-0 z-[9999] flex h-[100dvh] w-screen items-center justify-center overflow-y-auto bg-[#0D1218] p-4 text-white"
+        >
+          <div className="my-auto w-full max-w-md rounded-2xl border border-white/10 bg-[#17202A] p-5 text-center shadow-2xl sm:p-7">
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.25em] text-[#C5A77B]">
               Restaurant Concierge
             </p>
@@ -401,7 +476,7 @@ export default function Home() {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">

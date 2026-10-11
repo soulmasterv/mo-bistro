@@ -1,5 +1,6 @@
 "use client";
 import StaffAccountManager from "@/components/staff-account-manager";
+import StaffShiftScheduler from "@/components/staff-shift-scheduler";
 import DemoControls from "@/components/demo-controls";
 import SeatingSettings from "@/components/seating-settings";
 
@@ -18,16 +19,8 @@ type Settings = {
   restaurant_name: string;
 };
 
-type Staff = {
-  id: number;
-  username: string;
-  role: string;
-  active: number;
-};
-
 export default function ManagementPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [users, setUsers] = useState<Staff[]>([]);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -41,7 +34,6 @@ export default function ManagementPage() {
         })
         .then(data => {
           setSettings(data.settings);
-          setUsers(data.users);
         })
         .catch(err => setError(err.message));
     };
@@ -183,32 +175,8 @@ export default function ManagementPage() {
           </section>
         )}
 
-        <section className="mt-7 rounded-2xl border border-white/10 bg-[#17202A] p-6">
-          <h2 className="text-xl font-semibold">Staff accounts</h2>
-          <p className="mt-2 text-sm text-slate-400">
-            Managers have full access. Reception accounts can manage the queue.
-          </p>
-
-
-          <div className="mt-5 space-y-3">
-            {users.map((user) => (
-              <div
-                key={user.id}
-                className="flex justify-between rounded-xl border border-white/10 p-4 text-sm"
-              >
-                <span>{user.username}</span>
-                <span className="capitalize text-[#C5A77B]">
-                  {user.role}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <p className="mt-5 text-xs text-slate-400">
-            Staff accounts are created using the server CLI.
-          </p>
-        </section>
         <StaffAccountManager />
+        <StaffShiftScheduler />
         <ManagementExtras />
         <SeatingSettings />
         <DemoControls />

@@ -333,7 +333,7 @@ export default function ReceptionTableRequests() {
         aria-label="Toggle table-ready notifications"
         aria-controls="table-request-notifications"
         aria-expanded={notificationPanelOpen}
-        className="flex min-h-12 items-center gap-2 rounded-full bg-[#293126] px-5 py-3 text-sm font-semibold text-white shadow-xl"
+        className="flex min-h-14 items-center gap-3 rounded-full bg-[#293126] px-6 py-3 text-base font-semibold text-white shadow-xl"
       >
         <span className="relative" aria-hidden="true">
           🔔
@@ -352,7 +352,7 @@ export default function ReceptionTableRequests() {
     </div>
 
     {notificationPanelOpen && (
-    <section id="table-request-notifications" className="fixed bottom-20 right-4 z-50 w-[min(420px,calc(100vw-32px))] rounded-2xl border border-[#D6B681] bg-[#293126] p-5 text-white shadow-2xl">
+    <section id="table-request-notifications" className="fixed bottom-20 right-4 z-[70] max-h-[min(65dvh,540px)] w-[min(420px,calc(100vw-32px))] overflow-y-auto rounded-2xl border border-[#D6B681] bg-[#293126] p-4 text-white shadow-2xl">
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-semibold">Table-ready requests ({requests.length})</h2>
         <button onClick={soundEnabled ? mute : () => void enableSound()} className="rounded-lg border border-white/20 px-3 py-2 text-xs">
