@@ -1,7 +1,7 @@
 import { currentStaff } from "@/lib/staff-auth";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import { checkRateLimit } from "@/lib/api-rate-limit";
-import { previewTestRecipient, sendPreviewTest } from "@/lib/whatsapp/preview-test";
+import { previewTestRecipient, previewTestState, sendPreviewTest } from "@/lib/whatsapp/preview-test";
 export const runtime = "nodejs";
 const headers = { "Cache-Control": "no-store" };
 async function authorize() {
@@ -12,7 +12,7 @@ async function authorize() {
 }
 export async function GET() {
   const denied = await authorize(); if (denied) return denied;
-  try { previewTestRecipient(); return Response.json({enabled:true}, {headers}); }
+  try { previewTestRecipient(); return Response.json(await previewTestState(), {headers}); }
   catch { return Response.json({enabled:false}, {headers}); }
 }
 export async function POST(request: Request) {
@@ -32,5 +32,5 @@ export async function POST(request: Request) {
     if (limited) return limited;
   } catch { return Response.json({error:"Test rate limiter unavailable"}, {status:503, headers}); }
   try { return Response.json(await sendPreviewTest(), {headers}); }
-  catch { return Response.json({error:"Approved template configuration missing"}, {status:503, headers}); }
+  catch { return Response.json({error:"Test unavailable: verify Preview migration and provider configuration"}, {status:503, headers}); }
 }

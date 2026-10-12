@@ -1,3 +1,4 @@
+import { previewTestEnabled } from "@/lib/whatsapp/preview-test";
 import { after } from "next/server";
 import {
   safeEqual,
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid envelope" }, { status: 400 });
   try {
     await processMetaWebhook(payload);
-    after(async () => {
+    if (!previewTestEnabled()) after(async () => {
       try {
         await dispatchOutbox();
       } catch {

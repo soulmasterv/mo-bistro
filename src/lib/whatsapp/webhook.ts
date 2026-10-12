@@ -1,4 +1,5 @@
 import "server-only";
+import { recordPreviewInbound, recordPreviewDelivery } from "@/lib/whatsapp/preview-test";
 import { getPostgres } from "@/lib/postgres-db";
 import { hashCode, isStop, normalizePhone, parseSubscription } from "@/lib/whatsapp/policy";
 import { scheduleAlmostReady, scheduleReview } from "@/lib/whatsapp/service";
@@ -25,6 +26,7 @@ export async function processMetaWebhook(payload: MetaPayload) {
       const phone = normalizePhone(message.from);
       const timestamp = Number(message.timestamp);
       if (!Number.isSafeInteger(timestamp) || timestamp <= 0 || timestamp * 1000 > Date.now()+300_000) continue;
+      if (await recordPreviewInbound(message.id, phone, timestamp)) continue;
       const text = message.type === "button" ? message.button?.payload || "" :
         message.type === "text" ? message.text?.body || "" : "";
       const stopped = message.type === "text" && isStop(text);
@@ -73,6 +75,7 @@ export async function processMetaWebhook(payload: MetaPayload) {
           !["sent","delivered","read","failed"].includes(status.status)) continue;
       const timestamp = Number(status.timestamp);
       if (!Number.isSafeInteger(timestamp) || timestamp <= 0) continue;
+      if (await recordPreviewDelivery(status.id,status.status,timestamp,status.biz_opaque_callback_data)) continue;
       await sql.begin(async tx => {
         // The opaque job ID reconciles an accepted send whose HTTP response was lost.
         const jobId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(status.biz_opaque_callback_data || "")
