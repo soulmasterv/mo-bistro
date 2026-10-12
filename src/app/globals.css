@@ -2079,3 +2079,48 @@ html[data-theme="dark"]
   color: #f0f1f3 !important;
   border-color: #454852 !important;
 }
+
+/* Reception summaries support the queue instead of dominating the viewport. */
+.bistro-reception .bistro-stat-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin-bottom: 16px;
+  background: var(--staff-surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.bistro-reception .bistro-stat {
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 0;
+}
+.bistro-reception .bistro-stat + .bistro-stat {
+  border-left: 1px solid var(--line);
+}
+.bistro-reception .bistro-stat-top {
+  font-size: 11px;
+  line-height: 1.3;
+}
+.bistro-reception .bistro-stat-top svg {
+  display: none;
+}
+.bistro-reception .bistro-stat strong {
+  font-size: 22px;
+  line-height: 1.15;
+  margin: 4px 0 0;
+  letter-spacing: 0;
+}
+@media (max-width: 600px) {
+  .bistro-reception .bistro-stat {
+    padding: 8px;
+  }
+  .bistro-reception .bistro-stat-top {
+    font-size: 10px;
+    min-height: 26px;
+  }
+  .bistro-reception .bistro-stat strong {
+    font-size: 20px;
+    margin-top: 2px;
+  }
+}

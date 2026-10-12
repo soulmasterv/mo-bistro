@@ -287,7 +287,7 @@ export default function Home() {
   );
 
   return (
-    <main className="bistro-app">
+    <main className="bistro-app bistro-reception">
       <div className="bistro-container">
         <section
           className="bistro-notification-center"
