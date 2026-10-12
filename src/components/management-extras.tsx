@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2, Users, Armchair } from "lucide-react";
+import { Plus, Trash2, Armchair } from "lucide-react";
 
 type Table = {
   id: number;
@@ -11,42 +11,25 @@ type Table = {
   status: "free" | "occupied";
 };
 
-type Staff = {
-  id: number;
-  username: string;
-  role: string;
-  active: number;
-};
-
 export default function ManagementExtras() {
   const [tables, setTables] = useState<Table[]>([]);
-  const [staff, setStaff] = useState<Staff[]>([]);
-  const [username, setUsername] = useState("");
-  const [credential, setCredential] = useState("");
-  const [role, setRole] = useState<"manager" | "reception">("reception");
   const [tableName, setTableName] = useState("");
   const [seats, setSeats] = useState(4);
   const [area, setArea] = useState<"indoor" | "outdoor">("indoor");
+  const [failed, setFailed] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const [tablesResponse, managementResponse] = await Promise.all([
-      fetch("/api/management/tables", { cache: "no-store" }),
-      fetch("/api/management", { cache: "no-store" }),
-    ]);
-
-    if (!tablesResponse.ok || !managementResponse.ok) {
-      throw new Error("Manager access required");
-    }
-
-    setTables(await tablesResponse.json());
-    const data = await managementResponse.json();
-    setStaff(data.users);
+    const response = await fetch("/api/management/tables", { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Unable to load restaurant tables.");
+    setTables(data);
   }, []);
 
   useEffect(() => {
-    void load().catch(e => setMessage(e.message));
+    const initial = window.setTimeout(() => { void load().catch(e => { setFailed(true); setMessage(e.message); }); }, 0);
+    return () => window.clearTimeout(initial);
   }, [load]);
 
   async function send(
@@ -54,7 +37,9 @@ export default function ManagementExtras() {
     method: string,
     payload: object
   ) {
+    if (busy) return false;
     setBusy(true);
+    setFailed(false);
     setMessage("");
 
     try {
@@ -74,6 +59,7 @@ export default function ManagementExtras() {
       setMessage("Changes saved successfully.");
       return true;
     } catch (error) {
+      setFailed(true);
       setMessage(error instanceof Error ? error.message : "Request failed");
       return false;
     } finally {
@@ -83,70 +69,6 @@ export default function ManagementExtras() {
 
   return (
     <div className="mt-7 space-y-7">
-      <section className="rounded-2xl border border-white/10 bg-[#17202A] p-6">
-        <div className="mb-5 flex items-center gap-3">
-          <Users className="text-[#C5A77B]" />
-          <h2 className="text-xl font-semibold">Staff management</h2>
-        </div>
-
-        <form
-          className="grid gap-3 md:grid-cols-3"
-          onSubmit={async e => {
-            e.preventDefault();
-            const ok = await send("/api/management/staff", "POST", {
-              username,
-              credential,
-              role,
-            });
-            if (ok) {
-              setUsername("");
-              setCredential("");
-            }
-          }}
-        >
-          <input
-            required
-            minLength={3}
-            placeholder="Username"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            className="rounded-xl border border-white/10 bg-[#0D1218] p-3"
-          />
-          <input
-            required
-            type="password"
-            minLength={4}
-            placeholder="Password / PIN (min. 4)"
-            value={credential}
-            onChange={e => setCredential(e.target.value)}
-            className="rounded-xl border border-white/10 bg-[#0D1218] p-3"
-          />
-          <select
-            value={role}
-            onChange={e => setRole(e.target.value as typeof role)}
-            className="rounded-xl border border-white/10 bg-[#0D1218] p-3"
-          >
-            <option value="reception">Reception</option>
-            <option value="manager">Manager</option>
-          </select>
-          <button
-            disabled={busy}
-            className="flex items-center justify-center gap-2 rounded-xl bg-[#C5A77B] p-3 font-semibold text-[#101820] disabled:opacity-50 md:col-span-3"
-          >
-            <Plus size={17} /> Add staff account
-          </button>
-        </form>
-
-        <div className="mt-5 divide-y divide-white/10">
-          {staff.map(user => (
-            <div key={user.id} className="flex justify-between py-3 text-sm">
-              <span>{user.username}</span>
-              <span className="capitalize text-[#C5A77B]">{user.role}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
       <section className="rounded-2xl border border-white/10 bg-[#17202A] p-6">
         <div className="mb-5 flex items-center gap-3">
           <Armchair className="text-[#C5A77B]" />
@@ -198,6 +120,12 @@ export default function ManagementExtras() {
           </button>
         </form>
 
+        {message && (
+          <p role={failed ? "alert" : "status"} className="mt-4 rounded-xl border border-white/10 p-4 text-sm">
+            {message}
+          </p>
+        )}
+
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           {tables.map(table => (
             <div
@@ -230,11 +158,7 @@ export default function ManagementExtras() {
         </div>
       </section>
 
-      {message && (
-        <p role="status" className="rounded-xl border border-white/10 p-4 text-sm">
-          {message}
-        </p>
-      )}
+
     </div>
   );
 }

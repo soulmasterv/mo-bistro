@@ -7,8 +7,9 @@ export default function RuntimeTest() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const initial = window.setTimeout(() => setMounted(true), 0);
     console.log("REACT MOUNTED SUCCESSFULLY");
+    return () => window.clearTimeout(initial);
   }, []);
 
   return (

@@ -38,8 +38,7 @@ export default function ManagementPage() {
         .catch(err => setError(err.message));
     };
     refreshStaff();
-    window.addEventListener("staff-account-created", refreshStaff);
-    return () => window.removeEventListener("staff-account-created", refreshStaff);
+
   }, []);
 
   async function save() {

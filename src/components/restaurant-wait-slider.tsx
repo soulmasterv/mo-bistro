@@ -31,7 +31,8 @@ export default function RestaurantWaitSlider() {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    const initial = window.setTimeout(() => void refresh(), 0);
+    return () => window.clearTimeout(initial);
   }, [refresh]);
 
   async function save() {

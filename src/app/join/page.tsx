@@ -41,7 +41,6 @@ export default function JoinPage() {
     let expiryTimer: ReturnType<typeof setTimeout> | undefined;
 
     const code = new URLSearchParams(window.location.search).get("code") || "";
-    setQrCode(code);
 
     async function checkQR() {
       try {
@@ -113,10 +112,11 @@ export default function JoinPage() {
       }
     }
 
-    void checkQR();
+    const initial = window.setTimeout(() => { setQrCode(code); void checkQR(); }, 0);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(initial);
       if (expiryTimer) clearTimeout(expiryTimer);
     };
   }, []);

@@ -1,6 +1,5 @@
 "use client";
 import Link from "next/link";
-import WaiterRequestNotifications from "@/components/waiter-request-notifications";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -253,7 +252,7 @@ export default function WaiterPage() {
                 try {
                   const response = await fetch("/api/auth/logout", { method: "POST" });
                   if (!response.ok) throw new Error("Logout failed.");
-                  window.location.href = "/login";
+                  window.location.replace("/login");
                 } catch {
                   setError("Could not log out. Please try again.");
                 }
