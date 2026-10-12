@@ -51,9 +51,14 @@ export async function verifyQstash(raw: string, signature: string | null, path: 
 }
 
 export type SendResult = { state: "sent" | "simulated" | "pending" | "failed" | "unknown";
-  messageId?: string; error?: string };
+  messageId?: string; providerStatus?: number; error?: string };
 export async function sendTemplate(payload: ReturnType<typeof templatePayload>): Promise<SendResult> {
   if (!liveSendingEnabled()) return { state: "simulated" };
+  return requestMetaTemplate(payload);
+}
+
+// Internal transport shared by the normal policy-gated sender and isolated Preview test.
+export async function requestMetaTemplate(payload: ReturnType<typeof templatePayload>): Promise<SendResult> {
   const access = process.env.META_WHATSAPP_ACCESS_TOKEN, phoneId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
   const version = process.env.META_GRAPH_API_VERSION;
   if (!access || !phoneId || !/^\d+$/.test(phoneId) || !/^v\d+\.\d+$/.test(version || "")) {
@@ -66,11 +71,11 @@ export async function sendTemplate(payload: ReturnType<typeof templatePayload>):
     });
     const body = await response.json().catch(() => null);
     if (response.ok && typeof body?.messages?.[0]?.id === "string") {
-      return { state: "sent", messageId: body.messages[0].id };
+      return { state: "sent", providerStatus: response.status, messageId: body.messages[0].id };
     }
     // Ambiguous acceptance must not be blindly retried: Meta has no send idempotency key.
-    if (response.status >= 500 || response.ok) return { state: "unknown", error: "meta_acceptance_unknown" };
-    if (response.status === 429 && body?.error) return { state: "pending", error: "meta_rate_limited" };
-    return { state: "failed", error: `meta_rejected_${response.status}` };
+    if (response.status >= 500 || response.ok) return { state: "unknown", providerStatus: response.status, error: "meta_acceptance_unknown" };
+    if (response.status === 429 && body?.error) return { state: "pending", providerStatus: response.status, error: "meta_rate_limited" };
+    return { state: "failed", providerStatus: response.status, error: `meta_rejected_${response.status}` };
   } catch { return { state: "unknown", error: "meta_network_acceptance_unknown" }; }
 }

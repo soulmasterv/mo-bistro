@@ -1,4 +1,5 @@
 "use client";
+import WhatsAppPreviewTest from "@/components/whatsapp-preview-test";
 import StaffAccountManager from "@/components/staff-account-manager";
 import StaffShiftScheduler from "@/components/staff-shift-scheduler";
 import DemoControls from "@/components/demo-controls";
@@ -71,6 +72,7 @@ export default function ManagementPage() {
 
   return (
     <main className="bistro-app bistro-management">
+      <WhatsAppPreviewTest />
       <div className="bistro-container">
         <header className="bistro-page-heading">
           <div>
