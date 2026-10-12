@@ -2128,3 +2128,10 @@ html[data-theme="dark"]
 .bistro-notification-center:empty {
   display: none;
 }
+
+/* Guest booking retains its original light palette regardless of staff theme. */
+html[data-theme="guest-light"] {
+  --background: #f4f0e9;
+  --foreground: #302d28;
+  color-scheme: light;
+}

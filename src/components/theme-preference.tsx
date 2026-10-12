@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
 
 type Preference = "system" | "light" | "dark";
 const KEY = "mo-bistro-theme";
@@ -41,9 +42,12 @@ function useTheme() {
 }
 export function ThemePreference() {
   const current = useTheme();
+  const pathname = usePathname();
   useEffect(() => {
-    document.documentElement.dataset.theme = current.split(":")[1];
-  }, [current]);
+    // Keep the existing guest booking palette independent of staff preferences.
+    document.documentElement.dataset.theme =
+      pathname === "/join" ? "guest-light" : current.split(":")[1];
+  }, [current, pathname]);
   return null;
 }
 export function ThemeSwitcher() {

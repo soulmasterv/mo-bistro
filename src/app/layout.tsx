@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ThemePreference, ThemeSwitcher } from "@/components/theme-preference";
+import { ThemePreference } from "@/components/theme-preference";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,9 +34,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <ThemePreference />
         {children}
-        <footer className="theme-footer">
-          <ThemeSwitcher />
-        </footer>
       </body>
     </html>
   );

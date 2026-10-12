@@ -73,7 +73,7 @@ test(
               contents:
                 args.path === "next/link"
                   ? 'import React from "react";export default function Link({children,...props}){return <a {...props}>{children}</a>}'
-                  : "export function useRouter(){return {replace:path=>location.assign(path),push:path=>location.assign(path),refresh(){}}}export function useSearchParams(){return new URLSearchParams(location.search)}",
+                  : "export function usePathname(){return location.pathname}export function useRouter(){return {replace:path=>location.assign(path),push:path=>location.assign(path),refresh(){}}}export function useSearchParams(){return new URLSearchParams(location.search)}",
             }));
             build.onResolve({ filter: /^@\// }, (args) => {
               const base = path.join(root, "src", args.path.slice(2));
