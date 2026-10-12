@@ -25,6 +25,9 @@ test(
       JSON.stringify(path.join(root, file).replaceAll("\\", "/"));
     const source =
       'import React from "react"; import {createRoot} from "react-dom/client";' +
+      "import Join from " +
+      component("src/app/join/page.tsx") +
+      ";" +
       "import Login from " +
       component("src/app/login/page.tsx") +
       ";" +
@@ -51,7 +54,7 @@ test(
       ";" +
       'const p=location.pathname;const role=document.cookie.match(/fixture_role=(manager|reception|waiter)/)?.[1] ?? "manager";' +
       'const title=p==="/waiter"?"Waiter":p.startsWith("/management")||p==="/manager"?"Management":"Reception";' +
-      'createRoot(document.getElementById("root")).render(p==="/login"?<Login/>:p==="/login/pin"?<PinLogin/>:<><ThemePreference/><Header role={role} workspace={title}/>{title==="Waiter"?<Waiter/>:title==="Management"?(p==="/management/staff-pins"?<StaffPins/>:<Management/>):<Reception/>}</>);';
+      'createRoot(document.getElementById("root")).render(p==="/join"?<><ThemePreference/><Join/></>:p==="/login"?<Login/>:p==="/login/pin"?<PinLogin/>:<><ThemePreference/><Header role={role} workspace={title}/>{title==="Waiter"?<Waiter/>:title==="Management"?(p==="/management/staff-pins"?<StaffPins/>:<Management/>):<Reception/>}</>);';
     await esbuild.build({
       stdin: { contents: source, loader: "tsx", resolveDir: root },
       bundle: true,
@@ -103,6 +106,7 @@ test(
     let staffUsername = "manager";
     const errors = [];
     const readyRequests = [];
+    let submittedBooking;
     const guests = [
       {
         id: 1,
@@ -213,12 +217,35 @@ test(
               /fixture_role=(manager|reception|waiter)/,
             )?.[1] ?? "manager";
         let data = {};
+        if (url.pathname.startsWith("/api/whatsapp/guests/")) {
+          res.setHeader("content-type", "application/json");
+          res.end(
+            JSON.stringify({
+              available: true,
+              subscribed: true,
+              feedback_consent: true,
+              confirmation_consent: true,
+              opted_out: false,
+            }),
+          );
+          return;
+        }
         switch (url.pathname) {
           case "/api/seating":
             data = {
               tables: tables.filter((table) => table.status === "free"),
               guest: guests[0],
             };
+            break;
+          case "/api/whatsapp/config":
+            data = { available: true };
+            break;
+          case "/api/qr/permit":
+            data = { valid: true, expiresAt: null };
+            break;
+          case "/api/join":
+            submittedBooking = body;
+            data = { token: "a".repeat(64) };
             break;
           case "/api/auth/login":
             data = { role: body.username, username: body.username };
@@ -395,10 +422,25 @@ test(
           .getByRole("button", { name: "Sign in", exact: true })
           .click();
         await page.waitForURL("**/manager");
-        await page.getByText("Switch Workspace", { exact: true }).waitFor();
+        await page.getByLabel("Open menu", { exact: true }).waitFor();
         await page.getByText("Monday", { exact: true }).waitFor();
-        const theme = page.getByLabel("Color theme", { exact: true });
-        await theme.selectOption("dark");
+        async function chooseTheme(value) {
+          if (
+            !(await page
+              .locator("details")
+              .first()
+              .evaluate((el) => el.open))
+          )
+            await page.getByLabel("Open menu", { exact: true }).click();
+          await page
+            .getByRole("button", {
+              name: "Use " + value + " theme",
+              exact: true,
+            })
+            .click();
+          await page.keyboard.press("Escape");
+        }
+        await chooseTheme("dark");
         await page.waitForFunction(
           () => document.documentElement.dataset.theme === "dark",
         );
@@ -424,7 +466,7 @@ test(
           () => document.documentElement.dataset.theme === "dark",
         );
         await page.emulateMedia({ colorScheme: "dark" });
-        await theme.selectOption("system");
+        await chooseTheme("system");
         await page.waitForFunction(
           () => document.documentElement.dataset.theme === "dark",
         );
@@ -432,8 +474,8 @@ test(
         await page.waitForFunction(
           () => document.documentElement.dataset.theme === "light",
         );
-        await theme.selectOption("light");
-        await page.getByText("Switch Workspace", { exact: true }).click();
+        await chooseTheme("light");
+        await page.getByLabel("Open menu", { exact: true }).click();
         assert.equal(
           await page
             .locator("details")
@@ -449,8 +491,10 @@ test(
             .evaluate((el) => el.open),
           false,
         );
-        await page.getByText("Switch Workspace", { exact: true }).click();
-        await theme.focus();
+        await page.getByLabel("Open menu", { exact: true }).click();
+        await page
+          .getByRole("button", { name: "Create employee", exact: true })
+          .focus();
         assert.equal(
           await page
             .locator("details")
@@ -473,7 +517,7 @@ test(
           ),
           "Management overflow at " + width,
         );
-        await page.getByText("Switch Workspace", { exact: true }).click();
+        await page.getByLabel("Open menu", { exact: true }).click();
         await page.getByRole("link", { name: "Waiter", exact: true }).click();
         await page.waitForURL("**/waiter");
         await page
@@ -490,14 +534,18 @@ test(
             path: path.join(screenshots, `waiter-${width}.png`),
             fullPage: width < 768,
           });
-        await page.getByText("Switch Workspace", { exact: true }).click();
+        await page.getByLabel("Open menu", { exact: true }).click();
         await page
           .getByRole("link", { name: "Reception", exact: true })
           .click();
         await page.waitForURL(origin + "/");
+        await page.getByRole("button", { name: "Tables", exact: true }).click();
         await page
           .getByRole("button", { name: "Clear Indoor 1", exact: true })
           .waitFor();
+        await page
+          .getByRole("button", { name: "Close tables", exact: true })
+          .click();
         assert.ok(
           await page.evaluate(
             () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -529,11 +577,26 @@ test(
           0,
         );
         await page
-          .getByRole("button", {
-            name: "More actions for " + unconfirmed.name,
-            exact: true,
-          })
-          .click();
+          .getByText("Subscribed to updates", { exact: true })
+          .waitFor();
+        if (screenshots)
+          await page.screenshot({
+            path: path.join(screenshots, `guest-sheet-${width}.png`),
+          });
+        const sheet = page.getByRole("dialog", {
+          name: unconfirmed.name,
+          exact: true,
+        });
+        assert.ok(await sheet.isVisible());
+        assert.equal(
+          await sheet
+            .getByRole("link", { name: "Open WhatsApp", exact: true })
+            .getAttribute("href"),
+          "https://wa.me/2" + unconfirmed.phone,
+        );
+        await page.keyboard.press("Escape");
+        await sheet.waitFor({ state: "hidden" });
+
         const queue = page.getByRole("region", { name: "Guest queue" });
         await queue.evaluate((el) => {
           el.style.maxHeight = "200px";
@@ -549,9 +612,7 @@ test(
           el.style.maxHeight = "";
           el.scrollTop = 0;
         });
-        await page
-          .getByLabel("Color theme", { exact: true })
-          .selectOption("dark");
+        await chooseTheme("dark");
         await page.waitForFunction(
           () => document.documentElement.dataset.theme === "dark",
         );
@@ -578,9 +639,7 @@ test(
             path: path.join(screenshots, `reception-dark-${width}.png`),
             fullPage: width < 768,
           });
-        await page
-          .getByLabel("Color theme", { exact: true })
-          .selectOption("light");
+        await chooseTheme("light");
         assert.equal(
           await page
             .getByRole("heading", { name: "Table readiness", exact: true })
@@ -676,10 +735,14 @@ test(
           });
         await page.keyboard.press("Escape");
         await seat.waitFor({ state: "hidden" });
+        await page.getByRole("button", { name: "Tables", exact: true }).click();
         await page
           .getByRole("button", { name: "Clear Indoor 1", exact: true })
           .click();
         await page.getByText("Table is now free.", { exact: true }).waitFor();
+        await page
+          .getByRole("button", { name: "Close tables", exact: true })
+          .click();
         await page.getByText("Indoor 1 is ready!", { exact: true }).waitFor();
         assert.ok(
           await page
@@ -696,6 +759,7 @@ test(
           });
         mode = "simple";
         await page.reload();
+        await page.getByRole("button", { name: "Tables", exact: true }).click();
         await page
           .getByRole("button", { name: "Table free", exact: true })
           .first()
@@ -723,8 +787,11 @@ test(
             path: path.join(screenshots, `reception-simple-${width}.png`),
             fullPage: width < 768,
           });
+        await page
+          .getByRole("button", { name: "Close tables", exact: true })
+          .click();
         occupied = 1;
-        await page.getByText("Switch Workspace", { exact: true }).click();
+        await page.getByLabel("Open menu", { exact: true }).click();
         await page.getByRole("link", { name: "Waiter", exact: true }).click();
         await page.waitForURL("**/waiter");
         await page
@@ -736,13 +803,13 @@ test(
         await page
           .getByText("Indoor request sent to Reception.", { exact: true })
           .waitFor();
-        await page.getByText("Switch Workspace", { exact: true }).click();
+        await page.getByLabel("Open menu", { exact: true }).click();
         await page
           .getByRole("link", { name: "Reception", exact: true })
           .click();
         await page.waitForURL(origin + "/");
         await page
-          .getByRole("heading", { name: "Table readiness", exact: true })
+          .getByRole("button", { name: "Open table requests (1)", exact: true })
           .waitFor();
         assert.ok(
           await page
@@ -762,7 +829,7 @@ test(
           });
         }
         await page
-          .getByRole("button", { name: /Table requests: 1 pending/ })
+          .getByRole("button", { name: "Open table requests (1)", exact: true })
           .click();
         assert.equal(
           await page
@@ -843,7 +910,7 @@ test(
         await page.getByText(staffUsername, { exact: true }).first().waitFor();
         await page.getByText("Monday", { exact: true }).waitFor();
         await assertNoSideScroll("Long Manager content");
-        await page.getByText("Switch Workspace", { exact: true }).click();
+        await page.getByLabel("Open menu", { exact: true }).click();
         await assertNoSideScroll("Open workspace selector");
         await page.goto(origin + "/waiter");
         await page
@@ -852,18 +919,21 @@ test(
         await assertNoSideScroll("Long Waiter content");
         await page.goto(origin + "/");
         await page
-          .getByRole("heading", { name: guests[0].name, exact: true })
+          .getByRole("button", {
+            name: "Guest details for " + guests[0].name,
+            exact: true,
+          })
           .waitFor();
         await assertNoSideScroll("Long Reception content");
         await page
-          .getByRole("button", { name: /Table requests: 1 pending/ })
+          .getByRole("button", { name: "Open table requests (1)", exact: true })
           .click();
         await page
           .getByRole("button", { name: "Approve", exact: true })
           .waitFor();
         await assertNoSideScroll("Open request panel");
         await page
-          .getByRole("button", { name: /Table requests: 1 pending/ })
+          .getByRole("button", { name: "Open table requests (1)", exact: true })
           .click();
         await page
           .getByRole("button", {
@@ -871,9 +941,10 @@ test(
             exact: true,
           })
           .click();
-        await assertNoSideScroll("Open guest menu");
+        await assertNoSideScroll("Open guest sheet");
         await page
-          .getByRole("button", { name: "Seat " + guests[0].name, exact: true })
+          .getByRole("dialog", { name: guests[0].name, exact: true })
+          .getByRole("button", { name: "Seat guest", exact: true })
           .click();
         await page
           .getByRole("dialog", { name: "Assign table", exact: true })
@@ -919,14 +990,52 @@ test(
         ]);
         const page = await context.newPage();
         await page.goto(origin + (role === "waiter" ? "/waiter" : "/"));
+        await page.getByLabel("Open menu", { exact: true }).click();
         await page
           .getByRole("button", { name: "Sign out", exact: true })
           .waitFor();
         assert.equal(
-          await page.getByText("Switch Workspace", { exact: true }).count(),
+          await page
+            .getByRole("link", { name: "Management", exact: true })
+            .count(),
           0,
         );
         await context.close();
+      }
+      for (const consent of [false, true]) {
+        const guestContext = await browser.newContext({
+          viewport: { width: 390, height: 844 },
+          colorScheme: "dark",
+        });
+        const guestPage = await guestContext.newPage();
+        await guestContext.addInitScript(() =>
+          localStorage.setItem("mo-bistro-theme", "dark"),
+        );
+        await guestPage.goto(origin + "/join");
+        await guestPage.getByRole("checkbox").waitFor();
+        assert.equal(await guestPage.getByRole("checkbox").count(), 1);
+        await guestPage.waitForFunction(
+          () => document.documentElement.dataset.theme === "guest-light",
+        );
+        await guestPage
+          .getByPlaceholder("Full name", { exact: true })
+          .fill("Omar Hassan");
+        await guestPage
+          .getByPlaceholder("01XXXXXXXXX", { exact: true })
+          .fill("01012345678");
+        if (consent) await guestPage.getByRole("checkbox").check();
+        if (screenshots && consent)
+          await guestPage.screenshot({
+            path: path.join(screenshots, "join-combined-consent.png"),
+            fullPage: true,
+          });
+        await guestPage
+          .getByRole("button", { name: "Join the waitlist", exact: true })
+          .click();
+        await guestPage.waitForURL("**/status?token=*");
+        assert.equal(submittedBooking.whatsapp_confirmation_consent, consent);
+        assert.equal(submittedBooking.whatsapp_feedback_consent, consent);
+        await guestContext.close();
       }
       assert.deepEqual(errors, []);
       console.log("Browser evidence directory: " + temp);

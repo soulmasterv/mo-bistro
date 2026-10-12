@@ -1,7 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 export type NotificationKind = "confirmation" | "almost_ready" | "review";
-export const CONSENT_VERSION = "whatsapp-v1-2026-10-12";
+export const CONSENT_VERSION = "whatsapp-v2-2026-10-12";
 export function whatsappEnabled() {
   return process.env.WHATSAPP_ENABLED === "true" && process.env.MO_BISTRO_DB === "postgres";
 }

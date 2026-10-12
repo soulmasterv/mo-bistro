@@ -34,7 +34,6 @@ export default function JoinPage() {
   const [error, setError] = useState("");
   const [whatsappAvailable, setWhatsappAvailable] = useState(false);
   const [whatsappConfirmation, setWhatsappConfirmation] = useState(false);
-  const [whatsappFeedback, setWhatsappFeedback] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -156,7 +155,7 @@ export default function JoinPage() {
           seating_preference: seatingPreference,
           qr_code: qrCode,
           whatsapp_confirmation_consent: whatsappAvailable && whatsappConfirmation,
-          whatsapp_feedback_consent: whatsappAvailable && whatsappFeedback,
+          whatsapp_feedback_consent: whatsappAvailable && whatsappConfirmation,
         }),
       });
 
@@ -436,11 +435,7 @@ export default function JoinPage() {
                   <legend className="px-1 font-semibold">Optional WhatsApp messages</legend>
                   <label className="flex items-start gap-3">
                     <input type="checkbox" checked={whatsappConfirmation} onChange={e => setWhatsappConfirmation(e.target.checked)} />
-                    <span>Send me one WhatsApp booking confirmation. I can choose “Subscribe to Updates” in that message to receive further updates.</span>
-                  </label>
-                  <label className="flex items-start gap-3">
-                    <input type="checkbox" checked={whatsappFeedback} onChange={e => setWhatsappFeedback(e.target.checked)} />
-                    <span>Send me one review request 60 minutes after seating, only if I subscribe to updates.</span>
+                    <span>Send me one WhatsApp booking confirmation. If I reply to subscribe, send me queue updates and one review request 60 minutes after seating.</span>
                   </label>
                   <p className="text-xs text-[#777367]">Booking is available without these options. Reply STOP to unsubscribe.</p>
                 </fieldset>}

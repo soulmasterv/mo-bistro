@@ -2,6 +2,7 @@
 import ReceptionTableRequests from "@/components/reception-table-requests";
 import TableReadyNotifications from "@/components/table-ready-notifications";
 
+import GuestDetailSheet from "@/components/guest-detail-sheet";
 import SeatGuestModal from "@/components/seat-guest-modal";
 
 import { guestDialHref } from "@/lib/guest-phone";
@@ -23,6 +24,7 @@ import {
   ArrowUpRight,
   XCircle,
   RefreshCw,
+  Armchair,
 } from "lucide-react";
 
 type GuestStatus = "waiting" | "called" | "seated" | "no_show" | "cancelled";
@@ -75,6 +77,9 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [addError, setAddError] = useState("");
+  const [showTables, setShowTables] = useState(false);
+  const tablesDialog = useRef<HTMLDivElement>(null);
+  useStaffDialog(showTables, tablesDialog, () => setShowTables(false));
   const loadGuests = useCallback(async (force = false) => {
     if (guestsController.current && !force) return;
     guestsController.current?.abort();
@@ -189,29 +194,6 @@ export default function Home() {
     };
   }, [showQR]);
 
-  useEffect(() => {
-    if (openGuestMenu === null) return;
-
-    function dismiss(event: PointerEvent) {
-      const target = event.target;
-      if (target instanceof Element && !target.closest("[data-guest-menu]")) {
-        setOpenGuestMenu(null);
-      }
-    }
-
-    function escape(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpenGuestMenu(null);
-    }
-
-    document.addEventListener("pointerdown", dismiss);
-    document.addEventListener("keydown", escape);
-
-    return () => {
-      document.removeEventListener("pointerdown", dismiss);
-      document.removeEventListener("keydown", escape);
-    };
-  }, [openGuestMenu]);
-
   async function performAction(id: number, action: Action) {
     if (action === "seat") {
       const guest = guests.find((g) => g.id === id);
@@ -286,8 +268,9 @@ export default function Home() {
       (queueFilter === "all" || g.status === queueFilter),
   );
 
+  const selectedGuest = active.find((guest) => guest.id === openGuestMenu);
   return (
-    <main className="bistro-app bistro-reception">
+    <main className="bistro-app bistro-reception queue-first">
       <div className="bistro-container">
         <section
           className="bistro-notification-center"
@@ -313,6 +296,14 @@ export default function Home() {
               aria-label="Refresh queue"
             >
               <RefreshCw size={18} />
+            </button>
+            <button
+              type="button"
+              className="bistro-button bistro-button-secondary"
+              onClick={() => setShowTables(true)}
+            >
+              <Armchair size={18} />
+              Tables
             </button>
             <button
               type="button"
@@ -452,7 +443,16 @@ export default function Home() {
                           .join("")}
                       </div>
                       <div className="bistro-guest-copy">
-                        <h3>{guest.name}</h3>
+                        <h3>
+                          <button
+                            type="button"
+                            className="queue-guest-name"
+                            aria-label={"Guest details for " + guest.name}
+                            onClick={() => setOpenGuestMenu(guest.id)}
+                          >
+                            {guest.name}
+                          </button>
+                        </h3>
                         <p>
                           <Users size={13} /> {guest.party_size} guests{" "}
                           <span>·</span>{" "}
@@ -462,6 +462,9 @@ export default function Home() {
                               ? "Indoor"
                               : "Outdoor"}
                         </p>
+                        {guest.status === "called" && (
+                          <span className="queue-called-marker">Called</span>
+                        )}
                         <span className="bistro-phone">{guest.phone}</span>
                       </div>
                       <span
@@ -474,7 +477,7 @@ export default function Home() {
                       </span>
                     </div>
                     <div className="bistro-guest-bottom">
-                      <span className="bistro-muted">
+                      <span className="bistro-muted queue-guest-confirmation">
                         {guest.confirmation_required === false ? (
                           "Booking active"
                         ) : guest.confirmed === 1 ? (
@@ -511,7 +514,7 @@ export default function Home() {
                           aria-label={"Seat " + guest.name}
                           className="bistro-button"
                         >
-                          Seat guest <ArrowUpRight size={15} />
+                          Seat <ArrowUpRight size={15} />
                         </button>
                         <div className="bistro-guest-menu" data-guest-menu>
                           <button
@@ -527,52 +530,6 @@ export default function Home() {
                           >
                             ···
                           </button>
-                          {openGuestMenu === guest.id && (
-                            <div className="bistro-dropdown">
-                              {guest.status === "waiting" && (
-                                <button
-                                  disabled={busy}
-                                  onClick={() => {
-                                    setOpenGuestMenu(null);
-                                    void performAction(guest.id, "call");
-                                  }}
-                                >
-                                  Mark called
-                                </button>
-                              )}
-                              {guest.confirmation_required !== false &&
-                                guest.confirmed !== 1 && (
-                                  <button
-                                    disabled={busy}
-                                    onClick={() => {
-                                      setOpenGuestMenu(null);
-                                      void performAction(guest.id, "confirm");
-                                    }}
-                                  >
-                                    Confirm booking
-                                  </button>
-                                )}
-                              <button
-                                disabled={busy}
-                                onClick={() => {
-                                  setOpenGuestMenu(null);
-                                  void performAction(guest.id, "no_show");
-                                }}
-                              >
-                                No-show
-                              </button>
-                              <button
-                                className="bistro-danger"
-                                disabled={busy}
-                                onClick={() => {
-                                  setOpenGuestMenu(null);
-                                  void performAction(guest.id, "cancel");
-                                }}
-                              >
-                                Cancel booking
-                              </button>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -594,10 +551,6 @@ export default function Home() {
               </span>
             </footer>
           </section>
-          <aside className="bistro-service-column">
-            <TableAvailability />
-            <RestaurantWaitSlider />
-          </aside>
         </div>
         <footer className="bistro-page-footer">
           <span>
@@ -606,6 +559,73 @@ export default function Home() {
           <span>Thoughtful service, from arrival to goodbye.</span>
         </footer>
       </div>
+      <nav className="queue-bottom-bar" aria-label="Queue tools">
+        <button type="button" onClick={() => setShowTables(true)}>
+          <Armchair size={20} />
+          <span>Tables</span>
+        </button>
+        <button type="button" onClick={openQR}>
+          <QrCode size={20} />
+          <span>QR Code</span>
+        </button>
+        <button
+          type="button"
+          className="queue-add-guest"
+          onClick={() => {
+            setAddError("");
+            setShowAdd(true);
+          }}
+        >
+          <Plus size={20} />
+          <span>Add guest</span>
+        </button>
+      </nav>
+      {selectedGuest && (
+        <GuestDetailSheet
+          key={selectedGuest.id}
+          guest={selectedGuest}
+          busy={busy}
+          error={error}
+          onClose={() => setOpenGuestMenu(null)}
+          onSeat={() => {
+            setOpenGuestMenu(null);
+            void performAction(selectedGuest.id, "seat");
+          }}
+          onAction={(action) => void performAction(selectedGuest.id, action)}
+        />
+      )}
+      {showTables &&
+        createPortal(
+          <div
+            className="bistro-dialog-scope queue-sheet-overlay"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setShowTables(false);
+            }}
+          >
+            <div
+              ref={tablesDialog}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="tables-sheet-title"
+              tabIndex={-1}
+              className="queue-guest-sheet queue-tables-sheet"
+            >
+              <header>
+                <h2 id="tables-sheet-title">Tables</h2>
+                <button
+                  type="button"
+                  aria-label="Close tables"
+                  onClick={() => setShowTables(false)}
+                >
+                  <XCircle size={22} />
+                </button>
+              </header>
+              <TableAvailability />
+              <RestaurantWaitSlider />
+            </div>
+          </div>,
+          document.body,
+        )}
       {showQR &&
         createPortal(
           <div

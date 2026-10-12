@@ -50,34 +50,39 @@ export function ThemePreference() {
   }, [current, pathname]);
   return null;
 }
+function choose(value: Preference) {
+  try {
+    window.localStorage.setItem(KEY, value);
+  } catch {
+    volatilePreference = value;
+  }
+  document.documentElement.dataset.theme =
+    value === "system"
+      ? window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light"
+      : value;
+  window.dispatchEvent(new Event(CHANGE));
+}
+
 export function ThemeSwitcher() {
   const current = useTheme();
   return (
-    <label className="theme-switcher">
+    <div className="theme-menu-control" role="group" aria-label="Color theme">
       <span>Theme</span>
-      <select
-        aria-label="Color theme"
-        value={current.split(":")[0]}
-        onChange={(event) => {
-          const value = event.target.value as Preference;
-          try {
-            window.localStorage.setItem(KEY, value);
-          } catch {
-            volatilePreference = value;
-          }
-          document.documentElement.dataset.theme =
-            value === "system"
-              ? window.matchMedia("(prefers-color-scheme: dark)").matches
-                ? "dark"
-                : "light"
-              : value;
-          window.dispatchEvent(new Event(CHANGE));
-        }}
-      >
-        <option value="system">System</option>
-        <option value="light">Light</option>
-        <option value="dark">Dark</option>
-      </select>
-    </label>
+      <div>
+        {(["light", "dark", "system"] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            aria-label={"Use " + value + " theme"}
+            aria-pressed={current.split(":")[0] === value}
+            onClick={() => choose(value)}
+          >
+            {value[0].toUpperCase() + value.slice(1)}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

@@ -137,6 +137,9 @@ export default function ReceptionTableRequests() {
       setUnreadRequestIds(reconciled.unread);
       knownRequestIds.current = currentIds;
       setRequests(list);
+      window.dispatchEvent(
+        new CustomEvent("mo-bistro-requests-changed", { detail: list.length }),
+      );
 
       if (
         !list.some(
@@ -191,6 +194,21 @@ export default function ReceptionTableRequests() {
       window.removeEventListener("mo-bistro-tables-changed", onChanged);
     };
   }, [refresh]);
+
+  useEffect(() => {
+    function openRequests() {
+      notificationPanelOpenRef.current = true;
+      setNotificationPanelOpen(true);
+      unreadIdsRef.current = new Set();
+      setUnreadRequestIds(new Set());
+      document
+        .querySelector(".bistro-notification-center")
+        ?.scrollIntoView({ block: "start" });
+    }
+    window.addEventListener("mo-bistro-open-requests", openRequests);
+    return () =>
+      window.removeEventListener("mo-bistro-open-requests", openRequests);
+  }, []);
 
   useEffect(() => {
     if (localStorage.getItem("mo-bistro-reception-sound") !== "on") return;

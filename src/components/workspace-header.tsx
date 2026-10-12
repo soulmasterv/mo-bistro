@@ -1,12 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import {
-  ChevronDown,
-  LayoutDashboard,
-  LogOut,
-  UtensilsCrossed,
-} from "lucide-react";
+import { Menu, Bell, LogOut, UtensilsCrossed } from "lucide-react";
 import type { StaffRole } from "@/lib/staff-session-shared";
 
 import { ThemeSwitcher } from "@/components/theme-preference";
@@ -27,6 +22,7 @@ export default function WorkspaceHeader({
   const selector = useRef<HTMLDetailsElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [pendingCount, setPendingCount] = useState(0);
   useEffect(() => {
     function dismiss(event: PointerEvent | FocusEvent) {
       if (
@@ -43,6 +39,14 @@ export default function WorkspaceHeader({
       document.removeEventListener("pointerdown", dismiss);
       document.removeEventListener("focusin", dismiss);
     };
+  }, []);
+  useEffect(() => {
+    function update(event: Event) {
+      setPendingCount(Number((event as CustomEvent).detail) || 0);
+    }
+    window.addEventListener("mo-bistro-requests-changed", update);
+    return () =>
+      window.removeEventListener("mo-bistro-requests-changed", update);
   }, []);
   async function logout() {
     if (busy) return;
@@ -78,25 +82,41 @@ export default function WorkspaceHeader({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ThemeSwitcher />
-          {role === "manager" && (
-            <details
-              ref={selector}
-              className="relative"
-              onKeyDown={(event) => {
-                if (event.key === "Escape" && selector.current) {
-                  selector.current.open = false;
-                  selector.current.querySelector("summary")?.focus();
-                }
-              }}
+          {workspace === "Reception" && pendingCount > 0 && (
+            <button
+              type="button"
+              className="queue-request-bell"
+              aria-label={`Open table requests (${pendingCount})`}
+              onClick={() =>
+                window.dispatchEvent(new Event("mo-bistro-open-requests"))
+              }
             >
-              <summary className="workspace-switch">
-                <LayoutDashboard size={17} aria-hidden="true" />
-                <span>Switch Workspace</span>
-                <ChevronDown size={16} aria-hidden="true" />
-              </summary>
-              <nav aria-label="Manager workspaces" className="workspace-menu">
-                {workspaces.map((item) => (
+              <Bell size={20} />
+              <span>{pendingCount}</span>
+            </button>
+          )}
+          <details
+            ref={selector}
+            className="relative"
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && selector.current) {
+                selector.current.open = false;
+                selector.current.querySelector("summary")?.focus();
+              }
+            }}
+          >
+            <summary
+              className="workspace-switch queue-menu-trigger"
+              aria-label="Open menu"
+            >
+              <Menu size={22} />
+              <span className="sr-only">
+                {role === "manager" ? "Switch Workspace" : "Menu"}
+              </span>
+            </summary>
+            <nav aria-label="Workspace menu" className="workspace-menu">
+              {role === "manager" &&
+                workspaces.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
@@ -109,21 +129,18 @@ export default function WorkspaceHeader({
                     {item.label}
                   </Link>
                 ))}
-              </nav>
-            </details>
-          )}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void logout()}
-            className="workspace-signout bistro-signout"
-            aria-label="Sign out"
-          >
-            <LogOut size={18} aria-hidden="true" />
-            <span className="hidden sm:inline">
-              {busy ? "Signing out…" : "Sign out"}
-            </span>
-          </button>
+              <ThemeSwitcher />
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void logout()}
+                className="workspace-option queue-menu-signout"
+              >
+                <LogOut size={17} />
+                {busy ? "Signing out…" : "Sign out"}
+              </button>
+            </nav>
+          </details>
         </div>
       </div>
       {error && (
