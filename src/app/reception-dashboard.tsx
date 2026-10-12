@@ -10,11 +10,11 @@ import TableAvailability from "@/components/table-availability";
 import RestaurantWaitSlider from "@/components/restaurant-wait-slider";
 
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { createPortal } from "react-dom";
 import {
-  Users, Clock3, CheckCircle2, Plus, Phone,
+  Users, CheckCircle2, Plus, Phone,
   Bell, Search, QrCode,
   ArrowUpRight, XCircle, RefreshCw
 } from "lucide-react";
@@ -45,12 +45,14 @@ const labels: Record<GuestStatus, string> = {
 };
 
 export default function Home() {
+  const guestsController = useRef<AbortController | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [isManager, setIsManager] = useState(false);
   const [seatingGuest, setSeatingGuest] = useState<Guest | null>(null);
   const [search, setSearch] = useState("");
   const [openGuestMenu, setOpenGuestMenu] = useState<number | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const qrDialog = useRef<HTMLDivElement>(null);
   const [showQR, setShowQR] = useState(false);
   const [registrationUrl, setRegistrationUrl] = useState("");
   const [name, setName] = useState("");
@@ -61,22 +63,29 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [addError, setAddError] = useState("");
-  const loadGuests = useCallback(async () => {
+  const loadGuests = useCallback(async (force = false) => {
+    if (guestsController.current && !force) return;
+    guestsController.current?.abort();
+    const controller = new AbortController();
+    guestsController.current = controller;
     try {
-      const response = await fetch("/api/guests", { cache: "no-store" });
+      const response = await fetch("/api/guests", { cache: "no-store", signal: controller.signal });
       if (!response.ok) throw new Error("Unable to load guests");
-      setGuests(await response.json());
+      const data = await response.json();
+      if (!controller.signal.aborted) setGuests(data);
     } catch {
-      setError("Could not refresh the waitlist.");
+      if (!controller.signal.aborted) setError("Could not refresh the waitlist.");
+    } finally {
+      if (guestsController.current === controller) guestsController.current = null;
     }
   }, []);
 
   useEffect(() => {
-    void loadGuests();
-    const timer = setInterval(() => void loadGuests(), 5000);
-    const onTablesChanged = () => { void loadGuests(); };
+    const initial = window.setTimeout(() => void loadGuests(), 0);
+    const timer = setInterval(() => { if (document.visibilityState === "visible") void loadGuests(); }, 5000);
+    const onTablesChanged = () => { void loadGuests(true); };
     window.addEventListener("mo-bistro-tables-changed", onTablesChanged);
-    return () => { clearInterval(timer); window.removeEventListener("mo-bistro-tables-changed", onTablesChanged); };
+    return () => { window.clearTimeout(initial); guestsController.current?.abort(); guestsController.current = null; clearInterval(timer); window.removeEventListener("mo-bistro-tables-changed", onTablesChanged); };
   }, [loadGuests]);
 
   useEffect(() => {
@@ -120,17 +129,31 @@ export default function Home() {
   useEffect(() => {
     if (!showQR) return;
 
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = qrDialog.current;
+    dialog?.querySelector<HTMLButtonElement>("button")?.focus();
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setShowQR(false);
+      if (event.key === "Tab" && dialog) {
+        const controls = [...dialog.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input, select, [tabindex="0"]')];
+        const first = controls[0], last = controls[controls.length - 1];
+        if (!first) { event.preventDefault(); dialog.focus(); }
+        else if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
+          event.preventDefault(); last.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialog)) {
+          event.preventDefault(); first.focus();
+        }
+      }
     };
 
     document.addEventListener("keydown", closeOnEscape);
 
     return () => {
       document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [showQR]);
@@ -183,7 +206,7 @@ export default function Home() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Action failed");
-      await loadGuests();
+      await loadGuests(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Action failed");
     } finally {
@@ -213,7 +236,7 @@ export default function Home() {
       setParty(2);
       setSeatingPreference("any");
       setShowAdd(false);
-      await loadGuests();
+      await loadGuests(true);
     } catch (err) {
       setAddError(err instanceof Error ? err.message : "Unable to add guest");
     } finally {
@@ -235,7 +258,7 @@ export default function Home() {
         <header className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-[#C5A77B]">
-              Restaurant Concierge
+              Mo Bistro
             </p>
             <h1 className="text-4xl font-semibold tracking-tight">Waitlist</h1>
             <p className="mt-2 text-sm text-slate-400">
@@ -247,7 +270,7 @@ export default function Home() {
                 type="button"
                 onClick={async () => {
                   await fetch("/api/auth/logout", { method: "POST" });
-                  window.location.href = "/login";
+                  window.location.replace("/login");
                 }}
                 className="rounded-xl border border-white/10 px-4 text-sm hover:bg-white/10"
               >
@@ -284,7 +307,7 @@ export default function Home() {
         <section className="mb-9 grid gap-4 md:grid-cols-3">
           {[
             { label: "Waiting guests", value: waiting, icon: Users },
-            { label: "Pending requests", value: called, icon: Bell },
+            { label: "Called guests", value: called, icon: Bell },
             { label: "Seated guests", value: seated, icon: CheckCircle2 }
           ].map(stat => (
             <div key={stat.label} className="rounded-2xl border border-white/10 bg-[#17202A] p-6">
@@ -333,7 +356,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="max-h-[min(52dvh,560px)] divide-y divide-white/10 overflow-y-auto overscroll-contain px-3">
+          <div className="max-h-[65dvh] sm:max-h-[560px] divide-y divide-white/10 overflow-y-auto overscroll-contain touch-pan-y px-3 pb-16">
       {filtered.map((guest) => {
         const position = active.findIndex(g => g.id === guest.id) + 1;
         const dialHref = guestDialHref(guest.phone);
@@ -343,7 +366,12 @@ export default function Home() {
             <div className="min-w-0">
               <h3 className="break-words font-semibold leading-tight">{guest.name}</h3>
               <p className="mt-1 text-xs text-slate-300">{guest.party_size} guests · {guest.seating_preference === "any" ? "Any seating" : guest.seating_preference === "indoor" ? "Indoor" : "Outdoor"}</p>
-              <p className="text-xs text-slate-400">{labels[guest.status]}{guest.confirmed === 1 ? " · Confirmed" : ""}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-semibold ${guest.status === "called" ? "bg-[#C5A77B]/20 text-[#E9CFA8]" : "bg-white/10 text-slate-200"}`}>
+                  <Bell size={15} aria-hidden="true" />{guest.status === "waiting" ? "Uncalled" : labels[guest.status]}
+                </span>
+                {guest.confirmed === 1 && <span className="text-xs text-emerald-300">Confirmed</span>}
+              </div>
             </div>
             <div className="flex items-center gap-1">
               {dialHref ? (
@@ -421,18 +449,21 @@ export default function Home() {
 
       {showQR && createPortal(
         <div
+          ref={qrDialog}
+          tabIndex={-1}
           role="dialog"
+          aria-describedby="qr-instructions"
           aria-modal="true"
           aria-label="Guest registration QR code"
           className="fixed inset-0 z-[9999] flex h-[100dvh] w-screen items-center justify-center overflow-y-auto bg-[#0D1218] p-4 text-white"
         >
           <div className="my-auto w-full max-w-md rounded-2xl border border-white/10 bg-[#17202A] p-5 text-center shadow-2xl sm:p-7">
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.25em] text-[#C5A77B]">
-              Restaurant Concierge
+              Mo Bistro
             </p>
             <h2 className="text-2xl font-semibold">Guest Registration</h2>
-            <p className="mt-2 text-sm text-slate-400">
-              Ask your guest to scan this code to join the waitlist.
+            <p id="qr-instructions" className="mt-2 text-sm text-slate-400">
+              Scan this QR code to join the waitlist.
             </p>
 
             <div className="mx-auto my-7 w-fit rounded-2xl bg-white p-5">
@@ -463,7 +494,8 @@ export default function Home() {
                     window.prompt("Copy registration link:", registrationUrl);
                   }
                 }}
-                className="flex-1 rounded-xl border border-white/20 p-3 text-sm hover:bg-white/10"
+                disabled={!registrationUrl}
+                className="flex-1 rounded-xl border border-white/20 p-3 text-sm hover:bg-white/10 disabled:opacity-40"
               >
                 Copy link
               </button>

@@ -17,6 +17,7 @@ import {
 const STORAGE_KEY = "restaurant_guest_tracking_token";
 
 type Tracking = {
+  confirmation_required: boolean;
   guest: {
     name: string;
     party_size: number;
@@ -70,13 +71,13 @@ function StatusContent() {
   }, [token]);
 
   useEffect(() => {
-    void refresh();
+    const initial = window.setTimeout(() => void refresh(), 0);
 
     const timer = setInterval(() => {
       void refresh();
     }, 5000);
 
-    return () => clearInterval(timer);
+    return () => { window.clearTimeout(initial); clearInterval(timer); };
   }, [refresh]);
 
 async function cancel() {
@@ -227,7 +228,7 @@ async function cancel() {
                   Reception confirmation
                 </span>
                 <strong>
-                  {data.guest.confirmed ? "Confirmed" : "Pending"}
+                  {data.guest.confirmed ? "Confirmed" : data.confirmation_required ? "Pending" : "Not required"}
                 </strong>
               </div>
             </div>
@@ -257,7 +258,7 @@ async function cancel() {
                 onClick={() => window.alert("Our menu is coming soon.")}
                 className="w-full rounded-xl border border-[#DDD5C9] p-3 font-medium text-[#A78A60]"
               >
-                Explore Mo Bistro's menu
+                Explore Mo Bistro&apos;s menu
               </button>
             )}
 

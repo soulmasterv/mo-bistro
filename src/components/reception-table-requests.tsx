@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import SeatGuestModal from "@/components/seat-guest-modal";
+import { reconcileRequestIds } from "@/lib/request-notifications";
 
 type RequestItem = {
   id: number;
@@ -18,7 +19,10 @@ type ApprovedTable = { name: string; guest: SuggestedGuest | null };
 export default function ReceptionTableRequests() {
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
-  const [unreadRequestCount, setUnreadRequestCount] = useState(0);
+  const [unreadRequestIds, setUnreadRequestIds] = useState<Set<number>>(new Set());
+  const unreadIdsRef = useRef(new Set<number>());
+  const refreshController = useRef<AbortController | null>(null);
+  const unreadRequestCount = unreadRequestIds.size;
   const knownRequestIds = useRef<Set<number> | null>(null);
   const notificationPanelOpenRef = useRef(false);
   const [tables, setTables] = useState<Array<{
@@ -33,7 +37,6 @@ export default function ReceptionTableRequests() {
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState("");
-  const seen = useRef<Set<number> | null>(null);
   const audio = useRef<AudioContext | null>(null);
   const soundRef = useRef(false);
 
@@ -76,9 +79,14 @@ export default function ReceptionTableRequests() {
     localStorage.setItem("mo-bistro-reception-sound", "off");
   }
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
+    if (refreshController.current && !force) return;
+    refreshController.current?.abort();
+    const controller = new AbortController();
+    refreshController.current = controller;
     try {
       const response = await fetch("/api/reception/table-requests", {
+        signal: controller.signal,
         cache: "no-store",
         credentials: "same-origin",
       });
@@ -87,44 +95,43 @@ export default function ReceptionTableRequests() {
         throw new Error(failure.error || "Unable to load table requests.");
       }
       const data = await response.json();
-      const list: RequestItem[] = Array.isArray(data) ? data :
+      const raw: RequestItem[] = Array.isArray(data) ? data :
         Array.isArray(data.requests) ? data.requests : [];
-      const ids = new Set(list.map(item => Number(item.id)));
-      if (seen.current !== null && [...ids].some(id => !seen.current!.has(id))) {
-        chime();
-      }
-      seen.current = ids;
-      const currentIds = new Set<number>(
-        list.map((item: RequestItem) => Number(item.id))
-      );
-
-      if (knownRequestIds.current !== null) {
-        const newCount = [...currentIds].filter(
-          id => !knownRequestIds.current!.has(id)
-        ).length;
-
-        if (newCount > 0) {
-          setNotificationPanelOpen(true);
-          notificationPanelOpenRef.current = true;
-          setUnreadRequestCount(previous => previous + newCount);
-        }
-      }
-
+      const list = [...new Map(raw.map(item => [Number(item.id), {
+        ...item, id: Number(item.id),
+        table_id: item.table_id === null ? null : Number(item.table_id),
+      }])).values()].filter(item => Number.isSafeInteger(item.id) && item.id > 0);
+      if (controller.signal.aborted) return;
+      const currentIds = new Set(list.map(item => item.id));
+      const reconciled = reconcileRequestIds(currentIds, knownRequestIds.current,
+        unreadIdsRef.current, notificationPanelOpenRef.current);
+      if (reconciled.added.length > 0) chime();
+      unreadIdsRef.current = reconciled.unread;
+      setUnreadRequestIds(reconciled.unread);
       knownRequestIds.current = currentIds;
       setRequests(list);
 
+      if (!list.some(item => item.request_area)) {
+        setTables([]);
+        setError("");
+        return;
+      }
       const tablesResponse = await fetch("/api/tables", {
+        signal: controller.signal,
         cache: "no-store",
         credentials: "same-origin",
       });
 
+      if (!tablesResponse.ok) throw new Error("Unable to load occupied tables for area requests.");
       if (tablesResponse.ok) {
         const tableData = await tablesResponse.json();
-        setTables(Array.isArray(tableData) ? tableData : tableData.tables ?? []);
+        if (!controller.signal.aborted) setTables(Array.isArray(tableData) ? tableData : tableData.tables ?? []);
       }
-      setError("");
+      if (!controller.signal.aborted) setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to refresh requests.");
+      if (!controller.signal.aborted) setError(err instanceof Error ? err.message : "Unable to refresh requests.");
+    } finally {
+      if (refreshController.current === controller) refreshController.current = null;
     }
   }, []);
 
@@ -133,7 +140,16 @@ export default function ReceptionTableRequests() {
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") void refresh();
     }, 3000);
-    return () => clearInterval(timer);
+    const onChanged = (event: Event) => {
+      if ((event as CustomEvent).detail !== "reception-requests") void refresh(true);
+    };
+    window.addEventListener("mo-bistro-tables-changed", onChanged);
+    return () => {
+      clearInterval(timer);
+      refreshController.current?.abort();
+      refreshController.current = null;
+      window.removeEventListener("mo-bistro-tables-changed", onChanged);
+    };
   }, [refresh]);
 
   useEffect(() => {
@@ -226,12 +242,12 @@ export default function ReceptionTableRequests() {
       });
       const result = await response.json();
       if (!response.ok) {
-        await refresh();
+        await refresh(true);
         setSelectedTables(previous => { const next = { ...previous }; delete next[id]; return next; });
         throw new Error(result.error || "Request update failed.");
       }
-      window.dispatchEvent(new Event("mo-bistro-tables-changed"));
-      await refresh();
+      window.dispatchEvent(new CustomEvent("mo-bistro-tables-changed", { detail: "reception-requests" }));
+      await refresh(true);
       if (decision === "approve") {
         if (item) {
           const actualId = item.request_area
@@ -320,7 +336,8 @@ export default function ReceptionTableRequests() {
     )}
     {seatingGuest && <SeatGuestModal guest={seatingGuest} onClose={() => setSeatingGuest(null)} onSuccess={() => { setSeatingGuest(null); window.dispatchEvent(new Event("guest-seated")); }} />}
 
-    <div className="fixed bottom-4 right-4 z-[60] flex items-center gap-2">
+    <div className="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-2">
+      {error && !notificationPanelOpen && <p role="alert" className="max-w-xs rounded-lg bg-[#17202A] p-3 text-sm text-red-200">{error}</p>}
       <button
         type="button"
         onClick={() => {
@@ -328,17 +345,20 @@ export default function ReceptionTableRequests() {
           notificationPanelOpenRef.current = next;
           setNotificationPanelOpen(next);
 
-          if (next) setUnreadRequestCount(0);
+          if (next) {
+            unreadIdsRef.current = new Set();
+            setUnreadRequestIds(new Set());
+          }
         }}
-        aria-label="Toggle table-ready notifications"
+        aria-label={`Table requests: ${requests.length} pending, ${unreadRequestCount} unread`}
         aria-controls="table-request-notifications"
         aria-expanded={notificationPanelOpen}
-        className="flex min-h-14 items-center gap-3 rounded-full bg-[#293126] px-6 py-3 text-base font-semibold text-white shadow-xl"
+        className="flex min-h-16 items-center gap-3 rounded-full border border-[#C5A77B] bg-[#17202A] px-7 py-4 text-lg font-semibold text-white shadow-xl"
       >
         <span className="relative" aria-hidden="true">
           🔔
           {unreadRequestCount > 0 && (
-            <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+            <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
               {unreadRequestCount > 9 ? "9+" : unreadRequestCount}
             </span>
           )}
@@ -352,7 +372,7 @@ export default function ReceptionTableRequests() {
     </div>
 
     {notificationPanelOpen && (
-    <section id="table-request-notifications" className="fixed bottom-20 right-4 z-[70] max-h-[min(65dvh,540px)] w-[min(420px,calc(100vw-32px))] overflow-y-auto rounded-2xl border border-[#D6B681] bg-[#293126] p-4 text-white shadow-2xl">
+    <section id="table-request-notifications" className="fixed bottom-24 right-4 z-[70] max-h-[min(65dvh,540px)] w-[min(420px,calc(100vw-32px))] overflow-y-auto rounded-2xl border border-[#D6B681] bg-[#293126] p-4 text-white shadow-2xl">
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-semibold">Table-ready requests ({requests.length})</h2>
         <button onClick={soundEnabled ? mute : () => void enableSound()} className="rounded-lg border border-white/20 px-3 py-2 text-xs">
@@ -363,11 +383,11 @@ export default function ReceptionTableRequests() {
       {requests.length === 0 ? (
         <p className="mt-3 text-sm text-slate-300">No pending table requests.</p>
       ) : (
-        <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">
+        <div className="mt-4 space-y-3">
           {requests.map(item => (
             <div key={item.id} className="rounded-lg border border-white/10 p-3">
               <p className="font-semibold">{item.table_name || `Table ${item.table_id}`}</p>
-              <p className="mt-1 text-xs text-slate-300">Ready to release · {item.requested_by || "staff"}</p>
+              <p className="mt-1 text-xs text-slate-300">Ready to clear · {item.requested_by || "staff"}</p>
 
               {item.request_area && (
                 <label className="mt-3 block text-xs text-white">

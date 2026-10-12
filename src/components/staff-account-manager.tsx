@@ -19,6 +19,8 @@ export default function StaffAccountManager() {
   const [role, setRole] = useState<Role>("waiter");
   const [busy, setBusy] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [currentStaffId, setCurrentStaffId] = useState<number | null>(null);
+  const [warning, setWarning] = useState("");
   const [staffError, setStaffError] = useState("");
   const [staffMessage, setStaffMessage] = useState("");
   const [updatingId, setUpdatingId] = useState<number | null>(null);
@@ -34,6 +36,8 @@ export default function StaffAccountManager() {
         throw new Error(result.error || "Unable to load employees.");
       }
       setEmployees(Array.isArray(result.users) ? result.users : []);
+      setCurrentStaffId(result.current_staff_id ?? null);
+      setWarning(result.warning ?? "");
       setStaffError("");
     } catch (error) {
       setStaffError(error instanceof Error ? error.message : "Unable to load employees.");
@@ -41,9 +45,9 @@ export default function StaffAccountManager() {
   }, []);
 
   useEffect(() => {
-    void loadEmployees();
+    const initial = window.setTimeout(() => void loadEmployees(), 0);
     window.addEventListener("staff-account-created", loadEmployees);
-    return () => window.removeEventListener("staff-account-created", loadEmployees);
+    return () => { window.clearTimeout(initial); window.removeEventListener("staff-account-created", loadEmployees); };
   }, [loadEmployees]);
 
   async function updateStatus(employee: Employee) {
@@ -133,6 +137,7 @@ export default function StaffAccountManager() {
           </button>
         </div>
 
+        {warning && <p role="status" className="mt-3 text-sm text-amber-200">{warning}</p>}
         {staffError && <p role="alert" className="mt-3 text-sm text-red-300">{staffError}</p>}
         {staffMessage && <p role="status" className="mt-3 text-sm text-emerald-300">{staffMessage}</p>}
 
@@ -157,7 +162,7 @@ export default function StaffAccountManager() {
                 </a>
                 <button
                   type="button"
-                  disabled={updatingId !== null}
+                  disabled={updatingId !== null || (employee.active === 1 && (employee.id === currentStaffId || (employee.role === "manager" && employees.filter(user => user.role === "manager" && user.active === 1).length <= 1)))}
                   onClick={() => void updateStatus(employee)}
                   className="rounded-lg border border-white/20 px-3 py-2 text-xs font-medium disabled:opacity-50"
                 >

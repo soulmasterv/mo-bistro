@@ -60,6 +60,7 @@ export default function SeatGuestModal({
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to seat guest");
 
+      window.dispatchEvent(new Event("mo-bistro-tables-changed"));
       onSuccess();
       onClose();
     } catch (e) {

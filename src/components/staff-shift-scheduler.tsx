@@ -36,6 +36,7 @@ export default function StaffShiftScheduler() {
   const [loading, setLoading] = useState(true);
   const [savingDay, setSavingDay] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [feedbackDay, setFeedbackDay] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
 
   const load = useCallback(async () => {
@@ -81,9 +82,9 @@ export default function StaffShiftScheduler() {
   }, []);
 
   useEffect(() => {
-    void load();
+    const initial = window.setTimeout(() => void load(), 0);
     window.addEventListener("staff-account-created", load);
-    return () => window.removeEventListener("staff-account-created", load);
+    return () => { window.clearTimeout(initial); window.removeEventListener("staff-account-created", load); };
   }, [load]);
 
   function getShift(day: number): Shift {
@@ -117,6 +118,7 @@ export default function StaffShiftScheduler() {
     if (selectedId === null || savingDay !== null) return;
 
     const shift = getShift(day);
+    setFeedbackDay(day);
     setSavingDay(day);
     setError("");
     setNotice("");
@@ -157,7 +159,8 @@ export default function StaffShiftScheduler() {
             Employee
             <select
               value={selectedId ?? ""}
-              onChange={event => setSelectedId(Number(event.target.value))}
+              disabled={savingDay !== null}
+              onChange={event => { setSelectedId(Number(event.target.value)); setFeedbackDay(null); setError(""); setNotice(""); }}
               className="mt-2 w-full rounded-xl border border-white/10 bg-[#0D1218] p-3"
             >
               {employees.map(employee => (
@@ -183,6 +186,7 @@ export default function StaffShiftScheduler() {
                       <h3 className="font-semibold">{day}</h3>
                       <label className="flex items-center gap-2 text-sm text-slate-300">
                         <input
+                          disabled={savingDay !== null}
                           type="checkbox"
                           checked={shift.is_off}
                           onChange={event => updateDay(index, {
@@ -200,6 +204,7 @@ export default function StaffShiftScheduler() {
                         <label className="text-xs text-slate-300">
                           Start
                           <input
+                            disabled={savingDay !== null}
                             type="time"
                             value={shift.start_time ?? "09:00"}
                             onChange={event => updateDay(index, {
@@ -211,6 +216,7 @@ export default function StaffShiftScheduler() {
                         <label className="text-xs text-slate-300">
                           End
                           <input
+                            disabled={savingDay !== null}
                             type="time"
                             value={shift.end_time ?? "17:00"}
                             onChange={event => updateDay(index, {
@@ -222,6 +228,8 @@ export default function StaffShiftScheduler() {
                       </div>
                     )}
 
+                    {feedbackDay === index && error && <p role="alert" className="mt-3 text-sm text-red-300">{error}</p>}
+                    {feedbackDay === index && notice && <p role="status" className="mt-3 text-sm text-emerald-300">{notice}</p>}
                     <button
                       type="button"
                       disabled={savingDay !== null}
@@ -238,8 +246,8 @@ export default function StaffShiftScheduler() {
         </>
       )}
 
-      {error && <p role="alert" className="mt-4 text-sm text-red-300">{error}</p>}
-      {notice && <p role="status" className="mt-4 text-sm text-emerald-300">{notice}</p>}
+      {feedbackDay === null && error && <p role="alert" className="mt-4 text-sm text-red-300">{error}</p>}
+      {feedbackDay === null && notice && <p role="status" className="mt-4 text-sm text-emerald-300">{notice}</p>}
     </section>
   );
 }

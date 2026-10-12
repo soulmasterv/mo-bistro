@@ -12,6 +12,8 @@ type StaffUser = {
 };
 
 export default function StaffPinsPage() {
+  const [pinSupported, setPinSupported] = useState(true);
+  const [warning, setWarning] = useState("");
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [pin, setPin] = useState("");
@@ -34,6 +36,8 @@ export default function StaffPinsPage() {
     }
 
     setUsers(Array.isArray(result.users) ? result.users : []);
+    setPinSupported(result.pin_supported !== false);
+    setWarning(result.warning ?? "");
   }, []);
 
   useEffect(() => {
@@ -217,7 +221,7 @@ export default function StaffPinsPage() {
                   <button
                     type="button"
                     onClick={() => void savePin()}
-                    disabled={saving || pin.length !== 6 || confirmPin.length !== 6}
+                    disabled={!pinSupported || saving || pin.length !== 6 || confirmPin.length !== 6}
                     className="mt-6 min-h-12 w-full rounded-xl bg-[#293126] font-semibold text-white disabled:opacity-40"
                   >
                     {saving ? "Saving..." : selected.has_pin ? "Replace PIN" : "Set PIN"}
@@ -227,6 +231,7 @@ export default function StaffPinsPage() {
             </>
           )}
 
+          {warning && <p role="status" className="mt-4 text-sm text-amber-800">{warning}</p>}
           {error && (
             <p role="alert" className="mt-4 text-sm text-red-700">
               {error}
