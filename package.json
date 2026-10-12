@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test:regressions": "node --test tests/regressions.test.mjs",
-    "test:whatsapp": "node --test tests/whatsapp.test.mjs"
+    "test:whatsapp": "node --test tests/whatsapp.test.mjs",
+    "test:postgres": "node --test tests/postgres-workflows.test.mjs",
+    "test:browser": "node --test tests/browser-workflows.test.mjs"
   },
   "dependencies": {
     "@upstash/qstash": "2.12.0",

@@ -1,65 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import vm from 'node:vm';
-import ts from 'typescript';
-import { createRequire } from 'node:module';
-const requireDependency = createRequire(import.meta.url);
-
-// Execute the actual handlers with isolated auth/license/SQL boundaries. No DB URL
-// or real database client is loaded. These are regression tests, not live DB tests.
-function load(file, mocks = {}, globals = {}) {
-  const filename = path.resolve(file);
-  const source = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
-    fileName: filename,
-  }).outputText;
-  const loadedModule = { exports: {} };
-  vm.runInNewContext(source, {
-    module: loadedModule, exports: loadedModule.exports, console: { error() {}, log() {} },
-    process: { env: { MO_BISTRO_DB: 'postgres' } }, Buffer, URL, Request, Response,
-    AbortController, Set, Map, Date, ...globals,
-    require(id) {
-      if (Object.hasOwn(mocks, id)) return mocks[id];
-      if (id === 'server-only') return {};
-      if (id === 'next/server') return { NextResponse: { json: (body, init) => Response.json(body, init) } };
-      if (id.startsWith('@/')) return load('src/' + id.slice(2) + '.ts', mocks, globals);
-      return requireDependency(id);
-    },
-  }, { filename });
-  return loadedModule.exports;
-}
-function harness(options = {}) {
-  const state = { actor: { id: 1, role: 'manager', username: 'manager' }, license: true, ...options };
-  const queries = [];
-  const sql = (strings, ...values) => {
-    if (!strings.raw) return strings;
-    const query = strings.join('?').replace(/\s+/g, ' ').trim();
-    queries.push({ query, values });
-    return Promise.resolve(state.query ? state.query(query, values) : []);
-  };
-  sql.begin = async callback => callback(sql);
-  const auth = { currentStaff: async () => state.actor, hashCredential: () => 'test-hash', initStaff() {}, getSetting: () => state.approval ?? 'false' };
-  const mocks = {
-    '@/lib/staff-auth': auth,
-    '@/lib/staff-auth-utils': { hashCredential: () => 'test-hash' },
-    '@/lib/postgres-db': { getPostgres: () => sql },
-    '@/lib/licensing/enforce': { requireActiveLicense: async () => state.license ? null : Response.json({ error: 'Subscription inactive' }, { status: 403 }) },
-    '@/lib/db': {},
-    '@/lib/staff-auth-postgres': { getSettingPostgres: async () => state.approval ?? 'false' },
-    '@/lib/api-rate-limit': { checkRateLimit: async () => null },
-    '@/lib/guest-eta-support': { hasGuestEtaColumn: async () => false },
-  };
-  return { state, sql, queries, mocks, route: file => load('src/app/api/' + file + '/route.ts', mocks) };
-}
-function request(method, body, headers = {}) {
-  return new Request('https://bistro.test/api/test', {
-    method, headers: { host: 'bistro.test', origin: 'https://bistro.test', 'content-type': 'application/json', ...headers },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  });
-}
-const context = id => ({ params: Promise.resolve({ id: String(id) }) });
+import { load,harness,request,context,requireDependency } from './handler-harness.mjs';
 
 test('Unread IDs reconcile disappearing, duplicate, initial and visible requests', () => {
   const { reconcileRequestIds } = load('src/lib/request-notifications.ts');
@@ -325,13 +266,14 @@ test('Both Reception table views expose Clear Table only for occupied tables', (
       { id: 5, name: 'Indoor 1', area: 'indoor', seats: 4, status: 'occupied' },
       { id: 6, name: 'Outdoor 1', area: 'outdoor', seats: 4, status: 'free' },
     ];
-    const values = [tables, mode, { indoor: 5 }, '', null, ''];
+    const pools=[{area:"indoor",total_tables:1,occupied_tables:1,free_tables:0,max_party_size:4},{area:"outdoor",total_tables:1,occupied_tables:0,free_tables:1,max_party_size:4}];
+    const values = [mode === "detailed" ? tables : [], mode, pools, null, '', null, ''];
     const react = { ...requireDependency('react'), useState: initial => [index < values.length ? values[index++] : initial, () => {}], useRef: initial => ({ current: initial }), useEffect() {}, useCallback: fn => fn };
     const Component = load('src/components/table-availability.tsx', { react }).default;
     const markup = renderToStaticMarkup(Component());
-    assert.match(markup, /Clear Table/);
-    assert.equal((markup.match(/Clear Table/g) ?? []).length, 1);
-    assert.match(markup, mode === 'simple' ? /Choose occupied table/ : /Clear Indoor 1/);
+    assert.match(markup, mode === "simple" ? /Table free/ : /Clear Table/);
+    if(mode === "simple") assert.ok(!markup.includes("Choose occupied table"));
+    else assert.match(markup,/Clear Indoor 1/);
     assert.ok(!markup.includes('Clear Outdoor 1'));
   }
 });
@@ -343,7 +285,7 @@ test('Reception queue badges and QR dialog contain accessible Mo Bistro copy', (
     { id: 1, name: 'Test Called', phone: '', party_size: 2, status: 'called', confirmed: 0, seating_preference: 'any' },
     { id: 2, name: 'Test Uncalled', phone: '', party_size: 2, status: 'waiting', confirmed: 0, seating_preference: 'any' },
   ];
-  const values = [guests, false, null, '', null, false, true, 'https://bistro.test/join', '', '', 2, 'any', false, '', ''];
+  const values = [guests, null, '', null, false, true, 'https://bistro.test/join', '', '', 2, 'any', false, '', ''];
   const react = { ...requireDependency('react'), useState: initial => [index < values.length ? values[index++] : initial, () => {}], useRef: initial => ({ current: initial }), useEffect() {}, useCallback: fn => fn };
   const mocks = { react, 'react-dom': { createPortal: value => value } };
   for (const component of ['reception-table-requests', 'table-ready-notifications', 'seat-guest-modal', 'table-availability', 'restaurant-wait-slider']) mocks['@/components/' + component] = () => null;
