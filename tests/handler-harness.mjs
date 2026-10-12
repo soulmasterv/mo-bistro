@@ -45,7 +45,14 @@ function load(file, mocks = {}, globals = {}, cache = new Map()) {
             NextResponse: { json: (body, init) => Response.json(body, init) },
           };
         if (id.startsWith("@/"))
-          return load("src/" + id.slice(2) + ".ts", mocks, globals, cache);
+          return load(
+            "src/" +
+              id.slice(2) +
+              (fs.existsSync("src/" + id.slice(2) + ".ts") ? ".ts" : ".tsx"),
+            mocks,
+            globals,
+            cache,
+          );
         return requireDependency(id);
       },
     },

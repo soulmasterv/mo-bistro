@@ -35,6 +35,7 @@ type Guest = {
   seating_preference: "indoor" | "outdoor" | "any";
   status: GuestStatus;
   confirmed: number;
+  confirmation_required?: boolean;
   source: string;
   created_at: string;
   eta_at?: string | null;
@@ -419,7 +420,12 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <div className="bistro-guest-list">
+            <div
+              className="bistro-guest-list"
+              role="region"
+              aria-label="Guest queue"
+              tabIndex={0}
+            >
               {filtered.map((guest) => {
                 const position = active.findIndex((g) => g.id === guest.id) + 1;
                 const dialHref = guestDialHref(guest.phone);
@@ -466,7 +472,9 @@ export default function Home() {
                     </div>
                     <div className="bistro-guest-bottom">
                       <span className="bistro-muted">
-                        {guest.confirmed === 1 ? (
+                        {guest.confirmation_required === false ? (
+                          "Booking active"
+                        ) : guest.confirmed === 1 ? (
                           <>
                             <CheckCircle2 size={14} /> Confirmed booking
                           </>
@@ -529,17 +537,18 @@ export default function Home() {
                                   Mark called
                                 </button>
                               )}
-                              {guest.confirmed !== 1 && (
-                                <button
-                                  disabled={busy}
-                                  onClick={() => {
-                                    setOpenGuestMenu(null);
-                                    void performAction(guest.id, "confirm");
-                                  }}
-                                >
-                                  Confirm booking
-                                </button>
-                              )}
+                              {guest.confirmation_required !== false &&
+                                guest.confirmed !== 1 && (
+                                  <button
+                                    disabled={busy}
+                                    onClick={() => {
+                                      setOpenGuestMenu(null);
+                                      void performAction(guest.id, "confirm");
+                                    }}
+                                  >
+                                    Confirm booking
+                                  </button>
+                                )}
                               <button
                                 disabled={busy}
                                 onClick={() => {

@@ -43,12 +43,15 @@ test(
       "import Waiter from " +
       component("src/app/waiter/waiter-dashboard.tsx") +
       ";" +
+      "import {ThemePreference} from " +
+      component("src/components/theme-preference.tsx") +
+      ";" +
       "import Header from " +
       component("src/components/workspace-header.tsx") +
       ";" +
       'const p=location.pathname;const role=document.cookie.match(/fixture_role=(manager|reception|waiter)/)?.[1] ?? "manager";' +
       'const title=p==="/waiter"?"Waiter":p.startsWith("/management")||p==="/manager"?"Management":"Reception";' +
-      'createRoot(document.getElementById("root")).render(p==="/login"?<Login/>:p==="/login/pin"?<PinLogin/>:<><Header role={role} workspace={title}/>{title==="Waiter"?<Waiter/>:title==="Management"?(p==="/management/staff-pins"?<StaffPins/>:<Management/>):<Reception/>}</>);';
+      'createRoot(document.getElementById("root")).render(p==="/login"?<Login/>:p==="/login/pin"?<PinLogin/>:<><ThemePreference/><Header role={role} workspace={title}/>{title==="Waiter"?<Waiter/>:title==="Management"?(p==="/management/staff-pins"?<StaffPins/>:<Management/>):<Reception/>}</>);';
     await esbuild.build({
       stdin: { contents: source, loader: "tsx", resolveDir: root },
       bundle: true,
@@ -231,7 +234,10 @@ test(
             data = { id: 1, role, username: role };
             break;
           case "/api/guests":
-            data = guests;
+            data = guests.map((guest) => ({
+              ...guest,
+              confirmation_required: false,
+            }));
             break;
           case "/api/seating":
             data = {
@@ -391,6 +397,67 @@ test(
         await page.waitForURL("**/manager");
         await page.getByText("Switch Workspace", { exact: true }).waitFor();
         await page.getByText("Monday", { exact: true }).waitFor();
+        const theme = page.getByLabel("Color theme", { exact: true });
+        await theme.selectOption("dark");
+        await page.waitForFunction(
+          () => document.documentElement.dataset.theme === "dark",
+        );
+        assert.equal(
+          await page
+            .locator(".bistro-app")
+            .evaluate((el) => getComputedStyle(el).backgroundColor),
+          "rgb(16, 28, 22)",
+        );
+        if (screenshots)
+          await page.screenshot({
+            path: path.join(screenshots, `management-dark-${width}.png`),
+            fullPage: width < 768,
+          });
+        assert.equal(
+          await page
+            .locator(".bistro-settings-card")
+            .evaluate((el) => getComputedStyle(el).backgroundColor),
+          "rgb(28, 42, 36)",
+        );
+        await page.reload();
+        await page.waitForFunction(
+          () => document.documentElement.dataset.theme === "dark",
+        );
+        await page.emulateMedia({ colorScheme: "dark" });
+        await theme.selectOption("system");
+        await page.waitForFunction(
+          () => document.documentElement.dataset.theme === "dark",
+        );
+        await page.emulateMedia({ colorScheme: "light" });
+        await page.waitForFunction(
+          () => document.documentElement.dataset.theme === "light",
+        );
+        await theme.selectOption("light");
+        await page.getByText("Switch Workspace", { exact: true }).click();
+        assert.equal(
+          await page
+            .locator("details")
+            .first()
+            .evaluate((el) => el.open),
+          true,
+        );
+        await page.locator(".bistro-app").click({ position: { x: 2, y: 350 } });
+        assert.equal(
+          await page
+            .locator("details")
+            .first()
+            .evaluate((el) => el.open),
+          false,
+        );
+        await page.getByText("Switch Workspace", { exact: true }).click();
+        await theme.focus();
+        assert.equal(
+          await page
+            .locator("details")
+            .first()
+            .evaluate((el) => el.open),
+          false,
+        );
         if (screenshots)
           await page.screenshot({
             path: path.join(screenshots, `management-${width}.png`),
@@ -442,11 +509,65 @@ test(
             path: path.join(screenshots, `reception-${width}.png`),
             fullPage: width < 768,
           });
+        const unconfirmed = guests.find((guest) => guest.confirmed === 0);
+        await page
+          .getByRole("button", {
+            name: "More actions for " + unconfirmed.name,
+            exact: true,
+          })
+          .click();
+        assert.equal(
+          await page
+            .getByRole("button", { name: "Confirm booking", exact: true })
+            .count(),
+          0,
+        );
+        assert.equal(
+          await page
+            .getByText("Awaiting confirmation", { exact: true })
+            .count(),
+          0,
+        );
+        await page
+          .getByRole("button", {
+            name: "More actions for " + unconfirmed.name,
+            exact: true,
+          })
+          .click();
+        const queue = page.getByRole("region", { name: "Guest queue" });
+        await queue.evaluate((el) => {
+          el.style.maxHeight = "200px";
+        });
+        assert.ok(
+          await queue.evaluate((el) => el.scrollHeight > el.clientHeight),
+        );
+        await queue.evaluate((el) => {
+          el.scrollTop = el.scrollHeight;
+        });
+        assert.ok(await queue.evaluate((el) => el.scrollTop > 0));
+        await queue.evaluate((el) => {
+          el.style.maxHeight = "";
+          el.scrollTop = 0;
+        });
+        await page
+          .getByLabel("Color theme", { exact: true })
+          .selectOption("dark");
+        await page.waitForFunction(
+          () => document.documentElement.dataset.theme === "dark",
+        );
+        if (screenshots)
+          await page.screenshot({
+            path: path.join(screenshots, `reception-dark-${width}.png`),
+            fullPage: width < 768,
+          });
+        await page
+          .getByLabel("Color theme", { exact: true })
+          .selectOption("light");
         const readiness = await page
           .getByRole("heading", { name: "Table readiness", exact: true })
           .boundingBox();
         assert.ok(
-          readiness.y >= 0,
+          readiness.y + (await page.evaluate(() => window.scrollY)) >= 0,
           "Readiness is a dedicated document section",
         );
         assert.equal(
@@ -580,7 +701,10 @@ test(
         await page.getByRole("link", { name: "Waiter", exact: true }).click();
         await page.waitForURL("**/waiter");
         await page
-          .getByRole("button", { name: "Table is ready — Indoor", exact: true })
+          .getByRole("button", {
+            name: "Table is ready — Indoor",
+            exact: true,
+          })
           .click();
         await page
           .getByText("Indoor request sent to Reception.", { exact: true })
@@ -707,8 +831,22 @@ test(
           .getByRole("dialog", { name: "Mo Bistro", exact: true })
           .waitFor();
         await assertNoSideScroll("QR dialog");
+        assert.ok(
+          await page.locator(".bistro-qr-overlay").evaluate((el) => {
+            const rect = el.getBoundingClientRect();
+            return (
+              rect.top === 0 &&
+              rect.left === 0 &&
+              rect.width === innerWidth &&
+              rect.height === innerHeight &&
+              el.contains(document.elementFromPoint(5, 5))
+            );
+          }),
+        );
         await page.goto(origin + "/management/staff-pins");
-        await page.getByRole("combobox").selectOption("1");
+        await page
+          .locator('select:not([aria-label="Color theme"])')
+          .selectOption("1");
         await page.getByLabel("New six-digit PIN", { exact: true }).waitFor();
         await assertNoSideScroll("Staff PIN form");
         await page.goto(origin + "/login/pin");

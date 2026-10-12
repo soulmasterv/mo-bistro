@@ -70,17 +70,15 @@ test(
       await db.exec(repair);
       await db.exec(repair);
       const h = routes(db);
-      const response = await h
-        .route("management/staff-shifts")
-        .PUT(
-          request("PUT", {
-            staff_id: 2,
-            weekday: 0,
-            is_off: false,
-            start_time: "22:00",
-            end_time: "06:00",
-          }),
-        );
+      const response = await h.route("management/staff-shifts").PUT(
+        request("PUT", {
+          staff_id: 2,
+          weekday: 0,
+          is_off: false,
+          start_time: "22:00",
+          end_time: "06:00",
+        }),
+      );
       assert.equal(response.status, 200);
       const shifts = await h.route("management/staff-shifts").GET();
       assert.equal(shifts.status, 200);
@@ -110,15 +108,13 @@ test(
       );
       assert.equal(
         (
-          await h
-            .route("management/staff")
-            .POST(
-              request("POST", {
-                username: "waiter",
-                role: "waiter",
-                credential: "test-password",
-              }),
-            )
+          await h.route("management/staff").POST(
+            request("POST", {
+              username: "waiter",
+              role: "waiter",
+              credential: "test-password",
+            }),
+          )
         ).status,
         201,
       );
@@ -589,6 +585,87 @@ test(
         db.query("SELECT pin_hash FROM staff_users"),
         (error) => error.code === "42703",
       );
+    } finally {
+      await db.close();
+    }
+  },
+);
+
+test(
+  "Simple inventory migration upgrades base and named-request schemas directly and is repeatable",
+  { skip: !PGlite },
+  async () => {
+    for (const legacy of [false, true]) {
+      const db = await setup();
+      try {
+        if (legacy)
+          await db.exec(
+            fs.readFileSync(
+              "migrations/20261010_table_ready_requests.sql",
+              "utf8",
+            ),
+          );
+        const migration = fs.readFileSync(
+          "migrations/20261012_simple_inventory.sql",
+          "utf8",
+        );
+        await db.exec(migration);
+        await db.exec(migration);
+        const pools = (
+          await db.query(
+            "SELECT area,total_tables,occupied_tables FROM simple_table_capacity ORDER BY area",
+          )
+        ).rows;
+        assert.deepEqual(pools, [
+          { area: "indoor", total_tables: 2, occupied_tables: 0 },
+          { area: "outdoor", total_tables: 1, occupied_tables: 0 },
+        ]);
+        await db.exec(
+          "INSERT INTO table_ready_requests(area,requested_by,inventory_mode) VALUES ('indoor',1,'simple')",
+        );
+        await assert.rejects(
+          db.exec(
+            "INSERT INTO table_ready_requests(table_id,requested_by,inventory_mode) VALUES (1,1,'simple')",
+          ),
+        );
+        await db.exec(
+          "UPDATE simple_table_capacity SET occupied_tables=1 WHERE area='indoor'",
+        );
+        await db.exec(migration);
+        assert.equal(
+          (
+            await db.query(
+              "SELECT occupied_tables FROM simple_table_capacity WHERE area='indoor'",
+            )
+          ).rows[0].occupied_tables,
+          1,
+        );
+      } finally {
+        await db.close();
+      }
+    }
+  },
+);
+
+test(
+  "Queue API reports confirmation policy without changing stored guest consent",
+  { skip: !PGlite },
+  async () => {
+    const db = await setup();
+    try {
+      await db.exec(
+        "INSERT INTO guests(name,phone,party_size,confirmed) VALUES ('Unconfirmed','01012345678',2,0); INSERT INTO restaurant_settings(key,value) VALUES ('require_confirmation','false')",
+      );
+      const h = routes(db);
+      const data = await (await h.route("guests").GET()).json();
+      assert.equal(data[0].confirmation_required, false);
+      assert.equal(data[0].confirmed, 0);
+      await db.exec(
+        "UPDATE restaurant_settings SET value='true' WHERE key='require_confirmation'",
+      );
+      const enabled = await (await h.route("guests").GET()).json();
+      assert.equal(enabled[0].confirmation_required, true);
+      assert.equal(enabled[0].confirmed, 0);
     } finally {
       await db.close();
     }

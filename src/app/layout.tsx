@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemePreference, ThemeSwitcher } from "@/components/theme-preference";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,7 +14,10 @@ const geistMono = Geist_Mono({
 });
 
 export const viewport: Viewport = {
-  width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#0D1218",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0D1218",
 };
 
 export const metadata: Metadata = {
@@ -27,7 +31,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <ThemePreference />
+        {children}
+        <footer className="theme-footer">
+          <ThemeSwitcher />
+        </footer>
+      </body>
     </html>
   );
 }

@@ -526,7 +526,7 @@ check(
       new Date(guest.seated_at).getTime() + 3600000,
     );
     await database.exec(
-      "CREATE TABLE table_ready_requests(id INTEGER,table_id INTEGER,status TEXT,reviewed_at TIMESTAMPTZ)",
+      fs.readFileSync("migrations/20261010_table_ready_requests.sql", "utf8"),
     );
     await seating.releaseTablePostgres(1);
     assert.equal(
@@ -911,7 +911,7 @@ check(
     const b = await booking({ whatsapp_feedback_consent: true });
     await webhook.processMetaWebhook(envelope(inbound(b)));
     await database.exec(
-      "CREATE TABLE IF NOT EXISTS table_ready_requests(id INTEGER,table_id INTEGER,area TEXT,status TEXT,reviewed_at TIMESTAMPTZ); ALTER TABLE table_ready_requests ADD COLUMN IF NOT EXISTS area TEXT; INSERT INTO staff_users(username,role,credential_hash) VALUES ('manager','manager','fixture') ON CONFLICT DO NOTHING;",
+      "INSERT INTO staff_users(username,role,credential_hash) VALUES ('manager','manager','fixture') ON CONFLICT DO NOTHING;",
     );
     await database.exec(
       fs.readFileSync("migrations/20261012_simple_inventory.sql", "utf8"),

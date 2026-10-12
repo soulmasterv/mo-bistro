@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   LayoutDashboard,
@@ -8,6 +8,8 @@ import {
   UtensilsCrossed,
 } from "lucide-react";
 import type { StaffRole } from "@/lib/staff-session-shared";
+
+import { ThemeSwitcher } from "@/components/theme-preference";
 
 const workspaces = [
   { label: "Management", href: "/management" },
@@ -25,6 +27,23 @@ export default function WorkspaceHeader({
   const selector = useRef<HTMLDetailsElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  useEffect(() => {
+    function dismiss(event: PointerEvent | FocusEvent) {
+      if (
+        selector.current &&
+        event.target instanceof Node &&
+        !selector.current.contains(event.target)
+      ) {
+        selector.current.open = false;
+      }
+    }
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("focusin", dismiss);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("focusin", dismiss);
+    };
+  }, []);
   async function logout() {
     if (busy) return;
     setBusy(true);
@@ -59,6 +78,7 @@ export default function WorkspaceHeader({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <ThemeSwitcher />
           {role === "manager" && (
             <details
               ref={selector}
