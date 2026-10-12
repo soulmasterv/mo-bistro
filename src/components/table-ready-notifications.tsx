@@ -80,7 +80,7 @@ export default function TableReadyNotifications() {
                   area: table.area,
                 })),
                 ...current,
-              ].slice(0, 5)
+              ].slice(0, 5),
             );
           }
         }
@@ -110,32 +110,20 @@ export default function TableReadyNotifications() {
   if (notices.length === 0) return null;
 
   return (
-    <div
-      aria-live="polite"
-      className="mx-auto my-4 flex w-full max-w-6xl flex-col gap-3 px-4 sm:px-8"
-    >
+    <div aria-live="polite" className="bistro-table-notices">
       {notices.map((notice) => (
-        <div
-          key={notice.id}
-          role="status"
-          className="rounded-2xl border border-[#6B745E] bg-[#30362B] p-4 text-[#FFFCF7] shadow-2xl"
-        >
+        <div key={notice.id} role="status" className="bistro-table-notice">
           <div className="flex items-start gap-3">
-            <BellRing
-              size={22}
-              className="mt-1 shrink-0 text-[#D6B681]"
-            />
+            <BellRing size={22} className="mt-1 shrink-0" />
 
             <div className="min-w-0 flex-1">
-              <p className="font-semibold">
-                {notice.name} is ready!
-              </p>
+              <p className="font-semibold">{notice.name} is ready!</p>
 
-              <p className="mt-1 text-sm text-[#E0DCCD]">
+              <p className="mt-1 text-sm">
                 {notice.area} · {notice.seats} seats
               </p>
 
-              <p className="mt-2 text-xs text-[#C8CDBF]">
+              <p className="mt-2 text-xs">
                 A table is available for the next guests.
               </p>
             </div>
@@ -145,10 +133,10 @@ export default function TableReadyNotifications() {
               aria-label="Dismiss notification"
               onClick={() =>
                 setNotices((current) =>
-                  current.filter((item) => item.id !== notice.id)
+                  current.filter((item) => item.id !== notice.id),
                 )
               }
-              className="rounded-lg p-2 text-[#E0DCCD]"
+              className="rounded-lg p-2"
             >
               <X size={18} />
             </button>

@@ -406,7 +406,7 @@ test(
           await page
             .locator(".bistro-app")
             .evaluate((el) => getComputedStyle(el).backgroundColor),
-          "rgb(16, 28, 22)",
+          "rgb(18, 19, 22)",
         );
         if (screenshots)
           await page.screenshot({
@@ -417,7 +417,7 @@ test(
           await page
             .locator(".bistro-settings-card")
             .evaluate((el) => getComputedStyle(el).backgroundColor),
-          "rgb(28, 42, 36)",
+          "rgb(30, 32, 37)",
         );
         await page.reload();
         await page.waitForFunction(
@@ -555,6 +555,24 @@ test(
         await page.waitForFunction(
           () => document.documentElement.dataset.theme === "dark",
         );
+        await page.waitForFunction(() => {
+          const button = document.querySelector(
+            '[aria-label="Seat Omar Hassan"]',
+          );
+          return (
+            getComputedStyle(button).backgroundColor === "rgb(226, 228, 233)"
+          );
+        });
+        assert.deepEqual(
+          await page
+            .getByRole("button", { name: "Seat Omar Hassan", exact: true })
+            .evaluate((el) => ({
+              background: getComputedStyle(el).backgroundColor,
+              color: getComputedStyle(el).color,
+            })),
+          { background: "rgb(226, 228, 233)", color: "rgb(23, 25, 30)" },
+        );
+        await page.evaluate(() => window.scrollTo(0, 0));
         if (screenshots)
           await page.screenshot({
             path: path.join(screenshots, `reception-dark-${width}.png`),
@@ -579,6 +597,16 @@ test(
             ),
           "static",
           "Readiness must not overlay the queue",
+        );
+        assert.ok(
+          await page.locator(".bistro-notification-center").evaluate((el) => {
+            const queue = document.querySelector(".bistro-queue");
+            return (
+              el.getBoundingClientRect().bottom <=
+              queue.getBoundingClientRect().top
+            );
+          }),
+          "Notifications must be above the queue at every width",
         );
         await page.getByRole("button", { name: "QR Code" }).click();
         if (screenshots)
@@ -667,6 +695,20 @@ test(
           .getByRole("button", { name: "Clear Indoor 1", exact: true })
           .click();
         await page.getByText("Table is now free.", { exact: true }).waitFor();
+        await page.getByText("Indoor 1 is ready!", { exact: true }).waitFor();
+        assert.ok(
+          await page
+            .locator(".bistro-table-notice")
+            .evaluate(
+              (el) => el.closest(".bistro-notification-center") !== null,
+            ),
+        );
+        await page.evaluate(() => window.scrollTo(0, 0));
+        if (screenshots)
+          await page.screenshot({
+            path: path.join(screenshots, `notifications-${width}.png`),
+            fullPage: width < 768,
+          });
         mode = "simple";
         await page.reload();
         await page

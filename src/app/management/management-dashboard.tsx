@@ -75,12 +75,8 @@ export default function ManagementPage() {
         <header className="bistro-page-heading">
           <div>
             <p className="bistro-eyebrow">RESTAURANT OPERATIONS / MANAGEMENT</p>
-            <h1>
-              Set the stage.
-              <br />
-              <span>Make service effortless.</span>
-            </h1>
-            <p>A thoughtful home for your team, floor, and guest experience.</p>
+            <h1>Management</h1>
+            <p>Restaurant settings, staff and seating.</p>
           </div>
           <span className="bistro-live">
             <i /> Manager workspace

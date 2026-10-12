@@ -1483,138 +1483,138 @@ html[data-theme="light"] {
   color-scheme: light;
 }
 html[data-theme="dark"] {
-  --background: #101c16;
-  --foreground: #edf2e8;
+  --background: #121316;
+  --foreground: #f0f1f3;
   color-scheme: dark;
 }
 html[data-theme="dark"] :is(.bistro-app, .bistro-dialog-scope) {
-  --ink: #edf2e8;
-  --muted: #aab6a6;
-  --paper: #101c16;
-  --line: #35463b;
+  --ink: #f0f1f3;
+  --muted: #a5a8b0;
+  --paper: #121316;
+  --line: #34363e;
   color-scheme: dark;
 }
 html[data-theme="dark"] {
-  --tone-e2e6dc: #1c2a24;
-  --tone-55704B: #c2cdbd;
-  --tone-939a83: #b0bcae;
-  --tone-dfcfaa: #a9b6a8;
-  --tone-667d52: #b0bcae;
-  --tone-f7f0e0: #1c2a24;
-  --tone-d6e4cd: #1c2a24;
-  --tone-eee9da: #1c2a24;
-  --tone-eceee7: #1c2a24;
-  --tone-e9eadf: #1c2a24;
-  --tone-b3b7a5: #a9b6a8;
-  --tone-70875c: #b0bcae;
-  --tone-fbece6: #1c2a24;
-  --tone-869379: #b0bcae;
-  --tone-89927e: #b0bcae;
-  --tone-4d7448: #c2cdbd;
-  --tone-eaf2e4: #1c2a24;
-  --tone-d4dec5: #1c2a24;
-  --tone-86907c: #b0bcae;
-  --tone-f0f1e9: #1c2a24;
-  --tone-a0a58e: #a9b6a8;
-  --tone-537c8d: #b0bcae;
-  --tone-365239: #c2cdbd;
-  --tone-737d70: #b0bcae;
-  --tone-f2f3ed: #1c2a24;
-  --tone-e9eee3: #1c2a24;
-  --tone-9c8056: #b0bcae;
-  --tone-9b4940: #c2cdbd;
-  --tone-7d8777: #b0bcae;
-  --tone-f9fbf4: #1c2a24;
-  --tone-e5e8df: #1c2a24;
-  --tone-e9eee4: #1c2a24;
-  --tone-fffef8: #1c2a24;
-  --tone-d4dbc7: #1c2a24;
-  --tone-b6c3b2: #a9b6a8;
-  --tone-a78040: #b0bcae;
-  --tone-bb965e: #b0bcae;
-  --tone-6a7a68: #b0bcae;
-  --tone-ad9166: #b0bcae;
-  --tone-bba370: #a9b6a8;
-  --tone-faf6ee: #1c2a24;
-  --tone-49613e: #c2cdbd;
-  --tone-e5e7df: #1c2a24;
-  --tone-f7f8f2: #1c2a24;
-  --tone-fffdf5: #1c2a24;
-  --tone-c8d0c3: #1c2a24;
-  --tone-eaf2e7: #1c2a24;
-  --tone-e1e5db: #1c2a24;
-  --tone-506348: #c2cdbd;
-  --tone-ebeede: #1c2a24;
-  --tone-7e9c6e: #b0bcae;
-  --tone-89927d: #b0bcae;
-  --tone-638168: #b0bcae;
-  --tone-919882: #b0bcae;
-  --tone-959c88: #a9b6a8;
-  --tone-edf3f5: #1c2a24;
-  --tone-b89b6b: #a9b6a8;
-  --tone-f0f3e7: #1c2a24;
-  --tone-65825f: #b0bcae;
-  --tone-efd9cd: #1c2a24;
-  --tone-838c7c: #b0bcae;
-  --tone-939b83: #b0bcae;
-  --tone-a34d48: #b0bcae;
-  --tone-9d8155: #b0bcae;
-  --tone-f0f1e6: #1c2a24;
-  --tone-607255: #c2cdbd;
-  --tone-ad574c: #b0bcae;
-  --tone-e0d9c7: #1c2a24;
-  --tone-fffdf7: #1c2a24;
-  --tone-e5dfd1: #1c2a24;
-  --tone-dedfd5: #1c2a24;
-  --tone-e0e5d6: #1c2a24;
-  --tone-7b8870: #b0bcae;
-  --tone-e7e4d6: #1c2a24;
-  --tone-f5f4ef: #1c2a24;
-  --tone-edf3e9: #1c2a24;
-  --tone-a9b590: #a9b6a8;
-  --tone-e4e9db: #1c2a24;
-  --tone-87927a: #b0bcae;
-  --tone-edf1e8: #1c2a24;
-  --tone-9c7e40: #b0bcae;
-  --tone-9b835b: #b0bcae;
-  --tone-e3e7dc: #1c2a24;
-  --tone-8e986d: #b0bcae;
-  --tone-fffdf8: #1c2a24;
-  --tone-D6B681: #a9b6a8;
-  --tone-dfe5d4: #1c2a24;
-  --tone-e1e5da: #1c2a24;
-  --tone-f0ede4: #1c2a24;
-  --tone-567786: #b0bcae;
-  --tone-699675: #b0bcae;
-  --tone-f2e9d6: #1c2a24;
-  --tone-5c7e52: #c2cdbd;
-  --tone-3d5647: #c2cdbd;
-  --tone-ced7cc: #1c2a24;
-  --tone-C5A77B: #a9b6a8;
-  --tone-eee9de: #1c2a24;
-  --tone-899080: #b0bcae;
-  --tone-e1e9d9: #1c2a24;
-  --tone-e9eddf: #1c2a24;
-  --tone-859174: #b0bcae;
-  --tone-e9ecdf: #1c2a24;
-  --tone-f5f5ef: #1c2a24;
-  --tone-eef0e8: #1c2a24;
-  --tone-dce3cc: #1c2a24;
-  --tone-fffdf4: #1c2a24;
-  --tone-e0e5d7: #1c2a24;
-  --tone-f8f9f2: #1c2a24;
-  --tone-fffdf9: #1c2a24;
-  --tone-ebe0c9: #1c2a24;
-  --tone-e5eadb: #1c2a24;
-  --tone-e5ebdb: #1c2a24;
-  --tone-fffdf6: #1c2a24;
-  --tone-5a7f5d: #b0bcae;
-  --tone-788078: #b0bcae;
-  --tone-e2e6da: #1c2a24;
-  --tone-627255: #c2cdbd;
-  --tone-dde3d3: #1c2a24;
-  --tone-455841: #c2cdbd;
-  --tone-fff: #1c2a24;
+  --tone-e2e6dc: #1e2025;
+  --tone-55704B: #d6d8de;
+  --tone-939a83: #a5a8b0;
+  --tone-dfcfaa: #b0b3bb;
+  --tone-667d52: #a5a8b0;
+  --tone-f7f0e0: #1e2025;
+  --tone-d6e4cd: #1e2025;
+  --tone-eee9da: #1e2025;
+  --tone-eceee7: #1e2025;
+  --tone-e9eadf: #1e2025;
+  --tone-b3b7a5: #b0b3bb;
+  --tone-70875c: #a5a8b0;
+  --tone-fbece6: #1e2025;
+  --tone-869379: #a5a8b0;
+  --tone-89927e: #a5a8b0;
+  --tone-4d7448: #d6d8de;
+  --tone-eaf2e4: #1e2025;
+  --tone-d4dec5: #1e2025;
+  --tone-86907c: #a5a8b0;
+  --tone-f0f1e9: #1e2025;
+  --tone-a0a58e: #b0b3bb;
+  --tone-537c8d: #a5a8b0;
+  --tone-365239: #d6d8de;
+  --tone-737d70: #a5a8b0;
+  --tone-f2f3ed: #1e2025;
+  --tone-e9eee3: #1e2025;
+  --tone-9c8056: #a5a8b0;
+  --tone-9b4940: #d6d8de;
+  --tone-7d8777: #a5a8b0;
+  --tone-f9fbf4: #1e2025;
+  --tone-e5e8df: #1e2025;
+  --tone-e9eee4: #1e2025;
+  --tone-fffef8: #1e2025;
+  --tone-d4dbc7: #1e2025;
+  --tone-b6c3b2: #b0b3bb;
+  --tone-a78040: #a5a8b0;
+  --tone-bb965e: #a5a8b0;
+  --tone-6a7a68: #a5a8b0;
+  --tone-ad9166: #a5a8b0;
+  --tone-bba370: #b0b3bb;
+  --tone-faf6ee: #1e2025;
+  --tone-49613e: #d6d8de;
+  --tone-e5e7df: #1e2025;
+  --tone-f7f8f2: #1e2025;
+  --tone-fffdf5: #1e2025;
+  --tone-c8d0c3: #1e2025;
+  --tone-eaf2e7: #1e2025;
+  --tone-e1e5db: #1e2025;
+  --tone-506348: #d6d8de;
+  --tone-ebeede: #1e2025;
+  --tone-7e9c6e: #a5a8b0;
+  --tone-89927d: #a5a8b0;
+  --tone-638168: #a5a8b0;
+  --tone-919882: #a5a8b0;
+  --tone-959c88: #b0b3bb;
+  --tone-edf3f5: #1e2025;
+  --tone-b89b6b: #b0b3bb;
+  --tone-f0f3e7: #1e2025;
+  --tone-65825f: #a5a8b0;
+  --tone-efd9cd: #1e2025;
+  --tone-838c7c: #a5a8b0;
+  --tone-939b83: #a5a8b0;
+  --tone-a34d48: #a5a8b0;
+  --tone-9d8155: #a5a8b0;
+  --tone-f0f1e6: #1e2025;
+  --tone-607255: #d6d8de;
+  --tone-ad574c: #a5a8b0;
+  --tone-e0d9c7: #1e2025;
+  --tone-fffdf7: #1e2025;
+  --tone-e5dfd1: #1e2025;
+  --tone-dedfd5: #1e2025;
+  --tone-e0e5d6: #1e2025;
+  --tone-7b8870: #a5a8b0;
+  --tone-e7e4d6: #1e2025;
+  --tone-f5f4ef: #1e2025;
+  --tone-edf3e9: #1e2025;
+  --tone-a9b590: #b0b3bb;
+  --tone-e4e9db: #1e2025;
+  --tone-87927a: #a5a8b0;
+  --tone-edf1e8: #1e2025;
+  --tone-9c7e40: #a5a8b0;
+  --tone-9b835b: #a5a8b0;
+  --tone-e3e7dc: #1e2025;
+  --tone-8e986d: #a5a8b0;
+  --tone-fffdf8: #1e2025;
+  --tone-D6B681: #b0b3bb;
+  --tone-dfe5d4: #1e2025;
+  --tone-e1e5da: #1e2025;
+  --tone-f0ede4: #1e2025;
+  --tone-567786: #a5a8b0;
+  --tone-699675: #a5a8b0;
+  --tone-f2e9d6: #1e2025;
+  --tone-5c7e52: #d6d8de;
+  --tone-3d5647: #d6d8de;
+  --tone-ced7cc: #1e2025;
+  --tone-C5A77B: #b0b3bb;
+  --tone-eee9de: #1e2025;
+  --tone-899080: #a5a8b0;
+  --tone-e1e9d9: #1e2025;
+  --tone-e9eddf: #1e2025;
+  --tone-859174: #a5a8b0;
+  --tone-e9ecdf: #1e2025;
+  --tone-f5f5ef: #1e2025;
+  --tone-eef0e8: #1e2025;
+  --tone-dce3cc: #1e2025;
+  --tone-fffdf4: #1e2025;
+  --tone-e0e5d7: #1e2025;
+  --tone-f8f9f2: #1e2025;
+  --tone-fffdf9: #1e2025;
+  --tone-ebe0c9: #1e2025;
+  --tone-e5eadb: #1e2025;
+  --tone-e5ebdb: #1e2025;
+  --tone-fffdf6: #1e2025;
+  --tone-5a7f5d: #a5a8b0;
+  --tone-788078: #a5a8b0;
+  --tone-e2e6da: #1e2025;
+  --tone-627255: #d6d8de;
+  --tone-dde3d3: #1e2025;
+  --tone-455841: #d6d8de;
+  --tone-fff: #1e2025;
 }
 html[data-theme="light"]
   :is(
@@ -1645,16 +1645,16 @@ html[data-theme="dark"] .bistro-qr-frame {
   background: white;
 }
 html[data-theme="dark"] {
-  --tone-20352d: #dce6d4;
-  --tone-263c30: #dce6d4;
-  --tone-30472f: #dce6d4;
-  --tone-30442e: #dce6d4;
-  --tone-344736: #dce6d4;
-  --tone-455841: #dce6d4;
-  --tone-365239: #dce6d4;
-  --tone-49613e: #dce6d4;
-  --tone-506348: #dce6d4;
-  --tone-4d7448: #dce6d4;
+  --tone-20352d: #e0e2e7;
+  --tone-263c30: #e0e2e7;
+  --tone-30472f: #e0e2e7;
+  --tone-30442e: #e0e2e7;
+  --tone-344736: #e0e2e7;
+  --tone-455841: #e0e2e7;
+  --tone-365239: #e0e2e7;
+  --tone-49613e: #e0e2e7;
+  --tone-506348: #e0e2e7;
+  --tone-4d7448: #e0e2e7;
 }
 html[data-theme="light"] :is([class*="text-[#F5F0E7]"], [class*="text-white"]) {
   color: #20352d;
@@ -1663,7 +1663,7 @@ html[data-theme="light"] [class*="text-[#D0D3C9]"] {
   color: #65715e;
 }
 html[data-theme="dark"] .bistro-button-secondary {
-  color: #dce6d4;
+  color: #e0e2e7;
 }
 html[data-theme="light"] .bistro-workspace-header [class*="text-white"] {
   color: #faf6ee;
@@ -1671,99 +1671,411 @@ html[data-theme="light"] .bistro-workspace-header [class*="text-white"] {
 
 /* The QR poster covers the whole viewport, including sticky navigation. */
 .bistro-qr-overlay {
-  background-color: #101c16 !important;
+  background-color: #121316 !important;
   backdrop-filter: none;
 }
 html[data-theme="light"] .bistro-qr-overlay {
   background-color: #f5f4ef !important;
 }
 html[data-theme="dark"] [class*="bg-[#D8D1C3]"] {
-  background-color: #1c2a24;
+  background-color: #1e2025;
 }
 html[data-theme="dark"] [class*="bg-[#E2E5D9]"] {
-  background-color: #1c2a24;
+  background-color: #1e2025;
 }
 html[data-theme="dark"] [class*="bg-[#E8EDE3]"] {
-  background-color: #1c2a24;
+  background-color: #1e2025;
 }
 html[data-theme="dark"] [class*="bg-[#F1EBDF]"] {
-  background-color: #1c2a24;
+  background-color: #1e2025;
 }
 html[data-theme="dark"] [class*="bg-[#F4F0E9]"] {
-  background-color: #1c2a24;
+  background-color: #1e2025;
 }
 html[data-theme="dark"] [class*="bg-[#F4F1E9]"] {
-  background-color: #1c2a24;
+  background-color: #1e2025;
 }
 html[data-theme="dark"] [class*="bg-[#F6F2E9]"] {
-  background-color: #1c2a24;
+  background-color: #1e2025;
 }
 html[data-theme="dark"] [class*="bg-[#F7F4EE]"] {
-  background-color: #1c2a24;
+  background-color: #1e2025;
 }
 html[data-theme="dark"] [class*="bg-[#FFFCF7]"] {
-  background-color: #1c2a24;
+  background-color: #1e2025;
 }
 html[data-theme="dark"] [class*="bg-[#FFFDF9]"] {
-  background-color: #1c2a24;
+  background-color: #1e2025;
 }
 html[data-theme="dark"] [class*="text-[#242424]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#293126]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#2C3028]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#302D28]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#48613F]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#504B42]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#526347]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#5E4A31]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#727568]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#777064]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#77716A]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#777367]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#807B71]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#817A6C]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#88817A]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#948A7D]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#9A794E]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#A17E4E]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#A69F95]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
 }
 html[data-theme="dark"] [class*="text-[#A78A60]"] {
-  color: #b9c5b3;
+  color: #b7bac3;
+}
+
+/* Minimal staff workspaces: neutral surfaces, compact typography, no decoration. */
+.bistro-app,
+.bistro-dialog-scope {
+  --ink: #24262c;
+  --muted: #6b707a;
+  --paper: #f7f8fa;
+  --line: #e0e3e8;
+  --staff-surface: #ffffff;
+  --staff-soft: #f0f2f5;
+  --staff-action: #292c33;
+  --staff-inverse: #ffffff;
+}
+html[data-theme="dark"] :is(.bistro-app, .bistro-dialog-scope) {
+  --ink: #f0f1f3;
+  --muted: #a5a8b0;
+  --paper: #121316;
+  --line: #34363e;
+  --staff-surface: #1e2025;
+  --staff-soft: #272a31;
+  --staff-action: #e2e4e9;
+  --staff-inverse: #17191e;
+}
+.bistro-workspace-header {
+  background: #ffffff;
+  color: #24262c;
+  border-bottom: 1px solid #e0e3e8;
+}
+html[data-theme="dark"] .bistro-workspace-header {
+  background: #1a1c21;
+  color: #f0f1f3;
+  border-color: #34363e;
+}
+.bistro-workspace-header .workspace-menu {
+  background: #ffffff;
+  color: #24262c;
+  border-color: #e0e3e8;
+  box-shadow: 0 4px 16px #0001;
+}
+html[data-theme="dark"] .bistro-workspace-header .workspace-menu {
+  background: #25272e;
+  color: #f0f1f3;
+  border-color: #34363e;
+}
+.bistro-workspace-header .workspace-switch {
+  color: inherit;
+  border-color: #8885;
+  background: transparent;
+}
+.bistro-header-subtitle {
+  color: #777c86;
+  letter-spacing: 0;
+  font-size: 11px;
+}
+html[data-theme="dark"] .bistro-header-subtitle {
+  color: #a5a8b0;
+}
+.bistro-header-inner {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.bistro-container {
+  padding-top: 24px;
+}
+.bistro-page-heading {
+  margin-bottom: 24px;
+}
+.bistro-page-heading h1 {
+  font-size: 28px;
+  line-height: 1.25;
+  letter-spacing: -0.6px;
+  font-weight: 600;
+}
+.bistro-page-heading > div > p:last-child {
+  margin-top: 6px;
+  font-size: 13px;
+}
+.bistro-eyebrow,
+.bistro-nav-note,
+.bistro-page-footer,
+.bistro-avatar,
+.bistro-table-visual {
+  display: none;
+}
+.bistro-panel,
+.bistro-stat,
+.bistro-guest-card,
+.bistro-table-card,
+.bistro-area-card,
+.bistro-management-overview > article,
+.bistro-management-nav {
+  background: var(--staff-surface);
+  color: var(--ink);
+  border-color: var(--line);
+  border-radius: 10px;
+  box-shadow: none;
+}
+.bistro-stat strong {
+  font-size: 28px;
+  letter-spacing: -0.5px;
+  margin: 10px 0 0;
+  color: var(--ink);
+}
+.bistro-stat p {
+  display: none;
+}
+.bistro-stat-forest .bistro-stat-top {
+  color: var(--muted);
+}
+.bistro-stat-grid {
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.bistro-stat {
+  padding: 16px 18px;
+}
+.bistro-stat-top,
+.bistro-stat-top svg {
+  color: var(--muted);
+}
+.bistro-panel h2,
+.bistro-group-heading h2 {
+  font-size: 18px;
+  letter-spacing: -0.3px;
+}
+.bistro-panel-heading {
+  padding: 16px 20px;
+  border-color: var(--line);
+}
+.bistro-queue-controls {
+  padding: 12px 20px;
+  gap: 8px;
+}
+.bistro-guest-list {
+  padding: 4px 20px 16px;
+}
+.bistro-guest-card:hover {
+  box-shadow: none;
+}
+.bistro-guest-card.is-called {
+  background: var(--staff-surface);
+}
+.bistro-guest-main {
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+.bistro-button,
+.bistro-button:hover:not(:disabled),
+html[data-theme="dark"] .bistro-button {
+  background: var(--staff-action);
+  color: var(--staff-inverse);
+  border-color: var(--staff-action);
+  border-radius: 8px;
+  box-shadow: none;
+}
+.bistro-button-secondary,
+.bistro-button-secondary:hover:not(:disabled),
+html[data-theme="dark"] .bistro-button-secondary,
+.bistro-icon-button {
+  background: var(--staff-surface);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.bistro-search,
+.bistro-tabs button[aria-pressed="true"] {
+  background: var(--staff-soft);
+  border-color: var(--line);
+  color: var(--ink);
+}
+.bistro-management-nav {
+  padding: 12px;
+}
+.bistro-management-nav a {
+  margin: 0;
+  padding: 12px;
+  color: var(--ink);
+  border-radius: 6px;
+}
+.bistro-floor-grid {
+  gap: 14px;
+}
+.bistro-table-card h3 {
+  margin-top: 20px;
+  font-size: 18px;
+}
+.bistro-table-card > button {
+  margin-top: 16px;
+}
+.bistro-dialog-scope > div {
+  border-radius: 12px;
+  box-shadow: 0 8px 30px #0002;
+}
+.bistro-dialog-scope .bistro-qr-card {
+  background-image: none;
+}
+.bistro-qr-card #qr-heading {
+  font-family: inherit;
+  font-size: 28px;
+  letter-spacing: -0.5px;
+}
+.bistro-notification-center {
+  margin-bottom: 20px;
+}
+.bistro-notification-center .bistro-readiness-heading {
+  padding: 12px 16px;
+  background: var(--staff-surface);
+  border-color: var(--line);
+  flex-wrap: nowrap;
+}
+.bistro-notification-center .bistro-readiness-heading h2 {
+  font-size: 15px;
+}
+.bistro-notification-center .bistro-readiness-heading p {
+  font-size: 12px;
+}
+.bistro-notification-center .bistro-readiness-heading > button {
+  width: auto;
+  flex-shrink: 0;
+  background: var(--staff-soft) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+  font-size: 13px;
+}
+.bistro-notification-center .bistro-request-panel {
+  margin-top: 8px;
+  max-height: 50dvh;
+  overflow-y: auto;
+}
+.bistro-table-notices {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.bistro-table-notice {
+  border: 1px solid var(--line);
+  border-left: 3px solid #6386bd;
+  background: var(--staff-surface);
+  color: var(--ink);
+  padding: 12px 16px;
+  border-radius: 8px;
+}
+.bistro-workspace-header svg {
+  color: currentColor;
+}
+html[data-theme="light"] .bistro-workspace-header [class*="text-white"] {
+  color: #24262c;
+}
+@media (max-width: 600px) {
+  .bistro-notification-center .bistro-readiness-heading {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .bistro-notification-center .bistro-readiness-heading > button {
+    min-height: 44px;
+  }
+  .bistro-page-heading h1 {
+    font-size: 24px;
+  }
+}
+
+/* Preserve readable action contrast in nested legacy staff controls. */
+html[data-theme="dark"]
+  .bistro-app
+  .bistro-button:not(.bistro-button-secondary),
+html[data-theme="dark"]
+  .bistro-dialog-scope
+  .bistro-button:not(.bistro-button-secondary) {
+  background: #e2e4e9;
+  color: #17191e;
+  border-color: #e2e4e9;
+}
+html[data-theme="dark"] .bistro-app .bistro-button-secondary,
+html[data-theme="dark"] .bistro-dialog-scope .bistro-button-secondary {
+  background: #1e2025;
+  color: #f0f1f3;
+  border-color: #454852;
+}
+:is(.bistro-app, .bistro-dialog-scope)
+  :is([class*="bg-[#C5A77B]"], [class*="bg-[#D6B681]"]) {
+  background-color: var(--staff-action) !important;
+  color: var(--staff-inverse) !important;
+  border-color: var(--staff-action) !important;
+}
+:is(.bistro-app, .bistro-dialog-scope)
+  :is([class*="bg-[#C5A77B]"], [class*="bg-[#D6B681]"])
+  [class*="text-white"] {
+  color: var(--staff-inverse) !important;
+}
+.bistro-management-content > section,
+.bistro-settings-group > section,
+.bistro-settings-group > div > section {
+  border-radius: 10px;
+  box-shadow: none;
+}
+.bistro-workspace-header .workspace-signout {
+  color: inherit;
+}
+
+html[data-theme="dark"]
+  :is(.bistro-app, .bistro-dialog-scope)
+  .bistro-button:not(.bistro-button-secondary) {
+  background-color: #e2e4e9 !important;
+  color: #17191e !important;
+  border-color: #e2e4e9 !important;
+}
+html[data-theme="dark"]
+  :is(.bistro-app, .bistro-dialog-scope)
+  .bistro-button-secondary {
+  background-color: #1e2025 !important;
+  color: #f0f1f3 !important;
+  border-color: #454852 !important;
 }

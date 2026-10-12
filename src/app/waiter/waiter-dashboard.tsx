@@ -226,12 +226,8 @@ export default function WaiterPage() {
         <header className="bistro-page-heading">
           <div>
             <p className="bistro-eyebrow">SERVICE OPERATIONS / WAITER</p>
-            <h1>
-              The floor,
-              <br />
-              <span>at a glance.</span>
-            </h1>
-            <p>A clear view of every table. A better flow for every guest.</p>
+            <h1>Waiter</h1>
+            <p>Check table availability and request release.</p>
           </div>
           <div className="bistro-toolbar">
             <span className="bistro-live">

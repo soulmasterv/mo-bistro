@@ -289,15 +289,18 @@ export default function Home() {
   return (
     <main className="bistro-app">
       <div className="bistro-container">
+        <section
+          className="bistro-notification-center"
+          aria-label="Service notifications"
+        >
+          <ReceptionTableRequests />
+          <TableReadyNotifications />
+        </section>
         <header className="bistro-page-heading">
           <div>
             <p className="bistro-eyebrow">GUEST EXPERIENCE / RECEPTION</p>
-            <h1>
-              A warm welcome.
-              <br />
-              <span>A smooth service.</span>
-            </h1>
-            <p>Every arrival, every table, all in one place.</p>
+            <h1>Reception</h1>
+            <p>Manage the queue and seat guests.</p>
           </div>
           <div className="bistro-toolbar">
             <span className="bistro-live">
@@ -335,7 +338,7 @@ export default function Home() {
             {
               label: "Waiting guests",
               value: waiting,
-              caption: "Ready for a warm welcome",
+              caption: "Waiting for a table",
               icon: Users,
               tone: "gold",
             },
@@ -349,7 +352,7 @@ export default function Home() {
             {
               label: "Seated guests",
               value: seated,
-              caption: "Enjoying their visit",
+              caption: "Currently seated",
               icon: CheckCircle2,
               tone: "green",
             },
@@ -579,7 +582,7 @@ export default function Home() {
               {filtered.length === 0 && (
                 <div className="bistro-empty">
                   <Users size={30} />
-                  <h3>A little room to breathe.</h3>
+                  <h3>Queue is empty.</h3>
                   <p>No active guests found. New arrivals will appear here.</p>
                 </div>
               )}
@@ -592,7 +595,6 @@ export default function Home() {
             </footer>
           </section>
           <aside className="bistro-service-column">
-            <ReceptionTableRequests />
             <TableAvailability />
             <RestaurantWaitSlider />
           </aside>
@@ -781,7 +783,6 @@ export default function Home() {
           }}
         />
       )}
-      <TableReadyNotifications />
     </main>
   );
 }
