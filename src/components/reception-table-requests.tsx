@@ -424,55 +424,62 @@ export default function ReceptionTableRequests() {
         />
       )}
 
-      <div className="bistro-panel bistro-readiness-heading">
-        {error && !notificationPanelOpen && (
-          <p
-            role="alert"
-            className="max-w-xs rounded-lg bg-[#17202A] p-3 text-sm text-red-200"
+      {requests.length === 0 && error && (
+        <p role="alert" className="bistro-alert">
+          {error}
+        </p>
+      )}
+      {requests.length > 0 && (
+        <div className="bistro-panel bistro-readiness-heading">
+          {error && !notificationPanelOpen && (
+            <p
+              role="alert"
+              className="max-w-xs rounded-lg bg-[#17202A] p-3 text-sm text-red-200"
+            >
+              {error}
+            </p>
+          )}
+          <div>
+            <h2 className="font-semibold">Table readiness</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Review waiter requests and keep the floor moving.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const next = !notificationPanelOpenRef.current;
+              notificationPanelOpenRef.current = next;
+              setNotificationPanelOpen(next);
+
+              if (next) {
+                unreadIdsRef.current = new Set();
+                setUnreadRequestIds(new Set());
+              }
+            }}
+            aria-label={`Table requests: ${requests.length} pending, ${unreadRequestCount} unread`}
+            aria-controls="table-request-notifications"
+            aria-expanded={notificationPanelOpen}
+            className="flex min-h-12 items-center gap-3 rounded-xl border border-[#C5A77B] bg-[#17202A] px-4 py-3 text-base font-semibold text-white shadow-xl"
           >
-            {error}
-          </p>
-        )}
-        <div>
-          <h2 className="font-semibold">Table readiness</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Review waiter requests and keep the floor moving.
-          </p>
+            <span className="relative" aria-hidden="true">
+              🔔
+              {unreadRequestCount > 0 && (
+                <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
+                  {unreadRequestCount > 9 ? "9+" : unreadRequestCount}
+                </span>
+              )}
+            </span>
+            <span>
+              {requests.length > 0
+                ? `${requests.length} pending`
+                : "Table-ready requests"}
+            </span>
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            const next = !notificationPanelOpenRef.current;
-            notificationPanelOpenRef.current = next;
-            setNotificationPanelOpen(next);
+      )}
 
-            if (next) {
-              unreadIdsRef.current = new Set();
-              setUnreadRequestIds(new Set());
-            }
-          }}
-          aria-label={`Table requests: ${requests.length} pending, ${unreadRequestCount} unread`}
-          aria-controls="table-request-notifications"
-          aria-expanded={notificationPanelOpen}
-          className="flex min-h-12 items-center gap-3 rounded-xl border border-[#C5A77B] bg-[#17202A] px-4 py-3 text-base font-semibold text-white shadow-xl"
-        >
-          <span className="relative" aria-hidden="true">
-            🔔
-            {unreadRequestCount > 0 && (
-              <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
-                {unreadRequestCount > 9 ? "9+" : unreadRequestCount}
-              </span>
-            )}
-          </span>
-          <span>
-            {requests.length > 0
-              ? `${requests.length} pending`
-              : "Table-ready requests"}
-          </span>
-        </button>
-      </div>
-
-      {notificationPanelOpen && (
+      {requests.length > 0 && notificationPanelOpen && (
         <section
           id="table-request-notifications"
           className="bistro-panel bistro-request-panel"

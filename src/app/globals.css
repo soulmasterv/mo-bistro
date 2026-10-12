@@ -2124,3 +2124,7 @@ html[data-theme="dark"]
     margin-top: 2px;
   }
 }
+
+.bistro-notification-center:empty {
+  display: none;
+}

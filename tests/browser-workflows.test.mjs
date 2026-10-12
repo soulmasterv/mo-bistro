@@ -581,32 +581,17 @@ test(
         await page
           .getByLabel("Color theme", { exact: true })
           .selectOption("light");
-        const readiness = await page
-          .getByRole("heading", { name: "Table readiness", exact: true })
-          .boundingBox();
-        assert.ok(
-          readiness.y + (await page.evaluate(() => window.scrollY)) >= 0,
-          "Readiness is a dedicated document section",
-        );
         assert.equal(
           await page
             .getByRole("heading", { name: "Table readiness", exact: true })
-            .evaluate(
-              (node) =>
-                getComputedStyle(node.closest(".bistro-panel")).position,
-            ),
-          "static",
-          "Readiness must not overlay the queue",
+            .count(),
+          0,
         );
-        assert.ok(
-          await page.locator(".bistro-notification-center").evaluate((el) => {
-            const queue = document.querySelector(".bistro-queue");
-            return (
-              el.getBoundingClientRect().bottom <=
-              queue.getBoundingClientRect().top
-            );
-          }),
-          "Notifications must be above the queue at every width",
+        assert.equal(
+          await page
+            .locator(".bistro-notification-center")
+            .evaluate((el) => el.getBoundingClientRect().height),
+          0,
         );
         await page.getByRole("button", { name: "QR Code" }).click();
         if (screenshots)
@@ -757,6 +742,26 @@ test(
           .click();
         await page.waitForURL(origin + "/");
         await page
+          .getByRole("heading", { name: "Table readiness", exact: true })
+          .waitFor();
+        assert.ok(
+          await page
+            .locator(".bistro-notification-center")
+            .evaluate(
+              (el) =>
+                el.getBoundingClientRect().bottom <=
+                document.querySelector(".bistro-queue").getBoundingClientRect()
+                  .top,
+            ),
+        );
+        if (screenshots) {
+          await page.evaluate(() => window.scrollTo(0, 0));
+          await page.screenshot({
+            path: path.join(screenshots, `pending-request-${width}.png`),
+            fullPage: width < 768,
+          });
+        }
+        await page
           .getByRole("button", { name: /Table requests: 1 pending/ })
           .click();
         assert.equal(
@@ -772,6 +777,13 @@ test(
           .getByRole("heading", { name: "Table is free!", exact: true })
           .waitFor();
         assert.equal(occupied, 0);
+        await page
+          .getByRole("heading", { name: "Table readiness", exact: true })
+          .waitFor({ state: "hidden" });
+        assert.equal(
+          await page.locator("#table-request-notifications").count(),
+          0,
+        );
         mode = "detailed";
         tables[0].name = "W".repeat(40);
         staffUsername = "W".repeat(32);
