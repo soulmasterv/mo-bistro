@@ -1,7 +1,8 @@
 import ManagementDashboard from "./management-dashboard";
+import WorkspaceHeader from "@/components/workspace-header";
 import { requireStaffPage } from "@/lib/require-staff-page";
 
 export default async function Page() {
-  await requireStaffPage(["manager"]);
-  return <ManagementDashboard />;
+  const staff = await requireStaffPage(["manager"]);
+  return <><WorkspaceHeader role={staff.role} workspace="Management" /><ManagementDashboard /></>;
 }

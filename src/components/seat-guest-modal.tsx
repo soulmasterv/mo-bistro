@@ -20,12 +20,23 @@ type Guest = {
 export default function SeatGuestModal({
   guest,
   onClose,
-  onSuccess
+  onSuccess,
 }: {
   guest: Guest;
   onClose: () => void;
   onSuccess: () => void;
 }) {
+  const [mode, setMode] = useState<"simple" | "detailed">("detailed");
+  const [areas, setAreas] = useState<
+    Array<{
+      area: "indoor" | "outdoor";
+      free_tables: number;
+      max_party_size: number;
+    }>
+  >([]);
+  const [selectedArea, setSelectedArea] = useState<"indoor" | "outdoor" | null>(
+    null,
+  );
   const [tables, setTables] = useState<Table[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -33,17 +44,22 @@ export default function SeatGuestModal({
 
   useEffect(() => {
     fetch(`/api/seating?guest_id=${guest.id}`, { cache: "no-store" })
-      .then(async r => {
+      .then(async (r) => {
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || "Unable to load tables");
         return data;
       })
-      .then(data => setTables(data.tables))
-      .catch(e => setError(e.message));
+      .then((data) => {
+        setMode(data.mode === "simple" ? "simple" : "detailed");
+        setTables(data.tables ?? []);
+        setAreas(data.areas ?? []);
+      })
+      .catch((e) => setError(e.message));
   }, [guest.id]);
 
   async function confirm() {
-    if (selected === null || busy) return;
+    if (busy || (mode === "simple" ? selectedArea === null : selected === null))
+      return;
     setBusy(true);
     setError("");
 
@@ -53,8 +69,10 @@ export default function SeatGuestModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           guest_id: guest.id,
-          table_id: selected
-        })
+          ...(mode === "simple"
+            ? { area: selectedArea }
+            : { table_id: selected }),
+        }),
       });
 
       const data = await response.json();
@@ -90,8 +108,29 @@ export default function SeatGuestModal({
           {guest.seating_preference || "any"} preference
         </p>
 
+        {mode === "simple" && (
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {areas.map((area) => (
+              <button
+                type="button"
+                key={area.area}
+                onClick={() => setSelectedArea(area.area)}
+                aria-pressed={selectedArea === area.area}
+                className={`min-h-20 rounded-xl border p-4 text-left ${selectedArea === area.area ? "border-[#C5A77B] bg-[#C5A77B]/10" : "border-white/15"}`}
+              >
+                <span className="block font-semibold capitalize">
+                  {area.area}
+                </span>
+                <span className="mt-1 block text-sm text-slate-300">
+                  {area.free_tables} available · up to {area.max_party_size}{" "}
+                  guests
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
         <div className="mt-5 space-y-2">
-          {tables.map(table => {
+          {tables.map((table) => {
             const preferred =
               guest.seating_preference === "any" ||
               guest.seating_preference === table.area;
@@ -124,20 +163,32 @@ export default function SeatGuestModal({
           })}
         </div>
 
-        {tables.length === 0 && !error && (
-          <p className="mt-5 text-sm text-slate-400">
-            No suitable free tables currently available.
+        {(mode === "simple" ? areas.length === 0 : tables.length === 0) &&
+          !error && (
+            <p className="mt-5 text-sm text-slate-400">
+              No suitable free tables currently available.
+            </p>
+          )}
+
+        {error && (
+          <p role="alert" className="mt-4 text-sm text-red-300">
+            {error}
           </p>
         )}
 
-        {error && <p role="alert" className="mt-4 text-sm text-red-300">{error}</p>}
-
         <button
           onClick={() => void confirm()}
-          disabled={selected === null || busy}
+          disabled={
+            busy ||
+            (mode === "simple" ? selectedArea === null : selected === null)
+          }
           className="mt-6 w-full rounded-xl bg-[#C5A77B] px-5 py-3 font-semibold text-[#101820] disabled:opacity-40"
         >
-          {busy ? "Assigning..." : "Assign table & seat guest"}
+          {busy
+            ? "Seating…"
+            : mode === "simple"
+              ? "Seat guest in area"
+              : "Assign table & seat guest"}
         </button>
       </div>
     </div>

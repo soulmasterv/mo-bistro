@@ -125,7 +125,7 @@ export default function StaffPinsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F6F2E9] px-4 py-8 text-[#293126]">
+    <main className="min-h-screen bg-[#0D1218] px-4 py-8 text-white">
       <div className="mx-auto max-w-xl">
         <Link
           href="/management"
@@ -136,12 +136,12 @@ export default function StaffPinsPage() {
 
         <header className="mt-7">
           <h1 className="font-serif text-4xl">Staff PINs</h1>
-          <p className="mt-2 text-sm text-[#727568]">
+          <p className="mt-2 text-sm text-slate-400">
             Assign or reset individual staff sign-in PINs.
           </p>
         </header>
 
-        <section className="mt-7 rounded-2xl border border-[#D8D1C3] bg-[#FFFCF7] p-5 shadow-sm">
+        <section className="mt-7 rounded-2xl border border-white/10 bg-[#17202A] p-5 shadow-sm">
           {loading ? (
             <p>Loading staff...</p>
           ) : (
@@ -157,7 +157,7 @@ export default function StaffPinsPage() {
                     setError("");
                     setNotice("");
                   }}
-                  className="mt-2 min-h-12 w-full rounded-xl border border-[#C9C8BD] bg-white px-3"
+                  className="mt-2 min-h-12 w-full rounded-xl border border-white/15 bg-[#0D1218] px-3"
                 >
                   <option value="">Choose staff...</option>
                   {users.map(user => (
@@ -176,10 +176,10 @@ export default function StaffPinsPage() {
 
               {selected && (
                 <>
-                  <div className="mt-5 rounded-xl bg-[#F1EBDF] p-4 text-sm">
+                  <div className="mt-5 rounded-xl bg-[#0D1218] p-4 text-sm">
                     <p className="font-semibold">{selected.username}</p>
                     <p className="mt-1 capitalize">{selected.role}</p>
-                    <p className="mt-1 text-[#727568]">
+                    <p className="mt-1 text-slate-400">
                       {selected.has_pin
                         ? "PIN configured — saving will replace it."
                         : "No PIN configured yet."}
@@ -198,7 +198,7 @@ export default function StaffPinsPage() {
                       onChange={event =>
                         setPin(event.target.value.replace(/\D/g, "").slice(0, 6))
                       }
-                      className="mt-2 min-h-12 w-full rounded-xl border border-[#C9C8BD] bg-white px-4 text-lg tracking-widest"
+                      className="mt-2 min-h-12 w-full rounded-xl border border-white/15 bg-[#0D1218] px-4 text-lg tracking-widest"
                     />
                   </label>
 
@@ -214,7 +214,7 @@ export default function StaffPinsPage() {
                       onChange={event =>
                         setConfirmPin(event.target.value.replace(/\D/g, "").slice(0, 6))
                       }
-                      className="mt-2 min-h-12 w-full rounded-xl border border-[#C9C8BD] bg-white px-4 text-lg tracking-widest"
+                      className="mt-2 min-h-12 w-full rounded-xl border border-white/15 bg-[#0D1218] px-4 text-lg tracking-widest"
                     />
                   </label>
 
@@ -231,15 +231,15 @@ export default function StaffPinsPage() {
             </>
           )}
 
-          {warning && <p role="status" className="mt-4 text-sm text-amber-800">{warning}</p>}
+          {warning && <p role="status" className="mt-4 text-sm text-amber-200">{warning}</p>}
           {error && (
-            <p role="alert" className="mt-4 text-sm text-red-700">
+            <p role="alert" className="mt-4 text-sm text-red-300">
               {error}
             </p>
           )}
 
           {notice && (
-            <p role="status" className="mt-4 text-sm text-green-800">
+            <p role="status" className="mt-4 text-sm text-emerald-300">
               {notice}
             </p>
           )}

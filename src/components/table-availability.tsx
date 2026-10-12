@@ -11,13 +11,24 @@ type Table = {
   status: "free" | "occupied";
 };
 
+type Pool = {
+  area: "indoor" | "outdoor";
+  total_tables: number;
+  occupied_tables: number;
+  free_tables: number;
+  max_party_size: number;
+};
 type Mode = "simple" | "detailed";
 
 export default function TableAvailability() {
   const [tables, setTables] = useState<Table[]>([]);
   const [mode, setMode] = useState<Mode>("detailed");
   const loadController = useRef<AbortController | null>(null);
-  const [selectedByArea, setSelectedByArea] = useState<Partial<Record<"indoor" | "outdoor", number>>>({});
+  const [pools, setPools] = useState<Pool[]>([]);
+  const [busyArea, setBusyArea] = useState<string | null>(null);
+  const releaseOperation = useRef<
+    Partial<Record<"indoor" | "outdoor", string>>
+  >({});
   const [error, setError] = useState("");
 
   const load = useCallback(async (force = false) => {
@@ -26,23 +37,25 @@ export default function TableAvailability() {
     const controller = new AbortController();
     loadController.current = controller;
     try {
-      const [tableResponse, modeResponse] = await Promise.all([
-        fetch("/api/tables", { cache: "no-store", signal: controller.signal }),
-        fetch("/api/table-view-mode", { cache: "no-store", signal: controller.signal }),
-      ]);
-
-      if (!tableResponse.ok || !modeResponse.ok) {
-        throw new Error("Unable to load table availability.");
-      }
-
-      const [tableData, modeData] = await Promise.all([
-        tableResponse.json(),
-        modeResponse.json(),
-      ]);
-
+      const modeResponse = await fetch("/api/table-view-mode", {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      if (!modeResponse.ok) throw new Error("Unable to load table view mode.");
+      const modeData = await modeResponse.json();
+      const nextMode = modeData.mode === "simple" ? "simple" : "detailed";
+      const response = await fetch(
+        nextMode === "simple" ? "/api/simple-tables" : "/api/tables",
+        { cache: "no-store", signal: controller.signal },
+      );
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Unable to load table availability.");
+      if (data.blocked_by_named_inventory) throw new Error(data.warning);
       if (controller.signal.aborted) return;
-      setTables(tableData);
-      setMode(modeData.mode === "simple" ? "simple" : "detailed");
+      setMode(nextMode);
+      setTables(nextMode === "detailed" ? data : []);
+      setPools(nextMode === "simple" ? data.areas : []);
       setError("");
     } catch (err) {
       if (!controller.signal.aborted) throw err;
@@ -52,26 +65,47 @@ export default function TableAvailability() {
   }, []);
 
   useEffect(() => {
-    const initial = window.setTimeout(() => { void load().catch(err => setError(String(err))); }, 0);
+    const initial = window.setTimeout(() => {
+      void load().catch((err) => setError(String(err)));
+    }, 0);
 
     const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") void load().catch(err => setError(err instanceof Error ? err.message : "Unable to refresh tables."));
+      if (document.visibilityState === "visible")
+        void load().catch((err) =>
+          setError(
+            err instanceof Error ? err.message : "Unable to refresh tables.",
+          ),
+        );
     }, 5000);
 
     const onTablesChanged = (event: Event) => {
       if ((event as CustomEvent).detail !== "table-availability") {
-        void load(true).catch(err => setError(err instanceof Error ? err.message : "Unable to refresh tables."));
+        void load(true).catch((err) =>
+          setError(
+            err instanceof Error ? err.message : "Unable to refresh tables.",
+          ),
+        );
       }
     };
     window.addEventListener("mo-bistro-tables-changed", onTablesChanged);
-    return () => { window.clearTimeout(initial); loadController.current?.abort(); loadController.current = null; window.clearInterval(timer); window.removeEventListener("mo-bistro-tables-changed", onTablesChanged); };
+    return () => {
+      window.clearTimeout(initial);
+      loadController.current?.abort();
+      loadController.current = null;
+      window.clearInterval(timer);
+      window.removeEventListener("mo-bistro-tables-changed", onTablesChanged);
+    };
   }, [load]);
 
   const [releaseId, setReleaseId] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
   async function release(tableId: number) {
     if (releaseId !== null) return;
-    if (!tables.some(table => table.id === tableId && table.status === "occupied")) {
+    if (
+      !tables.some(
+        (table) => table.id === tableId && table.status === "occupied",
+      )
+    ) {
       setError("Choose a currently occupied table.");
       return;
     }
@@ -79,30 +113,107 @@ export default function TableAvailability() {
     setError("");
     setNotice("");
     try {
-      const response = await fetch("/api/waiter/tables/" + tableId + "/free", { method: "POST", credentials: "same-origin" });
+      const response = await fetch("/api/waiter/tables/" + tableId + "/free", {
+        method: "POST",
+        credentials: "same-origin",
+      });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Unable to release table.");
+      if (!response.ok)
+        throw new Error(data.error || "Unable to release table.");
       loadController.current?.abort();
-      setSelectedByArea(previous => Object.fromEntries(Object.entries(previous).filter(([, id]) => id !== tableId)));
-      setTables(previous => previous.map(table => table.id === tableId ? { ...table, status: "free" } : table));
+      setTables((previous) =>
+        previous.map((table) =>
+          table.id === tableId ? { ...table, status: "free" } : table,
+        ),
+      );
       setNotice("Table is now free.");
-      window.dispatchEvent(new CustomEvent("mo-bistro-tables-changed", { detail: "table-availability" }));
+      window.dispatchEvent(
+        new CustomEvent("mo-bistro-tables-changed", {
+          detail: "table-availability",
+        }),
+      );
       await load(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to release table.");
       void load().catch(() => {});
-    } finally { setReleaseId(null); }
+    } finally {
+      setReleaseId(null);
+    }
   }
 
-  const free = tables.filter(t => t.status === "free").length;
+  async function freeArea(area: "indoor" | "outdoor") {
+    if (busyArea) return;
+    const operationId = releaseOperation.current[area] ?? crypto.randomUUID();
+    releaseOperation.current[area] = operationId;
+    setBusyArea(area);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/simple-tables", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ area, operation_id: operationId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        if (response.status < 500) delete releaseOperation.current[area];
+        throw new Error(data.error || "Unable to free area capacity.");
+      }
+      delete releaseOperation.current[area];
+      loadController.current?.abort();
+      setPools((current) =>
+        current.map((pool) =>
+          pool.area === area && !data.repeated
+            ? {
+                ...pool,
+                occupied_tables: Math.max(0, pool.occupied_tables - 1),
+                free_tables: Math.min(pool.total_tables, pool.free_tables + 1),
+              }
+            : pool,
+        ),
+      );
+      setNotice(
+        `${area === "indoor" ? "Indoor" : "Outdoor"} availability updated.`,
+      );
+      window.dispatchEvent(
+        new CustomEvent("mo-bistro-tables-changed", {
+          detail: "table-availability",
+        }),
+      );
+      await load(true);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to free area capacity.",
+      );
+    } finally {
+      setBusyArea(null);
+    }
+  }
+  const free =
+    mode === "simple"
+      ? pools.reduce((count, pool) => count + pool.free_tables, 0)
+      : tables.filter((t) => t.status === "free").length;
+  const total =
+    mode === "simple"
+      ? pools.reduce((count, pool) => count + pool.total_tables, 0)
+      : tables.length;
 
   const summary = (area: "indoor" | "outdoor") => {
-    const areaTables = tables.filter(t => t.area === area);
+    if (mode === "simple") {
+      const pool = pools.find((item) => item.area === area);
+      return {
+        total: pool?.total_tables ?? 0,
+        free: pool?.free_tables ?? 0,
+        occupied: pool?.occupied_tables ?? 0,
+      };
+    }
+    const areaTables = tables.filter((t) => t.area === area);
 
     return {
       total: areaTables.length,
-      free: areaTables.filter(t => t.status === "free").length,
-      occupied: areaTables.filter(t => t.status === "occupied").length,
+      free: areaTables.filter((t) => t.status === "free").length,
+      occupied: areaTables.filter((t) => t.status === "occupied").length,
     };
   };
 
@@ -112,13 +223,13 @@ export default function TableAvailability() {
         <div>
           <h2 className="text-xl font-semibold">Table availability</h2>
           <p className="mt-1 text-sm text-slate-400">
-            {free} free / {tables.length} total
+            {free} free / {total} total
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => void load().catch(err => setError(String(err)))}
+          onClick={() => void load().catch((err) => setError(String(err)))}
           className="rounded-xl border border-white/10 p-3"
           aria-label="Refresh tables"
         >
@@ -139,7 +250,7 @@ export default function TableAvailability() {
 
       {mode === "simple" ? (
         <div className="grid gap-4 sm:grid-cols-2">
-          {(["indoor", "outdoor"] as const).map(area => {
+          {(["indoor", "outdoor"] as const).map((area) => {
             const counts = summary(area);
 
             return (
@@ -149,9 +260,7 @@ export default function TableAvailability() {
               >
                 <div className="flex items-center gap-3">
                   <Armchair size={22} className="text-[#C5A77B]" />
-                  <h3 className="text-lg font-semibold capitalize">
-                    {area}
-                  </h3>
+                  <h3 className="text-lg font-semibold capitalize">{area}</h3>
                 </div>
 
                 <p className="mt-5 text-3xl font-semibold text-emerald-300">
@@ -165,33 +274,21 @@ export default function TableAvailability() {
                   <span>{counts.occupied} occupied</span>
                   <span>{counts.total} total</span>
                 </div>
-                {counts.occupied > 0 && (
-                  <div className="mt-4">
-                    <label className="block text-sm">
-                      Table to clear
-                      <select value={selectedByArea[area] ?? ""}
-                        onChange={event => setSelectedByArea(previous => ({ ...previous, [area]: Number(event.target.value) }))}
-                        className="mt-2 min-h-11 w-full rounded-lg border border-white/20 bg-[#17202A] p-3">
-                        <option value="">Choose occupied table...</option>
-                        {tables.filter(table => table.area === area && table.status === "occupied").map(table => (
-                          <option key={table.id} value={table.id}>{table.name}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <button type="button" disabled={releaseId !== null || !tables.some(table => table.id === selectedByArea[area] && table.status === "occupied" && table.area === area)}
-                      onClick={() => void release(selectedByArea[area]!)}
-                      className="mt-3 min-h-12 w-full rounded-lg bg-[#C5A77B] px-3 font-semibold text-[#101820] disabled:opacity-40">
-                      {releaseId === selectedByArea[area] ? "Clearing…" : "Clear Table"}
-                    </button>
-                  </div>
-                )}
+                <button
+                  type="button"
+                  disabled={counts.occupied === 0 || busyArea !== null}
+                  onClick={() => void freeArea(area)}
+                  className="mt-4 min-h-12 w-full rounded-xl bg-[#C5A77B] px-4 font-semibold text-[#101820] disabled:opacity-40"
+                >
+                  {busyArea === area ? "Updating…" : "Table free"}
+                </button>
               </div>
             );
           })}
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {tables.map(table => (
+          {tables.map((table) => (
             <div
               key={table.id}
               className="rounded-xl border border-white/10 bg-[#0D1218] p-4"
@@ -216,15 +313,28 @@ export default function TableAvailability() {
                 {table.seats} seats · {table.area}
               </p>
 
-              {table.status === "occupied" && <button type="button" disabled={releaseId !== null} onClick={() => void release(table.id)} aria-label={"Clear " + table.name} className="mt-3 min-h-11 w-full rounded-lg bg-[#C5A77B] px-3 text-sm font-semibold text-[#101820] disabled:opacity-40">{releaseId === table.id ? "Clearing…" : "Clear Table"}</button>}
-
+              {table.status === "occupied" && (
+                <button
+                  type="button"
+                  disabled={releaseId !== null}
+                  onClick={() => void release(table.id)}
+                  aria-label={"Clear " + table.name}
+                  className="mt-3 min-h-11 w-full rounded-lg bg-[#C5A77B] px-3 text-sm font-semibold text-[#101820] disabled:opacity-40"
+                >
+                  {releaseId === table.id ? "Clearing…" : "Clear Table"}
+                </button>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      {notice && <p role="status" className="mt-3 text-sm text-emerald-300">{notice}</p>}
-      {tables.length === 0 && (
+      {notice && (
+        <p role="status" className="mt-3 text-sm text-emerald-300">
+          {notice}
+        </p>
+      )}
+      {total === 0 && (
         <p className="mt-4 text-sm text-slate-400">
           No tables yet. A manager can add tables in Settings.
         </p>

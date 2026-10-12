@@ -8,8 +8,7 @@ import ManagementExtras from "@/components/management-extras";
 
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Settings2, ArrowLeft, Save } from "lucide-react";
+import { Settings2, Save } from "lucide-react";
 
 type Settings = {
   qr_rotation_seconds: string;
@@ -66,12 +65,8 @@ export default function ManagementPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0D1218] px-5 py-10 text-white">
-      <div className="mx-auto max-w-3xl">
-        <Link href="/" className="mb-8 inline-flex items-center gap-2 text-sm text-[#C5A77B]">
-          <ArrowLeft size={16} /> Back to waitlist
-        </Link>
-
+    <main className="min-h-screen bg-[#0D1218] px-4 py-6 sm:px-6 sm:py-8 text-white">
+      <div className="mx-auto max-w-5xl">
         <div className="mb-8 flex items-center gap-3">
           <Settings2 className="text-[#C5A77B]" size={30} />
           <div>

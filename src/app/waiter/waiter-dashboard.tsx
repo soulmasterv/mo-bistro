@@ -2,12 +2,7 @@
 import Link from "next/link";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  CheckCircle2,
-  Clock3,
-  RefreshCw,
-  UtensilsCrossed,
-} from "lucide-react";
+import { CheckCircle2, Clock3, RefreshCw, UtensilsCrossed } from "lucide-react";
 
 type RestaurantTable = {
   id: number;
@@ -20,13 +15,23 @@ type RestaurantTable = {
 type Filter = "all" | "occupied" | "free";
 
 export default function WaiterPage() {
+  const [pools, setPools] = useState<
+    Array<{
+      area: string;
+      total_tables: number;
+      occupied_tables: number;
+      free_tables: number;
+    }>
+  >([]);
   const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [pendingTableIds, setPendingTableIds] = useState<number[]>([]);
   const [pendingAreas, setPendingAreas] = useState<string[]>([]);
   const [busyArea, setBusyArea] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"simple" | "detailed">("detailed");
   const [filter, setFilter] = useState<Filter>("all");
-  const [areaFilter, setAreaFilter] = useState<"all" | "indoor" | "outdoor">("all");
+  const [areaFilter, setAreaFilter] = useState<"all" | "indoor" | "outdoor">(
+    "all",
+  );
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -35,89 +40,53 @@ export default function WaiterPage() {
 
   const refresh = useCallback(async () => {
     try {
-      const response = await fetch("/api/tables", {
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-
-      if (response.status === 401 || response.status === 403) {
-        setUnauthorized(true);
-        throw new Error("Please sign in with your staff account.");
-      }
-
-      if (!response.ok) {
-        throw new Error("Could not load restaurant tables.");
-      }
-
-      const data: unknown = await response.json();
-
-      const record =
-        data && typeof data === "object"
-          ? (data as Record<string, unknown>)
-          : {};
-
-      const raw = Array.isArray(data)
-        ? data
-        : Array.isArray(record.tables)
-          ? record.tables
-          : Array.isArray(record.data)
-            ? record.data
-            : null;
-
-      if (!raw) {
-        throw new Error("Unexpected table API response.");
-      }
-
-      const normalized: RestaurantTable[] = raw
-        .filter(
-          (item): item is Record<string, unknown> =>
-            !!item && typeof item === "object" && !Array.isArray(item)
-        )
-        .map((item) => ({
-          id: Number(item.id),
-          name: String(item.name ?? `Table ${item.id}`),
-          seats: Number(item.seats ?? 0),
-          area: String(item.area ?? "indoor").toLowerCase(),
-          status: String(item.status ?? "free").toLowerCase(),
-        }))
-        .filter((table) => Number.isSafeInteger(table.id));
-
-      setTables(normalized);
-
       const modeResponse = await fetch("/api/table-view-mode", {
         cache: "no-store",
         credentials: "same-origin",
       });
-
-      if (!modeResponse.ok) {
-        throw new Error("Could not load manager table-view setting.");
-      }
-
+      if (modeResponse.status === 401 || modeResponse.status === 403)
+        setUnauthorized(true);
       const modeData = await modeResponse.json();
-      setViewMode(modeData.mode === "simple" ? "simple" : "detailed");
+      if (!modeResponse.ok)
+        throw new Error(modeData.error || "Could not load table mode.");
+      const mode = modeData.mode === "simple" ? "simple" : "detailed";
+      const response = await fetch(
+        mode === "simple" ? "/api/simple-tables" : "/api/tables",
+        { cache: "no-store", credentials: "same-origin" },
+      );
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Could not load table availability.");
+      if (data.blocked_by_named_inventory) throw new Error(data.warning);
+      setViewMode(mode);
+      setPools(mode === "simple" ? data.areas : []);
+      setTables(mode === "detailed" ? data : []);
       const requestResponse = await fetch("/api/waiter/table-requests", {
         cache: "no-store",
         credentials: "same-origin",
       });
       if (requestResponse.ok) {
         const requestData = await requestResponse.json();
-        const pendingIds = (Array.isArray(requestData.requests) ? requestData.requests : [])
+        const pendingIds = (
+          Array.isArray(requestData.requests) ? requestData.requests : []
+        )
           .filter((request: { status: string }) => request.status === "pending")
           .map((request: { table_id: number }) => Number(request.table_id));
         setPendingTableIds(pendingIds);
         setPendingAreas(
           (Array.isArray(requestData.requests) ? requestData.requests : [])
-            .filter((request: { status: string; area?: string }) =>
-              request.status === "pending" && !!request.area
+            .filter(
+              (request: { status: string; area?: string }) =>
+                request.status === "pending" && !!request.area,
             )
-            .map((request: { area: string }) => request.area)
+            .map((request: { area: string }) => request.area),
         );
       }
       setError("");
       setUnauthorized(false);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Unable to refresh tables."
+        err instanceof Error ? err.message : "Unable to refresh tables.",
       );
     } finally {
       setLoading(false);
@@ -163,17 +132,27 @@ export default function WaiterPage() {
     };
   }, [refresh]);
 
-  const occupied = tables.filter((t) => t.status === "occupied").length;
-  const free = tables.filter((t) => t.status === "free").length;
+  const occupied =
+    viewMode === "simple"
+      ? pools.reduce((count, pool) => count + pool.occupied_tables, 0)
+      : tables.filter((t) => t.status === "occupied").length;
+  const free =
+    viewMode === "simple"
+      ? pools.reduce((count, pool) => count + pool.free_tables, 0)
+      : tables.filter((t) => t.status === "free").length;
+  const total =
+    viewMode === "simple"
+      ? pools.reduce((count, pool) => count + pool.total_tables, 0)
+      : tables.length;
 
   const visible = useMemo(
     () =>
       tables.filter(
         (table) =>
           (filter === "all" || table.status === filter) &&
-          (areaFilter === "all" || table.area === areaFilter)
+          (areaFilter === "all" || table.area === areaFilter),
       ),
-    [tables, filter, areaFilter]
+    [tables, filter, areaFilter],
   );
 
   async function requestAreaReady(area: "indoor" | "outdoor") {
@@ -197,7 +176,9 @@ export default function WaiterPage() {
         throw new Error(result.error || "Unable to send area request.");
       }
 
-      setNotice(`${area === "indoor" ? "Indoor" : "Outdoor"} request sent to Reception.`);
+      setNotice(
+        `${area === "indoor" ? "Indoor" : "Outdoor"} request sent to Reception.`,
+      );
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed.");
@@ -209,8 +190,6 @@ export default function WaiterPage() {
   async function markReady(table: RestaurantTable) {
     if (busyId !== null || table.status !== "occupied") return;
 
-
-
     setBusyId(table.id);
     setError("");
     setNotice("");
@@ -221,7 +200,7 @@ export default function WaiterPage() {
         {
           method: "POST",
           credentials: "same-origin",
-        }
+        },
       );
 
       const result = await response.json().catch(() => ({}));
@@ -234,7 +213,7 @@ export default function WaiterPage() {
       await refresh();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Unable to mark table ready."
+        err instanceof Error ? err.message : "Unable to mark table ready.",
       );
     } finally {
       setBusyId(null);
@@ -242,26 +221,10 @@ export default function WaiterPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F4F0E9] text-[#30362B]">
-      <header className="bg-[#30362B] px-4 pb-4 pt-4 text-[#F9F4E9] sm:px-8">
+    <main className="min-h-screen bg-[#0D1218] text-white">
+      <header className="bg-[#17202A] px-4 pb-4 pt-4 text-[#F9F4E9] sm:px-8">
         <div className="mx-auto max-w-6xl">
           <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  const response = await fetch("/api/auth/logout", { method: "POST" });
-                  if (!response.ok) throw new Error("Logout failed.");
-                  window.location.replace("/login");
-                } catch {
-                  setError("Could not log out. Please try again.");
-                }
-              }}
-              className="flex min-h-11 items-center gap-2 text-sm text-[#E4DDCD]"
-            >
-              Log Out
-            </button>
-
             <span className="rounded-full border border-[#777D6B] px-3 py-2 text-[10px] font-semibold tracking-[0.2em]">
               DISTRICT 5
             </span>
@@ -275,30 +238,28 @@ export default function WaiterPage() {
           </div>
 
           <h1 className="mt-4 font-serif text-4xl sm:text-5xl">
-            Table management.
+            Waiter workspace
           </h1>
 
           <p className="mt-3 max-w-lg text-sm leading-6 text-[#D9D9CF]">
-            Keep reception informed. Mark a table ready once it has
-            been cleared and prepared for the next guests.
+            Keep reception informed. Mark a table ready once it has been cleared
+            and prepared for the next guests.
           </p>
 
           <div className="mt-7 grid grid-cols-3 gap-2 sm:max-w-xl sm:gap-4">
             {[
-              { label: "Total", value: tables.length },
+              { label: "Total", value: total },
               { label: "Available", value: free },
               { label: "Occupied", value: occupied },
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="rounded-2xl border border-[#666D5E] bg-[#3D4436] p-3 sm:p-5"
+                className="rounded-xl border border-[#666D5E] bg-[#3D4436] p-3 sm:p-5"
               >
                 <div className="font-serif text-3xl text-[#F9F4E9]">
                   {stat.value}
                 </div>
-                <div className="mt-1 text-xs text-[#D5D4C7]">
-                  {stat.label}
-                </div>
+                <div className="mt-1 text-xs text-[#D5D4C7]">{stat.label}</div>
               </div>
             ))}
           </div>
@@ -308,8 +269,10 @@ export default function WaiterPage() {
       <section className="mx-auto max-w-6xl px-4 py-6 sm:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-serif text-2xl">Restaurant floor</h2>
-            <p className="mt-1 text-xs text-[#77796F]">
+            <h2 id="restaurant-floor" className="text-2xl font-semibold">
+              Table is ready
+            </h2>
+            <p className="mt-1 text-xs text-slate-400">
               Live updates · Every 3 seconds
             </p>
           </div>
@@ -324,60 +287,61 @@ export default function WaiterPage() {
           </button>
         </div>
 
-        <p className="mt-5 text-xs text-[#77796F]">
+        <p className="mt-5 text-xs text-slate-400">
           {viewMode === "simple" ? "Simple view" : "Detailed view"}
           {" · "}Controlled by management
         </p>
 
-        {viewMode === "detailed" && <>
-      <div className="mt-3 flex flex-wrap gap-2">
-          {(
-            [
-              ["all", "All tables"],
-              ["occupied", "Occupied"],
-              ["free", "Available"],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setFilter(value)}
-              className={`min-h-11 shrink-0 rounded-full px-5 text-sm font-medium ${
-                filter === value
-                  ? "bg-[#30362B] text-white"
-                  : "border border-[#D7D3C8] bg-white text-[#30362B]"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {viewMode === "detailed" && (
+          <>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {(
+                [
+                  ["all", "All tables"],
+                  ["occupied", "Occupied"],
+                  ["free", "Available"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFilter(value)}
+                  className={`min-h-11 shrink-0 rounded-full px-5 text-sm font-medium ${
+                    filter === value
+                      ? "bg-[#17202A] text-white"
+                      : "border border-white/15 bg-[#17202A] text-white"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
 
-        <div className="mt-2 flex flex-wrap gap-2">
-          {(
-            [
-              ["all", "All areas"],
-              ["indoor", "Indoor"],
-              ["outdoor", "Outdoor"],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setAreaFilter(value)}
-              className={`min-h-11 shrink-0 rounded-full px-5 text-sm font-medium ${
-                areaFilter === value
-                  ? "bg-[#30362B] text-white"
-                  : "border border-[#D7D3C8] bg-white text-[#30362B]"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        </>}
-      {error && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {(
+                [
+                  ["all", "All areas"],
+                  ["indoor", "Indoor"],
+                  ["outdoor", "Outdoor"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setAreaFilter(value)}
+                  className={`min-h-11 shrink-0 rounded-full px-5 text-sm font-medium ${
+                    areaFilter === value
+                      ? "bg-[#17202A] text-white"
+                      : "border border-white/15 bg-[#17202A] text-white"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        {error && (
           <div
             role="alert"
             className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
@@ -402,31 +366,31 @@ export default function WaiterPage() {
 
         {loading ? (
           <p className="py-12 text-center text-sm">Loading tables...</p>
-        ) : (viewMode === "detailed" ? visible.length === 0 : tables.length === 0) ? (
-          <p className="py-12 text-center text-sm text-[#77796F]">
+        ) : (viewMode === "detailed" ? visible.length === 0 : total === 0) ? (
+          <p className="py-12 text-center text-sm text-slate-400">
             No tables in this category.
           </p>
         ) : viewMode === "simple" ? (
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {(["indoor", "outdoor"] as const).map(area => {
-              const areaTables = tables.filter(table => table.area === area);
-              const areaFree = areaTables.filter(table => table.status === "free").length;
-              const areaOccupied = areaTables.filter(table => table.status === "occupied").length;
+            {(["indoor", "outdoor"] as const).map((area) => {
+              const pool = pools.find((item) => item.area === area);
+              const areaFree = pool?.free_tables ?? 0;
+              const areaOccupied = pool?.occupied_tables ?? 0;
 
               return (
                 <article
                   key={area}
-                  className="rounded-2xl border border-[#DDD8CB] bg-[#FFFCF7] p-3 shadow-sm"
+                  className="rounded-xl border border-white/10 bg-[#17202A] p-3 shadow-sm"
                 >
                   <h3 className="font-serif text-2xl capitalize">{area}</h3>
                   <p className="mt-2 text-2xl font-semibold text-[#55704B]">
                     {areaFree}
-                    <span className="ml-2 text-sm font-normal text-[#77796F]">
+                    <span className="ml-2 text-sm font-normal text-slate-400">
                       available
                     </span>
                   </p>
-                  <p className="mt-2 text-sm text-[#77796F]">
-                    {areaOccupied} occupied · {areaTables.length} total
+                  <p className="mt-2 text-sm text-slate-400">
+                    {areaOccupied} occupied · {pool?.total_tables ?? 0} total
                   </p>
                   <button
                     type="button"
@@ -436,13 +400,13 @@ export default function WaiterPage() {
                       pendingAreas.includes(area)
                     }
                     onClick={() => void requestAreaReady(area)}
-                    className="mt-3 min-h-12 w-full rounded-xl bg-[#30362B] px-3 text-sm font-semibold text-white disabled:opacity-40"
+                    className="mt-3 min-h-12 w-full rounded-xl bg-[#17202A] px-3 text-sm font-semibold text-white disabled:opacity-40"
                   >
                     {busyArea === area
                       ? "Sending..."
                       : pendingAreas.includes(area)
                         ? "Awaiting Reception approval"
-                        : `Table empty — ${area === "indoor" ? "Indoor" : "Outdoor"}`}
+                        : `Table is ready — ${area === "indoor" ? "Indoor" : "Outdoor"}`}
                   </button>
                 </article>
               );
@@ -452,28 +416,26 @@ export default function WaiterPage() {
           <div className="mt-5 grid grid-cols-1 gap-3 min-[390px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {visible.map((table) => {
               const isOccupied = table.status === "occupied";
-              const isPending = isOccupied && pendingTableIds.includes(table.id);
+              const isPending =
+                isOccupied && pendingTableIds.includes(table.id);
 
               return (
                 <article
                   key={table.id}
-                  className="flex min-w-0 flex-col rounded-2xl border border-[#DDD8CB] bg-[#FFFCF7] p-4 shadow-sm"
+                  className="flex min-w-0 flex-col rounded-xl border border-white/10 bg-[#17202A] p-4 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <h3 className="break-words font-serif text-2xl">
                         {table.name}
                       </h3>
-                      <p className="mt-1 text-xs capitalize text-[#85867C]">
+                      <p className="mt-1 text-xs capitalize text-slate-400">
                         {table.area} · {table.seats} seats
                       </p>
                     </div>
 
                     {isOccupied ? (
-                      <Clock3
-                        size={22}
-                        className="shrink-0 text-[#B28B55]"
-                      />
+                      <Clock3 size={22} className="shrink-0 text-[#B28B55]" />
                     ) : (
                       <CheckCircle2
                         size={22}
@@ -489,7 +451,11 @@ export default function WaiterPage() {
                         : "bg-[#E9F0E3] text-[#55704B]"
                     }`}
                   >
-                    {isPending ? "Awaiting reception approval" : isOccupied ? "Occupied" : "Available"}
+                    {isPending
+                      ? "Awaiting reception approval"
+                      : isOccupied
+                        ? "Occupied"
+                        : "Available"}
                   </div>
 
                   <button
@@ -498,7 +464,7 @@ export default function WaiterPage() {
                     onClick={() => void markReady(table)}
                     className={`mt-3 min-h-12 w-full rounded-xl text-sm font-semibold ${
                       isOccupied
-                        ? "bg-[#30362B] text-white disabled:opacity-50"
+                        ? "bg-[#C5A77B] text-[#101820] disabled:opacity-50"
                         : "cursor-default bg-[#E8E8E0] text-[#7B8175]"
                     }`}
                   >
@@ -506,9 +472,9 @@ export default function WaiterPage() {
                       ? "Sending request..."
                       : isPending
                         ? "Awaiting approval"
-                      : isOccupied
-                        ? "Request table ready"
-                        : "Already ready"}
+                        : isOccupied
+                          ? "Table is ready"
+                          : "Already ready"}
                   </button>
                 </article>
               );
@@ -516,7 +482,6 @@ export default function WaiterPage() {
           </div>
         )}
       </section>
-
     </main>
   );
 }

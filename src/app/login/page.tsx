@@ -56,6 +56,7 @@ export default function LoginPage() {
         throw new Error("Your account has an unsupported role.");
       }
 
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
       router.replace(destinations[role]);
       router.refresh();
     } catch (err) {
@@ -66,10 +67,10 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#EDECE5] px-4 py-10">
+    <main className="flex min-h-screen items-center justify-center bg-[#0D1218] px-4 py-10">
       <form
         onSubmit={submit}
-        className="w-full max-w-md rounded-3xl bg-[#2D352A] p-7 text-[#F5F0E7] shadow-2xl sm:p-10"
+        className="w-full max-w-md rounded-2xl border border-white/10 bg-[#17202A] p-6 text-[#F5F0E7] shadow-2xl sm:p-10"
       >
         <div className="mb-8 flex flex-col items-center text-center">
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#46513F]">
@@ -93,12 +94,11 @@ export default function LoginPage() {
           Username
           <input
             required
-            autoFocus
             value={username}
             onChange={(event) => setUsername(event.target.value)}
             autoComplete="username"
             placeholder="Your username"
-            className="mt-2 min-h-12 w-full rounded-xl border border-transparent bg-[#F5F1E9] px-4 text-[#293126] outline-none placeholder:text-[#81877D] focus:border-[#D6B681]"
+            className="mt-2 min-h-12 w-full rounded-xl border border-white/15 bg-[#0D1218] px-4 text-white outline-none placeholder:text-[#81877D] focus:border-[#D6B681]"
           />
         </label>
 

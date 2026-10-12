@@ -6,6 +6,7 @@ import { reconcileRequestIds } from "@/lib/request-notifications";
 
 type RequestItem = {
   id: number;
+  inventory_mode?: "simple" | "detailed";
   table_id: number | null;
   request_area?: "indoor" | "outdoor" | null;
   table_name?: string;
@@ -13,25 +14,36 @@ type RequestItem = {
   requested_at?: string;
 };
 
-type SuggestedGuest = { id: number; name: string; party_size: number; seating_preference: string };
+type SuggestedGuest = {
+  id: number;
+  name: string;
+  party_size: number;
+  seating_preference: string;
+};
 type ApprovedTable = { name: string; guest: SuggestedGuest | null };
 
 export default function ReceptionTableRequests() {
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
-  const [unreadRequestIds, setUnreadRequestIds] = useState<Set<number>>(new Set());
+  const [unreadRequestIds, setUnreadRequestIds] = useState<Set<number>>(
+    new Set(),
+  );
   const unreadIdsRef = useRef(new Set<number>());
   const refreshController = useRef<AbortController | null>(null);
   const unreadRequestCount = unreadRequestIds.size;
   const knownRequestIds = useRef<Set<number> | null>(null);
   const notificationPanelOpenRef = useRef(false);
-  const [tables, setTables] = useState<Array<{
-    id: number;
-    name: string;
-    area: string;
-    status: string;
-  }>>([]);
-  const [selectedTables, setSelectedTables] = useState<Record<number, number>>({});
+  const [tables, setTables] = useState<
+    Array<{
+      id: number;
+      name: string;
+      area: string;
+      status: string;
+    }>
+  >([]);
+  const [selectedTables, setSelectedTables] = useState<Record<number, number>>(
+    {},
+  );
   const [approved, setApproved] = useState<ApprovedTable | null>(null);
   const [seatingGuest, setSeatingGuest] = useState<SuggestedGuest | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(false);
@@ -95,23 +107,42 @@ export default function ReceptionTableRequests() {
         throw new Error(failure.error || "Unable to load table requests.");
       }
       const data = await response.json();
-      const raw: RequestItem[] = Array.isArray(data) ? data :
-        Array.isArray(data.requests) ? data.requests : [];
-      const list = [...new Map(raw.map(item => [Number(item.id), {
-        ...item, id: Number(item.id),
-        table_id: item.table_id === null ? null : Number(item.table_id),
-      }])).values()].filter(item => Number.isSafeInteger(item.id) && item.id > 0);
+      const raw: RequestItem[] = Array.isArray(data)
+        ? data
+        : Array.isArray(data.requests)
+          ? data.requests
+          : [];
+      const list = [
+        ...new Map(
+          raw.map((item) => [
+            Number(item.id),
+            {
+              ...item,
+              id: Number(item.id),
+              table_id: item.table_id === null ? null : Number(item.table_id),
+            },
+          ]),
+        ).values(),
+      ].filter((item) => Number.isSafeInteger(item.id) && item.id > 0);
       if (controller.signal.aborted) return;
-      const currentIds = new Set(list.map(item => item.id));
-      const reconciled = reconcileRequestIds(currentIds, knownRequestIds.current,
-        unreadIdsRef.current, notificationPanelOpenRef.current);
+      const currentIds = new Set(list.map((item) => item.id));
+      const reconciled = reconcileRequestIds(
+        currentIds,
+        knownRequestIds.current,
+        unreadIdsRef.current,
+        notificationPanelOpenRef.current,
+      );
       if (reconciled.added.length > 0) chime();
       unreadIdsRef.current = reconciled.unread;
       setUnreadRequestIds(reconciled.unread);
       knownRequestIds.current = currentIds;
       setRequests(list);
 
-      if (!list.some(item => item.request_area)) {
+      if (
+        !list.some(
+          (item) => item.request_area && item.inventory_mode !== "simple",
+        )
+      ) {
         setTables([]);
         setError("");
         return;
@@ -122,16 +153,24 @@ export default function ReceptionTableRequests() {
         credentials: "same-origin",
       });
 
-      if (!tablesResponse.ok) throw new Error("Unable to load occupied tables for area requests.");
+      if (!tablesResponse.ok)
+        throw new Error("Unable to load occupied tables for area requests.");
       if (tablesResponse.ok) {
         const tableData = await tablesResponse.json();
-        if (!controller.signal.aborted) setTables(Array.isArray(tableData) ? tableData : tableData.tables ?? []);
+        if (!controller.signal.aborted)
+          setTables(
+            Array.isArray(tableData) ? tableData : (tableData.tables ?? []),
+          );
       }
       if (!controller.signal.aborted) setError("");
     } catch (err) {
-      if (!controller.signal.aborted) setError(err instanceof Error ? err.message : "Unable to refresh requests.");
+      if (!controller.signal.aborted)
+        setError(
+          err instanceof Error ? err.message : "Unable to refresh requests.",
+        );
     } finally {
-      if (refreshController.current === controller) refreshController.current = null;
+      if (refreshController.current === controller)
+        refreshController.current = null;
     }
   }, []);
 
@@ -141,7 +180,8 @@ export default function ReceptionTableRequests() {
       if (document.visibilityState === "visible") void refresh();
     }, 3000);
     const onChanged = (event: Event) => {
-      if ((event as CustomEvent).detail !== "reception-requests") void refresh(true);
+      if ((event as CustomEvent).detail !== "reception-requests")
+        void refresh(true);
     };
     window.addEventListener("mo-bistro-tables-changed", onChanged);
     return () => {
@@ -159,7 +199,10 @@ export default function ReceptionTableRequests() {
       try {
         const ctx = audio.current ?? new AudioContext();
         await ctx.resume();
-        if (!active) { if (!audio.current) void ctx.close(); return; }
+        if (!active) {
+          if (!audio.current) void ctx.close();
+          return;
+        }
         audio.current = ctx;
         soundRef.current = true;
         setSoundEnabled(true);
@@ -174,23 +217,40 @@ export default function ReceptionTableRequests() {
     }
     window.addEventListener("pointerdown", unlock);
     window.addEventListener("keydown", unlock);
-    return () => { active = false; cleanup(); };
+    return () => {
+      active = false;
+      cleanup();
+    };
   }, []);
 
-  useEffect(() => () => { void audio.current?.close(); }, []);
+  useEffect(
+    () => () => {
+      void audio.current?.close();
+    },
+    [],
+  );
 
   async function review(id: number, decision: "approve" | "reject") {
     if (busyId !== null) return;
-    const item = requests.find(entry => entry.id === id);
+    const item = requests.find((entry) => entry.id === id);
 
-    if (decision === "approve" && item?.request_area && !selectedTables[id]) {
+    if (
+      decision === "approve" &&
+      item?.request_area &&
+      item.inventory_mode !== "simple" &&
+      !selectedTables[id]
+    ) {
       setError("Select the occupied table to release.");
       return;
     }
 
     setBusyId(id);
     try {
-      if (decision === "approve" && item?.request_area) {
+      if (
+        decision === "approve" &&
+        item?.request_area &&
+        item.inventory_mode !== "simple"
+      ) {
         const latestResponse = await fetch("/api/tables", {
           cache: "no-store",
           credentials: "same-origin",
@@ -209,7 +269,7 @@ export default function ReceptionTableRequests() {
 
         const selected = latestTables.find(
           (table: { id: number; status: string; area: string }) =>
-            Number(table.id) === selectedTables[id]
+            Number(table.id) === selectedTables[id],
         );
 
         if (
@@ -218,13 +278,13 @@ export default function ReceptionTableRequests() {
           String(selected.area).toLowerCase() !== item.request_area
         ) {
           setTables(latestTables);
-          setSelectedTables(previous => {
+          setSelectedTables((previous) => {
             const next = { ...previous };
             delete next[id];
             return next;
           });
           throw new Error(
-            "That table is no longer occupied. Select another occupied table."
+            "That table is no longer occupied. Select another occupied table.",
           );
         }
       }
@@ -235,36 +295,55 @@ export default function ReceptionTableRequests() {
         credentials: "same-origin",
         body: JSON.stringify({
           action: decision,
-          ...(item?.request_area
-            ? { table_id: selectedTables[id] }
-            : {}),
+          ...(item?.request_area ? { table_id: selectedTables[id] } : {}),
         }),
       });
       const result = await response.json();
       if (!response.ok) {
         await refresh(true);
-        setSelectedTables(previous => { const next = { ...previous }; delete next[id]; return next; });
+        setSelectedTables((previous) => {
+          const next = { ...previous };
+          delete next[id];
+          return next;
+        });
         throw new Error(result.error || "Request update failed.");
       }
-      window.dispatchEvent(new CustomEvent("mo-bistro-tables-changed", { detail: "reception-requests" }));
+      window.dispatchEvent(
+        new CustomEvent("mo-bistro-tables-changed", {
+          detail: "reception-requests",
+        }),
+      );
       await refresh(true);
       if (decision === "approve") {
+        if (item?.inventory_mode === "simple") {
+          setApproved({
+            name: `${item.request_area === "outdoor" ? "Outdoor" : "Indoor"} area`,
+            guest: null,
+          });
+          return;
+        }
         if (item) {
           const actualId = item.request_area
             ? selectedTables[id]
             : item.table_id;
 
-          const actualTable = tables.find(table => table.id === actualId);
-          const actualName = actualTable?.name || item.table_name || `Table ${actualId}`;
+          const actualTable = tables.find((table) => table.id === actualId);
+          const actualName =
+            actualTable?.name || item.table_name || `Table ${actualId}`;
 
           setApproved({ name: actualName, guest: null });
           try {
-            const next = await fetch(`/api/reception/next-guest?table_id=${actualId}`, { cache: "no-store" });
+            const next = await fetch(
+              `/api/reception/next-guest?table_id=${actualId}`,
+              { cache: "no-store" },
+            );
             if (!next.ok) throw new Error("Unable to check the guest queue.");
             const data = await next.json();
             setApproved({ name: actualName, guest: data.guest ?? null });
           } catch {
-            setError("Table approved, but the next guest could not be checked. Use the regular reception queue.");
+            setError(
+              "Table approved, but the next guest could not be checked. Use the regular reception queue.",
+            );
           }
         }
       }
@@ -277,154 +356,211 @@ export default function ReceptionTableRequests() {
 
   return (
     <>
-    {approved && (
-      <aside
-        role="status"
-        aria-live="polite"
-        className="fixed right-4 top-4 z-[90] w-[min(380px,calc(100vw-32px))] rounded-2xl border border-[#D6B681] bg-[#FFFCF7] p-5 text-[#293126] shadow-2xl"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="font-serif text-2xl">Table is free!</h2>
-            <p className="mt-1 text-sm">
-              {approved.name} is available for the next guest.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setApproved(null)}
-            aria-label="Close confirmation"
-            className="rounded-lg border border-[#C9C8BD] px-3 py-1.5 text-sm"
-          >
-            ✕
-          </button>
-        </div>
-
-        {approved.guest ? (
-          <div className="mt-4 rounded-xl bg-[#F1EBDF] p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider">
-              Next eligible guest
-            </p>
-
-            <p className="mt-2 text-lg font-semibold">
-              {approved.guest.name}
-            </p>
-
-            <p className="text-sm">
-              {approved.guest.party_size} guests ·{" "}
-              {approved.guest.seating_preference}
-            </p>
+      {approved && (
+        <aside
+          role="status"
+          aria-live="polite"
+          className="mb-4 w-full rounded-2xl border border-[#D6B681] bg-[#FFFCF7] p-5 text-[#293126] shadow-2xl"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-serif text-2xl">Table is free!</h2>
+              <p className="mt-1 text-sm">
+                {approved.name} is available for the next guest.
+              </p>
+            </div>
 
             <button
               type="button"
-              onClick={() => {
-                setSeatingGuest(approved.guest);
-                setApproved(null);
-              }}
-              className="mt-4 min-h-11 w-full rounded-xl bg-[#293126] px-4 font-semibold text-white"
+              onClick={() => setApproved(null)}
+              aria-label="Close confirmation"
+              className="rounded-lg border border-[#C9C8BD] px-3 py-1.5 text-sm"
             >
-              Seat Guest
+              ✕
             </button>
           </div>
-        ) : (
-          <p className="mt-4 text-sm text-[#666A60]">
-            No eligible guests currently waiting for this table.
+
+          {approved.guest ? (
+            <div className="mt-4 rounded-xl bg-[#F1EBDF] p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider">
+                Next eligible guest
+              </p>
+
+              <p className="mt-2 text-lg font-semibold">
+                {approved.guest.name}
+              </p>
+
+              <p className="text-sm">
+                {approved.guest.party_size} guests ·{" "}
+                {approved.guest.seating_preference}
+              </p>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSeatingGuest(approved.guest);
+                  setApproved(null);
+                }}
+                className="mt-4 min-h-11 w-full rounded-xl bg-[#293126] px-4 font-semibold text-white"
+              >
+                Seat Guest
+              </button>
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-[#666A60]">
+              Choose the next eligible party from the reception queue.
+            </p>
+          )}
+        </aside>
+      )}
+      {seatingGuest && (
+        <SeatGuestModal
+          guest={seatingGuest}
+          onClose={() => setSeatingGuest(null)}
+          onSuccess={() => {
+            setSeatingGuest(null);
+            window.dispatchEvent(new Event("guest-seated"));
+          }}
+        />
+      )}
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#C5A77B]/20 bg-[#17202A] p-4">
+        {error && !notificationPanelOpen && (
+          <p
+            role="alert"
+            className="max-w-xs rounded-lg bg-[#17202A] p-3 text-sm text-red-200"
+          >
+            {error}
           </p>
         )}
-      </aside>
-    )}
-    {seatingGuest && <SeatGuestModal guest={seatingGuest} onClose={() => setSeatingGuest(null)} onSuccess={() => { setSeatingGuest(null); window.dispatchEvent(new Event("guest-seated")); }} />}
+        <div>
+          <h2 className="font-semibold">Table readiness</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Review waiter requests and keep the floor moving.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            const next = !notificationPanelOpenRef.current;
+            notificationPanelOpenRef.current = next;
+            setNotificationPanelOpen(next);
 
-    <div className="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-2">
-      {error && !notificationPanelOpen && <p role="alert" className="max-w-xs rounded-lg bg-[#17202A] p-3 text-sm text-red-200">{error}</p>}
-      <button
-        type="button"
-        onClick={() => {
-          const next = !notificationPanelOpenRef.current;
-          notificationPanelOpenRef.current = next;
-          setNotificationPanelOpen(next);
-
-          if (next) {
-            unreadIdsRef.current = new Set();
-            setUnreadRequestIds(new Set());
-          }
-        }}
-        aria-label={`Table requests: ${requests.length} pending, ${unreadRequestCount} unread`}
-        aria-controls="table-request-notifications"
-        aria-expanded={notificationPanelOpen}
-        className="flex min-h-16 items-center gap-3 rounded-full border border-[#C5A77B] bg-[#17202A] px-7 py-4 text-lg font-semibold text-white shadow-xl"
-      >
-        <span className="relative" aria-hidden="true">
-          🔔
-          {unreadRequestCount > 0 && (
-            <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
-              {unreadRequestCount > 9 ? "9+" : unreadRequestCount}
-            </span>
-          )}
-        </span>
-        <span>
-          {requests.length > 0
-            ? `${requests.length} pending`
-            : "Requests"}
-        </span>
-      </button>
-    </div>
-
-    {notificationPanelOpen && (
-    <section id="table-request-notifications" className="fixed bottom-24 right-4 z-[70] max-h-[min(65dvh,540px)] w-[min(420px,calc(100vw-32px))] overflow-y-auto rounded-2xl border border-[#D6B681] bg-[#293126] p-4 text-white shadow-2xl">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="font-semibold">Table-ready requests ({requests.length})</h2>
-        <button onClick={soundEnabled ? mute : () => void enableSound()} className="rounded-lg border border-white/20 px-3 py-2 text-xs">
-          {soundEnabled ? "Mute" : "Enable sound"}
+            if (next) {
+              unreadIdsRef.current = new Set();
+              setUnreadRequestIds(new Set());
+            }
+          }}
+          aria-label={`Table requests: ${requests.length} pending, ${unreadRequestCount} unread`}
+          aria-controls="table-request-notifications"
+          aria-expanded={notificationPanelOpen}
+          className="flex min-h-12 items-center gap-3 rounded-xl border border-[#C5A77B] bg-[#17202A] px-4 py-3 text-base font-semibold text-white shadow-xl"
+        >
+          <span className="relative" aria-hidden="true">
+            🔔
+            {unreadRequestCount > 0 && (
+              <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
+                {unreadRequestCount > 9 ? "9+" : unreadRequestCount}
+              </span>
+            )}
+          </span>
+          <span>
+            {requests.length > 0
+              ? `${requests.length} pending`
+              : "Table-ready requests"}
+          </span>
         </button>
       </div>
-      {error && <p role="alert" className="mt-3 text-sm text-red-300">{error}</p>}
-      {requests.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-300">No pending table requests.</p>
-      ) : (
-        <div className="mt-4 space-y-3">
-          {requests.map(item => (
-            <div key={item.id} className="rounded-lg border border-white/10 p-3">
-              <p className="font-semibold">{item.table_name || `Table ${item.table_id}`}</p>
-              <p className="mt-1 text-xs text-slate-300">Ready to clear · {item.requested_by || "staff"}</p>
 
-              {item.request_area && (
-                <label className="mt-3 block text-xs text-white">
-                  Select the occupied {item.request_area} table
-                  <select
-                    value={selectedTables[item.id] || ""}
-                    onChange={event => setSelectedTables(previous => ({
-                      ...previous,
-                      [item.id]: Number(event.target.value),
-                    }))}
-                    className="mt-2 w-full rounded-lg bg-white p-3 text-sm text-[#293126]"
-                  >
-                    <option value="">Choose table...</option>
-                    {tables
-                      .filter(table =>
-                        table.area?.toLowerCase() === item.request_area &&
-                        table.status === "occupied"
-                      )
-                      .map(table => (
-                        <option key={table.id} value={table.id}>
-                          {table.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-              )}
-              <div className="mt-3 flex gap-2">
-                <button disabled={busyId !== null} onClick={() => void review(item.id, "approve")} className="flex-1 rounded-lg bg-[#D6B681] p-3 font-semibold text-[#293126] disabled:opacity-50">Approve</button>
-                <button disabled={busyId !== null} onClick={() => void review(item.id, "reject")} className="flex-1 rounded-lg border border-white/30 p-3 disabled:opacity-50">Reject</button>
-              </div>
+      {notificationPanelOpen && (
+        <section
+          id="table-request-notifications"
+          className="mb-5 max-h-[65dvh] w-full overflow-y-auto rounded-2xl border border-[#D6B681] bg-[#293126] p-4 text-white shadow-2xl"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-semibold">
+              Table-ready requests ({requests.length})
+            </h2>
+            <button
+              onClick={soundEnabled ? mute : () => void enableSound()}
+              className="rounded-lg border border-white/20 px-3 py-2 text-xs"
+            >
+              {soundEnabled ? "Mute" : "Enable sound"}
+            </button>
+          </div>
+          {error && (
+            <p role="alert" className="mt-3 text-sm text-red-300">
+              {error}
+            </p>
+          )}
+          {requests.length === 0 ? (
+            <p className="mt-3 text-sm text-slate-300">
+              No pending table requests.
+            </p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {requests.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-lg border border-white/10 p-3"
+                >
+                  <p className="font-semibold">
+                    {item.table_name || `Table ${item.table_id}`}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-300">
+                    Ready to clear · {item.requested_by || "staff"}
+                  </p>
+
+                  {item.request_area && item.inventory_mode !== "simple" && (
+                    <label className="mt-3 block text-xs text-white">
+                      Select the occupied {item.request_area} table
+                      <select
+                        value={selectedTables[item.id] || ""}
+                        onChange={(event) =>
+                          setSelectedTables((previous) => ({
+                            ...previous,
+                            [item.id]: Number(event.target.value),
+                          }))
+                        }
+                        className="mt-2 w-full rounded-lg bg-white p-3 text-sm text-[#293126]"
+                      >
+                        <option value="">Choose table...</option>
+                        {tables
+                          .filter(
+                            (table) =>
+                              table.area?.toLowerCase() === item.request_area &&
+                              table.status === "occupied",
+                          )
+                          .map((table) => (
+                            <option key={table.id} value={table.id}>
+                              {table.name}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                  )}
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      disabled={busyId !== null}
+                      onClick={() => void review(item.id, "approve")}
+                      className="flex-1 rounded-lg bg-[#D6B681] p-3 font-semibold text-[#293126] disabled:opacity-50"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      disabled={busyId !== null}
+                      onClick={() => void review(item.id, "reject")}
+                      className="flex-1 rounded-lg border border-white/30 p-3 disabled:opacity-50"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+        </section>
       )}
-    </section>
-    )}
-
     </>
   );
 }

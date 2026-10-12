@@ -1,5 +1,6 @@
 "use client";
 
+import SimpleCapacitySettings from "@/components/simple-capacity-settings";
 import { useEffect, useState } from "react";
 
 export default function SeatingSettings() {
@@ -83,7 +84,7 @@ export default function SeatingSettings() {
       <div className="mt-6 rounded-xl border border-white/10 p-4">
         <h3 className="font-semibold">Staff table view</h3>
         <p className="mt-1 text-sm text-slate-400">
-          Controls the table layout used by Reception and Waiter.
+          Detailed Mode manages named tables. Simple Mode manages independent anonymous area capacity.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {(["simple", "detailed"] as const).map(mode => (
@@ -105,6 +106,7 @@ export default function SeatingSettings() {
         </div>
       </div>
 
+      <SimpleCapacitySettings />
       <label className="mt-5 flex items-center gap-3 text-sm">
         <input
           type="checkbox"

@@ -1,26 +1,26 @@
 @import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+:root { --background: #0D1218; --foreground: #F5F2EB; color-scheme: dark; }
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--background); --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans); --font-mono: var(--font-geist-mono);
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html { min-width: 0; scroll-padding-top: 6rem; }
+body { margin: 0; background: var(--background); color: var(--foreground); font-family: var(--font-geist-sans), Arial, sans-serif; -webkit-text-size-adjust: 100%; }
+main, section, form { min-width: 0; }
+button, summary, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button, summary { touch-action: manipulation; }
+:focus-visible { outline: 2px solid #C5A77B; outline-offset: 4px; }
+.workspace-header { position: sticky; top: 0; z-index: 80; border-bottom: 1px solid #ffffff14; background: #0D1218; padding-top: env(safe-area-inset-top); }
+.workspace-header-inner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; max-width: 80rem; margin: auto; padding: .875rem 1rem; }
+.workspace-switch, .workspace-signout { display: flex; align-items: center; justify-content: center; gap: .5rem; min-height: 44px; border: 1px solid #ffffff26; border-radius: .75rem; padding: .65rem .85rem; font-size: .875rem; cursor: pointer; }
+.workspace-switch { border-color: #C5A77B66; color: #E8CFAB; list-style: none; }
+.workspace-switch::-webkit-details-marker { display: none; }
+.workspace-menu { position: absolute; right: 0; top: calc(100% + .5rem); width: min(15rem, calc(100vw - 2rem)); border: 1px solid #ffffff26; border-radius: .875rem; padding: .375rem; background: #17202A; box-shadow: 0 16px 32px #0005; }
+.workspace-option { display: block; min-height: 44px; padding: .75rem; border-radius: .5rem; font-size: .875rem; }
+.workspace-option:hover, .workspace-option[aria-current="page"] { background: #C5A77B1A; color: #E8CFAB; }
+@media (max-width: 767px) {
+  /* Prevent iOS focus zoom without disabling the user's pinch zoom. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: 16px !important; }
+  .workspace-header-inner { gap: .625rem; }
 }
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0s !important; animation-duration: 0s !important; } }
