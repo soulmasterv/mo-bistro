@@ -28,6 +28,7 @@ test(
       "import Join from " +
       component("src/app/join/page.tsx") +
       ";" +
+      "import Status from " + component("src/app/status/page.tsx") + ";" +
       "import Login from " +
       component("src/app/login/page.tsx") +
       ";" +
@@ -54,7 +55,7 @@ test(
       ";" +
       'const p=location.pathname;const role=document.cookie.match(/fixture_role=(manager|reception|waiter)/)?.[1] ?? "manager";' +
       'const title=p==="/waiter"?"Waiter":p.startsWith("/management")||p==="/manager"?"Management":"Reception";' +
-      'createRoot(document.getElementById("root")).render(p==="/join"?<><ThemePreference/><Join/></>:p==="/login"?<Login/>:p==="/login/pin"?<PinLogin/>:<><ThemePreference/><Header role={role} workspace={title}/>{title==="Waiter"?<Waiter/>:title==="Management"?(p==="/management/staff-pins"?<StaffPins/>:<Management/>):<Reception/>}</>);';
+      'createRoot(document.getElementById("root")).render(p==="/join"?<><ThemePreference/><Join/></>:p==="/status"?<><ThemePreference/><Status/></>:p==="/login"?<><ThemePreference/><Login/></>:p==="/login/pin"?<><ThemePreference/><PinLogin/></>:<><ThemePreference/><Header role={role} workspace={p==="/workspace-fixture"?"Workspaces":title}/>{title==="Waiter"?<Waiter/>:title==="Management"?(p==="/management/staff-pins"?<StaffPins/>:<Management/>):<Reception/>}</>);';
     await esbuild.build({
       stdin: { contents: source, loader: "tsx", resolveDir: root },
       bundle: true,
@@ -243,6 +244,9 @@ test(
           case "/api/qr/permit":
             data = { valid: true, expiresAt: null };
             break;
+          case "/api/track":
+            data = {confirmation_required:true, guest:{name:"Omar Hassan",party_size:2,status:"waiting",confirmed:true,created_at:new Date().toISOString()}, queue_position:3,guests_ahead:2};
+            break;
           case "/api/join":
             submittedBooking = body;
             data = { token: "a".repeat(64) };
@@ -392,7 +396,7 @@ test(
         headless: true,
         executablePath: executable,
       });
-      for (const width of [320, 390, 768, 1440]) {
+      for (const width of [320, 390, 768, 1024, 1440]) {
         mode = "detailed";
         readyRequests.length = 0;
         tables[0].name = "Indoor 1";
@@ -407,10 +411,16 @@ test(
         });
         const page = await context.newPage();
         page.on("pageerror", (error) => errors.push(error.message));
+        await context.addInitScript(() => { if(location.pathname === "/login") localStorage.setItem("mo-bistro-theme", "dark"); });
         await page.goto(origin + "/login");
+        await page.waitForFunction(() => document.documentElement.dataset.theme === "guest-light");
         await page.getByLabel("Username", { exact: true }).fill("manager");
         await page.getByLabel("Password", { exact: true }).fill("fixture-only");
-        if (width < 768)
+        assert.equal(await page.getByLabel("Password", {exact:true}).evaluate(el=>getComputedStyle(el).color), "rgb(41, 49, 38)");
+        assert.equal(await page.getByRole("button", {name:"Sign in",exact:true}).evaluate(el=>getComputedStyle(el).color), "rgb(41, 49, 38)");
+        if(screenshots) await page.screenshot({path:path.join(screenshots, `login-restored-${width}.png`),fullPage:true});
+
+        if (width <= 1100)
           assert.ok(
             await page
               .getByLabel("Username", { exact: true })
@@ -448,7 +458,7 @@ test(
           await page
             .locator(".bistro-app")
             .evaluate((el) => getComputedStyle(el).backgroundColor),
-          "rgb(18, 19, 22)",
+          "rgb(16, 28, 22)",
         );
         if (screenshots)
           await page.screenshot({
@@ -459,7 +469,7 @@ test(
           await page
             .locator(".bistro-settings-card")
             .evaluate((el) => getComputedStyle(el).backgroundColor),
-          "rgb(30, 32, 37)",
+          "rgb(28, 42, 36)",
         );
         await page.reload();
         await page.waitForFunction(
@@ -621,7 +631,7 @@ test(
             '[aria-label="Seat Omar Hassan"]',
           );
           return (
-            getComputedStyle(button).backgroundColor === "rgb(226, 228, 233)"
+            getComputedStyle(button).backgroundColor === "rgb(214, 182, 129)"
           );
         });
         assert.deepEqual(
@@ -631,7 +641,7 @@ test(
               background: getComputedStyle(el).backgroundColor,
               color: getComputedStyle(el).color,
             })),
-          { background: "rgb(226, 228, 233)", color: "rgb(23, 25, 30)" },
+          { background: "rgb(214, 182, 129)", color: "rgb(41, 49, 38)" },
         );
         await page.evaluate(() => window.scrollTo(0, 0));
         if (screenshots)
@@ -1033,10 +1043,18 @@ test(
           .getByRole("button", { name: "Join the waitlist", exact: true })
           .click();
         await guestPage.waitForURL("**/status?token=*");
+        await guestPage.getByText("Omar Hassan", {exact:true}).waitFor();
+        await guestPage.waitForFunction(() => document.documentElement.dataset.theme === "guest-light");
+        if(screenshots) await guestPage.screenshot({path:path.join(screenshots,"status-restored.png"),fullPage:true});
         assert.equal(submittedBooking.whatsapp_confirmation_consent, consent);
         assert.equal(submittedBooking.whatsapp_feedback_consent, consent);
         await guestContext.close();
       }
+      const menuPage = await browser.newPage();
+      await menuPage.goto(origin + "/workspace-fixture");
+      await menuPage.getByLabel("Open menu",{exact:true}).click();
+      assert.equal(await menuPage.getByRole("navigation",{name:"Workspace menu"}).getByRole("link").count(),0);
+      await menuPage.close();
       assert.deepEqual(errors, []);
       console.log("Browser evidence directory: " + temp);
     } finally {

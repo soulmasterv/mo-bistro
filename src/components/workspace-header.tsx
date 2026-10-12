@@ -115,7 +115,7 @@ export default function WorkspaceHeader({
               </span>
             </summary>
             <nav aria-label="Workspace menu" className="workspace-menu">
-              {role === "manager" &&
+              {role === "manager" && workspace !== "Workspaces" &&
                 workspaces.map((item) => (
                   <Link
                     key={item.href}

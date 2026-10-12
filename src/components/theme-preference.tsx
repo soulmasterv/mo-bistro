@@ -5,12 +5,12 @@ import { usePathname } from "next/navigation";
 
 type Preference = "system" | "light" | "dark";
 const KEY = "mo-bistro-theme";
-let volatilePreference: Preference = "system";
+let volatilePreference: Preference = "light";
 const CHANGE = "mo-bistro-theme-change";
 function preference(): Preference {
   try {
     const value = window.localStorage.getItem(KEY);
-    if (value === "light" || value === "dark") return value;
+    if (value === "light" || value === "dark" || value === "system") return value;
   } catch {
     /* A storage restriction must not block the interface. */
   }
@@ -38,7 +38,7 @@ function subscribe(callback: () => void) {
   };
 }
 function useTheme() {
-  return useSyncExternalStore(subscribe, snapshot, () => "system:light");
+  return useSyncExternalStore(subscribe, snapshot, () => "light:light");
 }
 export function ThemePreference() {
   const current = useTheme();
@@ -46,7 +46,8 @@ export function ThemePreference() {
   useEffect(() => {
     // Keep the existing guest booking palette independent of staff preferences.
     document.documentElement.dataset.theme =
-      pathname === "/join" ? "guest-light" : current.split(":")[1];
+      ["/join", "/status", "/lookup", "/login", "/login/pin"].includes(pathname)
+        ? "guest-light" : current.split(":")[1];
   }, [current, pathname]);
   return null;
 }
