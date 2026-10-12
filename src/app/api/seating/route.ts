@@ -1,5 +1,7 @@
 import { requireActiveLicense } from "@/lib/licensing/enforce";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
+import { whatsappEnabled } from "@/lib/whatsapp/policy";
+import { dispatchOutbox } from "@/lib/whatsapp/service";
 import { currentStaff } from "@/lib/staff-auth";
 import { getAssignableTables, assignTable } from "@/lib/seating-v3";
 import { getAssignableTablesPostgres, assignTablePostgres } from "@/lib/seating-postgres";
@@ -54,6 +56,9 @@ export async function POST(request: Request) {
     const result = process.env.MO_BISTRO_DB === "postgres"
       ? await assignTablePostgres(body.guest_id, body.table_id)
       : assignTable(body.guest_id, body.table_id);
+    if (whatsappEnabled()) after(async () => {
+      try { await dispatchOutbox(); } catch { console.error("WhatsApp outbox dispatch deferred"); }
+    });
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(

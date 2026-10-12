@@ -7,7 +7,9 @@ import { getSetting } from "@/lib/staff-auth";
 import { verifyQR } from "@/lib/rotating-qr";
 import { cookies } from "next/headers";
 import { createHash } from "node:crypto";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
+import { recordBookingConsent, dispatchOutbox } from "@/lib/whatsapp/service";
+import { whatsappEnabled } from "@/lib/whatsapp/policy";
 import { z } from "zod";
 import db from "@/lib/db";
 import {
@@ -35,6 +37,8 @@ const schema = z.object({
   party_size: z.number().int().min(1).max(30),
   seating_preference: z.enum(["indoor", "outdoor", "any"]).default("any"),
   qr_code: z.string().optional(),
+  whatsapp_confirmation_consent: z.boolean().default(false),
+  whatsapp_feedback_consent: z.boolean().default(false),
 });
 
 export async function POST(request: Request) {
@@ -147,6 +151,7 @@ export async function POST(request: Request) {
           VALUES (${name}, ${phone}, ${party_size}, 'waiting', ${approval},
             'qr', ${tokenHash}, ${seating_preference}) RETURNING id
         `;
+        await recordBookingConsent(tx, Number(created[0].id), phone, tokenHash, body.data);
         return { id: created[0].id };
       });
       if ("error" in result) return NextResponse.json({ error: result.error === "full"
@@ -155,6 +160,9 @@ export async function POST(request: Request) {
         ? "Your QR registration has expired. Please scan the current QR code."
         : "This phone number already has an active registration. Please ask reception for assistance." },
         { status: result.error === "expired" ? 403 : 409 });
+      if (whatsappEnabled()) after(async () => {
+        try { await dispatchOutbox(); } catch { console.error("WhatsApp outbox dispatch deferred"); }
+      });
       return NextResponse.json({ success: true, id: result.id, token },
         { status: 201, headers: { "Cache-Control": "no-store" } });
     }

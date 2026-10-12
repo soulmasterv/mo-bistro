@@ -7,9 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:regressions": "node --test tests/regressions.test.mjs"
+    "test:regressions": "node --test tests/regressions.test.mjs",
+    "test:whatsapp": "node --test tests/whatsapp.test.mjs"
   },
   "dependencies": {
+    "@upstash/qstash": "2.12.0",
     "better-sqlite3": "^12.11.1",
     "lucide-react": "^1.53.0",
     "next": "16.4.0",
@@ -21,6 +23,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@tailwindcss/postcss": "^4.3.3",
     "@tailwindcss/turbopack": "^4",
     "@types/better-sqlite3": "^9.6.0",

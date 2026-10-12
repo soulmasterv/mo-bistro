@@ -1,6 +1,7 @@
 "use client";
 import MoBistroMenuCard from "@/components/mo-bistro-menu-card";
 import RestaurantWaitDisplay from "@/components/restaurant-wait-display";
+import WhatsappSubscription from "@/components/whatsapp-subscription";
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -272,6 +273,8 @@ async function cancel() {
                 {busy ? "Cancelling..." : "Leave waitlist"}
               </button>
             )}
+
+            {token && <WhatsappSubscription token={token} />}
 
             {!active && (
               <button

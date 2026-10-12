@@ -32,6 +32,16 @@ export default function JoinPage() {
   const [seatingPreference, setSeatingPreference] = useState<Seating>("any");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [whatsappAvailable, setWhatsappAvailable] = useState(false);
+  const [whatsappConfirmation, setWhatsappConfirmation] = useState(false);
+  const [whatsappFeedback, setWhatsappFeedback] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/whatsapp/config", { cache: "no-store" }).then(r => r.json())
+      .then(data => { if (active) setWhatsappAvailable(data.available === true); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   const [qrCode, setQrCode] = useState("");
   const [qrState, setQrState] = useState<"checking" | "valid" | "invalid">("checking");
@@ -145,6 +155,8 @@ export default function JoinPage() {
           party_size: partySize,
           seating_preference: seatingPreference,
           qr_code: qrCode,
+          whatsapp_confirmation_consent: whatsappAvailable && whatsappConfirmation,
+          whatsapp_feedback_consent: whatsappAvailable && whatsappFeedback,
         }),
       });
 
@@ -419,6 +431,19 @@ export default function JoinPage() {
                     queue. Seating preferences depend on availability.
                   </p>
                 </div>
+
+                {whatsappAvailable && <fieldset className="space-y-3 rounded-xl border border-[#E4DCD0] p-4 text-[13px]">
+                  <legend className="px-1 font-semibold">Optional WhatsApp messages</legend>
+                  <label className="flex items-start gap-3">
+                    <input type="checkbox" checked={whatsappConfirmation} onChange={e => setWhatsappConfirmation(e.target.checked)} />
+                    <span>Send me one WhatsApp booking confirmation. I can choose “Subscribe to Updates” in that message to receive further updates.</span>
+                  </label>
+                  <label className="flex items-start gap-3">
+                    <input type="checkbox" checked={whatsappFeedback} onChange={e => setWhatsappFeedback(e.target.checked)} />
+                    <span>Send me one review request 60 minutes after seating, only if I subscribe to updates.</span>
+                  </label>
+                  <p className="text-xs text-[#777367]">Booking is available without these options. Reply STOP to unsubscribe.</p>
+                </fieldset>}
 
                 {error && (
                   <div

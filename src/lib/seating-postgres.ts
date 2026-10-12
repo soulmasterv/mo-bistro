@@ -1,5 +1,7 @@
 import "server-only";
 import { getPostgres } from "@/lib/postgres-db";
+import { whatsappEnabled } from "@/lib/whatsapp/policy";
+import { scheduleReview } from "@/lib/whatsapp/service";
 
 export async function getAssignableTablesPostgres(guestId: number) {
   const sql = getPostgres();
@@ -39,7 +41,13 @@ export async function assignTablePostgres(guestId: number, tableId: number) {
     const occupied = await tx`SELECT id FROM guests WHERE table_id=${tableId} AND status='seated' LIMIT 1`;
     if (occupied.length) throw new Error("Table is already assigned");
     await tx`UPDATE restaurant_tables SET status='occupied',updated_at=CURRENT_TIMESTAMP WHERE id=${tableId}`;
-    await tx`UPDATE guests SET status='seated',table_id=${tableId},updated_at=CURRENT_TIMESTAMP WHERE id=${guestId}`;
+    if (whatsappEnabled()) {
+      const [seated] = await tx`UPDATE guests SET status='seated',table_id=${tableId},
+        seated_at=COALESCE(seated_at,NOW()),updated_at=CURRENT_TIMESTAMP WHERE id=${guestId} RETURNING seated_at`;
+      await scheduleReview(tx,guestId,new Date(seated.seated_at));
+    } else {
+      await tx`UPDATE guests SET status='seated',table_id=${tableId},updated_at=CURRENT_TIMESTAMP WHERE id=${guestId}`;
+    }
     await tx`INSERT INTO seating_history(guest_id,table_id) VALUES (${guestId},${tableId})`;
     return { success: true, guest_id: guestId, table_id: tableId };
   });

@@ -1,5 +1,7 @@
 import { hasGuestEtaColumn } from "@/lib/guest-eta-support";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
+import { scheduleAlmostReady, dispatchOutbox } from "@/lib/whatsapp/service";
+import { whatsappEnabled } from "@/lib/whatsapp/policy";
 import { z } from "zod";
 import { getPostgres } from "@/lib/postgres-db";
 import { requireActiveLicense } from "@/lib/licensing/enforce";
@@ -60,7 +62,8 @@ export async function PATCH(
 
     const minutes = parsed.data.minutes;
 
-    const updated = await sql`
+    const updated = await sql.begin(async tx => {
+      const rows = await tx`
       UPDATE guests
       SET eta_at = CASE
         WHEN ${minutes}::integer IS NULL THEN NULL
@@ -71,8 +74,15 @@ export async function PATCH(
         AND status IN ('waiting', 'called')
       RETURNING id, eta_at
     `;
+      if (rows.length && whatsappEnabled()) await scheduleAlmostReady(tx,guestId,
+        rows[0].eta_at ? new Date(rows[0].eta_at) : null);
+      return rows;
+    });
 
     if (updated.length) {
+      if (whatsappEnabled()) after(async () => {
+        try { await dispatchOutbox(); } catch { console.error("WhatsApp outbox dispatch deferred"); }
+      });
       return NextResponse.json({
         success: true,
         eta_at: updated[0].eta_at,
