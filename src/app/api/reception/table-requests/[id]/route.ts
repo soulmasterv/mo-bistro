@@ -1,13 +1,20 @@
 import { NextResponse } from "next/server";
 import { currentStaff } from "@/lib/staff-auth";
 import { requireActiveLicense } from "@/lib/licensing/enforce";
+import { WorkflowError } from "@/lib/workflow-error";
+import {
+  freeSimpleTableInTransaction,
+  type Area,
+} from "@/lib/simple-table-postgres";
+import { databaseErrorCode, databaseFailure } from "@/lib/database-errors";
+import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import { getPostgres } from "@/lib/postgres-db";
 
 export const runtime = "nodejs";
 
 export async function PATCH(
   request: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   const staff = await currentStaff();
 
@@ -15,21 +22,8 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const origin = request.headers.get("origin");
-  const host = request.headers.get("host");
-
-  if (origin) {
-    let originHost: string;
-    try {
-      originHost = new URL(origin).host;
-    } catch {
-      return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
-    }
-
-    if (!host || originHost !== host) {
-      return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
-    }
-  }
+  const originError = rejectCrossOrigin(request);
+  if (originError) return originError;
 
   const licenseError = await requireActiveLicense();
   if (licenseError) return licenseError;
@@ -59,7 +53,7 @@ export async function PATCH(
       await tx`SELECT pg_advisory_xact_lock(741122)`;
 
       const [pending] = await tx`
-        SELECT id, table_id, NULLIF(to_jsonb(table_ready_requests)->>'area', '') AS area, status
+        SELECT id, table_id, NULLIF(to_jsonb(table_ready_requests)->>'area', '') AS area, COALESCE(to_jsonb(table_ready_requests)->>'inventory_mode','detailed') AS inventory_mode, status
         FROM table_ready_requests
         WHERE id = ${requestId}
         FOR UPDATE
@@ -73,13 +67,35 @@ export async function PATCH(
         return { error: "Request already processed", status: 409 };
       }
 
+      const requestMode =
+        pending.inventory_mode === "simple" ? "simple" : "detailed";
+      const [mode] =
+        await tx`SELECT value FROM seating_settings WHERE key='table_view_mode'`;
+      if (action === "approve" && (mode?.value ?? "detailed") !== requestMode)
+        return {
+          error:
+            "Request belongs to a different inventory mode. Reject it before switching modes.",
+          status: 409,
+        };
       let selectedTableId = pending.table_id;
-      if (action === "approve") {
+      if (action === "approve" && pending.inventory_mode === "simple") {
+        if (pending.area !== "indoor" && pending.area !== "outdoor")
+          return { error: "Invalid request area", status: 400 };
+        await freeSimpleTableInTransaction(
+          tx,
+          pending.area as Area,
+          staff.id,
+          `request-${requestId}`,
+        );
+      } else if (action === "approve") {
         if (pending.area) {
           const supplied = Number(body?.table_id);
 
           if (!Number.isSafeInteger(supplied) || supplied < 1) {
-            return { error: "Select an occupied table before approving", status: 400 };
+            return {
+              error: "Select an occupied table before approving",
+              status: 400,
+            };
           }
 
           selectedTableId = supplied;
@@ -122,7 +138,7 @@ export async function PATCH(
         `;
       }
 
-      if (action === "approve") {
+      if (action === "approve" && pending.inventory_mode !== "simple") {
         await tx`UPDATE table_ready_requests SET status='cancelled', reviewed_by=${staff.id}, reviewed_at=NOW()
           WHERE table_id=${selectedTableId} AND id <> ${requestId} AND status='pending'`;
       }
@@ -140,23 +156,35 @@ export async function PATCH(
         success: true,
         request_id: requestId,
         status: newStatus,
-        table_id: action === "approve" ? Number(selectedTableId) : pending.table_id
+        table_id: selectedTableId === null ? null : Number(selectedTableId),
+        area: pending.area,
+        inventory_mode: pending.inventory_mode,
       };
     });
 
     if ("error" in result) {
       return NextResponse.json(
         { error: result.error },
-        { status: typeof result.status === "number" ? result.status : 409 }
+        { status: typeof result.status === "number" ? result.status : 409 },
       );
     }
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Table approval failed:", error);
+    if (error instanceof WorkflowError)
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    console.error(
+      "Table approval failed:",
+      databaseErrorCode(error) ?? "unavailable",
+    );
+    const failure = databaseFailure(
+      error,
+      "Unable to process request.",
+      "migrations/20261012_simple_inventory.sql",
+    );
     return NextResponse.json(
-      { error: "Unable to process request" },
-      { status: 503 }
+      { error: failure.error },
+      { status: failure.status },
     );
   }
 }

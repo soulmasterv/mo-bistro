@@ -1,3 +1,5 @@
+import { WorkflowError } from "@/lib/workflow-error";
+import { databaseFailure } from "@/lib/database-errors";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { NextResponse } from "next/server";
@@ -10,8 +12,9 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   const staff = await currentStaff();
-  if (!staff || !["manager","reception","waiter"].includes(staff.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!staff) return NextResponse.json({error:"Unauthorized"},{status:401});
+  if (!["manager","reception"].includes(staff.role)) {
+    return NextResponse.json({ error: "Reception access required" }, { status: 403 });
   }
   const licenseError = await requireActiveLicense();
   if (licenseError) return licenseError;
@@ -33,6 +36,10 @@ export async function POST(
       : releaseTable(tableId);
     return NextResponse.json(result);
   } catch (error) {
+    if (!(error instanceof WorkflowError) && process.env.MO_BISTRO_DB === "postgres") {
+      const failure=databaseFailure(error,"Unable to clear table.","migrations/20261012_simple_inventory.sql");
+      return NextResponse.json({error:failure.error},{status:failure.status});
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to release" },
       { status: 409 }

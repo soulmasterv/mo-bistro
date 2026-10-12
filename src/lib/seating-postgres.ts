@@ -1,3 +1,4 @@
+import { WorkflowError } from "@/lib/workflow-error";
 import "server-only";
 import { getPostgres } from "@/lib/postgres-db";
 import { whatsappEnabled } from "@/lib/whatsapp/policy";
@@ -25,21 +26,23 @@ export async function getAssignableTablesPostgres(guestId: number) {
 export async function assignTablePostgres(guestId: number, tableId: number) {
   const sql = getPostgres();
   return sql.begin(async tx => {
-    // Serialize all seating changes to avoid double assignments across requests.
+    // Serialize seating and inventory-mode changes.
     await tx`SELECT pg_advisory_xact_lock(741122)`;
+    const [mode] = await tx`SELECT value FROM seating_settings WHERE key='table_view_mode'`;
+    if (mode?.value === "simple") throw new WorkflowError("Use anonymous area seating in Simple Mode.");
     const [guest] = await tx`SELECT id,status,party_size,seating_preference,table_id FROM guests WHERE id=${guestId} FOR UPDATE`;
-    if (!guest) throw new Error("Guest not found");
-    if (!["waiting", "called"].includes(guest.status)) throw new Error("Only waiting guests can be seated");
+    if (!guest) throw new WorkflowError("Guest not found");
+    if (!["waiting", "called"].includes(guest.status)) throw new WorkflowError("Only waiting guests can be seated");
     const [table] = await tx`SELECT id,seats,area,status FROM restaurant_tables WHERE id=${tableId} FOR UPDATE`;
-    if (!table) throw new Error("Table not found");
-    if (table.status !== "free") throw new Error("Table is occupied");
-    if (table.seats < guest.party_size) throw new Error("Table is too small for this party");
+    if (!table) throw new WorkflowError("Table not found");
+    if (table.status !== "free") throw new WorkflowError("Table is occupied");
+    if (table.seats < guest.party_size) throw new WorkflowError("Table is too small for this party");
     const [setting] = await tx`SELECT value FROM seating_settings WHERE key='allow_area_override'`;
     if ((setting?.value ?? "true") !== "true" && guest.seating_preference !== "any" && guest.seating_preference !== table.area) {
-      throw new Error("Table does not match seating preference");
+      throw new WorkflowError("Table does not match seating preference");
     }
     const occupied = await tx`SELECT id FROM guests WHERE table_id=${tableId} AND status='seated' LIMIT 1`;
-    if (occupied.length) throw new Error("Table is already assigned");
+    if (occupied.length) throw new WorkflowError("Table is already assigned");
     await tx`UPDATE restaurant_tables SET status='occupied',updated_at=CURRENT_TIMESTAMP WHERE id=${tableId}`;
     if (whatsappEnabled()) {
       const [seated] = await tx`UPDATE guests SET status='seated',table_id=${tableId},
@@ -57,9 +60,11 @@ export async function releaseTablePostgres(tableId: number) {
   const sql = getPostgres();
   return sql.begin(async tx => {
     await tx`SELECT pg_advisory_xact_lock(741122)`;
+    const [mode] = await tx`SELECT value FROM seating_settings WHERE key='table_view_mode'`;
+    if (mode?.value === "simple") throw new WorkflowError("Use Table free by area in Simple Mode.");
     const [table] = await tx`SELECT id,status FROM restaurant_tables WHERE id=${tableId} FOR UPDATE`;
-    if (!table) throw new Error("Table not found");
-    if (table.status !== "occupied") throw new Error("Table is no longer occupied");
+    if (!table) throw new WorkflowError("Table not found");
+    if (table.status !== "occupied") throw new WorkflowError("Table is no longer occupied");
     await tx`UPDATE seating_history SET released_at=CURRENT_TIMESTAMP WHERE table_id=${tableId} AND released_at IS NULL`;
     await tx`UPDATE guests SET table_id=NULL,updated_at=CURRENT_TIMESTAMP WHERE table_id=${tableId} AND status='seated'`;
     await tx`UPDATE restaurant_tables SET status='free',updated_at=CURRENT_TIMESTAMP WHERE id=${tableId}`;

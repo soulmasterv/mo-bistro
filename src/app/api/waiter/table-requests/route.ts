@@ -18,6 +18,7 @@ export async function GET() {
     const requests = await getPostgres()`
       SELECT
         r.id,
+        COALESCE(to_jsonb(r)->>'inventory_mode', 'detailed') AS inventory_mode,
         r.table_id,
         COALESCE(t.area, NULLIF(to_jsonb(r)->>'area', '')) AS area,
         COALESCE(t.name, INITCAP(NULLIF(to_jsonb(r)->>'area', '')) || ' area') AS table_name,

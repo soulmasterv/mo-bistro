@@ -48,6 +48,8 @@ export async function POST(
     const result = await sql.begin(async (tx) => {
       await tx`SELECT pg_advisory_xact_lock(741122)`;
 
+      const [mode] = await tx`SELECT value FROM seating_settings WHERE key='table_view_mode'`;
+      if(mode?.value === "simple") return {error:"Use an area request in Simple Mode.",status:409};
       const [table] = await tx`
         SELECT id, status
         FROM restaurant_tables
