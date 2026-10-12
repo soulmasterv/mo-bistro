@@ -35,8 +35,8 @@ export async function GET() {
   try {
     const shifts = await getPostgres()`
       SELECT staff_id, weekday,
-             to_char(start_time, 'HH24:MI') AS start_time,
-             to_char(end_time, 'HH24:MI') AS end_time,
+             LEFT(start_time::text, 5) AS start_time,
+             LEFT(end_time::text, 5) AS end_time,
              is_off
       FROM staff_shifts
       ORDER BY staff_id, weekday

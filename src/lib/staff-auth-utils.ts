@@ -10,6 +10,7 @@ export function hashCredential(value: string) {
 }
 
 export function verifyCredential(value: string, stored: string) {
+  if (!/^[a-f0-9]{32}:[a-f0-9]{128}$/.test(stored)) return false;
   const [salt, expectedHex] = stored.split(":");
 
   if (!salt || !expectedHex) return false;

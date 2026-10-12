@@ -1,3 +1,4 @@
+import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import "server-only";
 
 import { NextResponse } from "next/server";
@@ -32,18 +33,8 @@ export async function POST(request: Request) {
 
   if (limited) return limited;
 
-  const origin = request.headers.get("origin");
-  const host = request.headers.get("host");
-
-  if (origin) {
-    try {
-      if (!host || new URL(origin).host !== host) {
-        return fail("Invalid origin", 403);
-      }
-    } catch {
-      return fail("Invalid origin", 403);
-    }
-  }
+  const originError=rejectCrossOrigin(request);
+  if(originError) return originError;
 
   if (process.env.MO_BISTRO_DB !== "postgres") {
     return fail("PIN login is not configured for this database.", 503);

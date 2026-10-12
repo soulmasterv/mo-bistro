@@ -1,3 +1,4 @@
+import { databaseFailure, databaseErrorCode } from "@/lib/database-errors";
 import { NextResponse } from "next/server";
 import { currentStaff } from "@/lib/staff-auth";
 import { hashCredential } from "@/lib/staff-auth-utils";
@@ -90,11 +91,12 @@ export async function PATCH(request: Request) {
       message: "Staff PIN updated.",
     });
   } catch (error) {
-    console.error("PIN assignment failed:", error);
+    console.error("PIN assignment failed:", databaseErrorCode(error) ?? "unavailable");
+    const failure=databaseFailure(error,"Unable to update PIN.","migrations/20261012_staff_schema_repair.sql");
 
     return NextResponse.json(
-      { error: "Unable to update PIN." },
-      { status: 500 }
+      { error: failure.error },
+      { status: failure.status }
     );
   }
 }

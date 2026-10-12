@@ -11,6 +11,9 @@ export async function requireReceptionStaff() {
 }
 
 export function rejectCrossOrigin(request: Request) {
+  if (request.headers.get("sec-fetch-site") === "cross-site") {
+    return NextResponse.json({error:"Invalid request site"},{status:403});
+  }
   const origin = request.headers.get("origin");
   if (!origin) return null;
   const host = request.headers.get("host");

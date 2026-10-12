@@ -1,3 +1,4 @@
+import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import "server-only";
 
@@ -28,22 +29,8 @@ export async function loginPostgres(request: Request) {
   if (limited) return limited;
 
   try {
-    const origin = request.headers.get("origin");
-    const host = request.headers.get("host");
-
-    if (origin) {
-      let originHost: string;
-
-      try {
-        originHost = new URL(origin).host;
-      } catch {
-        return response("Invalid origin", 403);
-      }
-
-      if (!host || originHost !== host) {
-        return response("Invalid origin", 403);
-      }
-    }
+    const originError=rejectCrossOrigin(request);
+    if(originError) return originError;
 
     const body = await request.json().catch(() => null);
     const username = body?.username;
