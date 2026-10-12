@@ -218,7 +218,7 @@ export default function TableAvailability() {
   };
 
   return (
-    <section className="mb-5 rounded-xl border border-white/10 bg-[#17202A] p-3 sm:p-4">
+    <section className="bistro-panel bistro-availability">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold">Table availability</h2>
@@ -287,7 +287,7 @@ export default function TableAvailability() {
           })}
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 grid-cols-2">
           {tables.map((table) => (
             <div
               key={table.id}

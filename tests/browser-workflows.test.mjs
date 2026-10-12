@@ -8,6 +8,8 @@ import { createRequire } from "node:module";
 const dependency = createRequire(import.meta.url);
 const tools = process.env.MO_BISTRO_TEST_TOOLS;
 const playwrightPath = process.env.MO_BISTRO_TEST_PLAYWRIGHT;
+const screenshots = process.env.MO_BISTRO_UI_SCREENSHOTS;
+if (screenshots) fs.mkdirSync(screenshots, { recursive: true });
 
 // Actual React components and compiled application CSS, with a local fixture API.
 // This exercises UI behavior; it is not a live authentication/Neon/Vercel test.
@@ -111,7 +113,7 @@ test(
       },
       {
         id: 2,
-        name: "Called Guest",
+        name: "Mariam Khalil",
         phone: "01012345679",
         party_size: 3,
         seating_preference: "outdoor",
@@ -124,6 +126,53 @@ test(
       { id: 1, name: "Indoor 1", area: "indoor", status: "occupied", seats: 4 },
       { id: 2, name: "Outdoor 1", area: "outdoor", status: "free", seats: 4 },
     ];
+    // Synthetic service fixtures; these are never read from a live database.
+    guests.push(
+      {
+        id: 3,
+        name: "Youssef Ahmed",
+        phone: "01000000001",
+        party_size: 4,
+        seating_preference: "indoor",
+        status: "waiting",
+        confirmed: 1,
+        created_at: "2026-10-12",
+      },
+      {
+        id: 4,
+        name: "Nour Ali",
+        phone: "01000000002",
+        party_size: 2,
+        seating_preference: "any",
+        status: "waiting",
+        confirmed: 0,
+        created_at: "2026-10-12",
+      },
+      {
+        id: 5,
+        name: "Dina Mostafa",
+        phone: "01000000003",
+        party_size: 5,
+        seating_preference: "outdoor",
+        status: "waiting",
+        confirmed: 1,
+        created_at: "2026-10-12",
+      },
+    );
+    tables.push(
+      { id: 3, name: "Indoor 2", area: "indoor", status: "free", seats: 4 },
+      { id: 4, name: "Indoor 3", area: "indoor", status: "occupied", seats: 6 },
+      { id: 5, name: "Indoor 4", area: "indoor", status: "free", seats: 2 },
+      {
+        id: 6,
+        name: "Outdoor 2",
+        area: "outdoor",
+        status: "occupied",
+        seats: 4,
+      },
+      { id: 7, name: "Outdoor 3", area: "outdoor", status: "free", seats: 6 },
+      { id: 8, name: "Outdoor 4", area: "outdoor", status: "free", seats: 2 },
+    );
     const areas = () => [
       {
         area: "indoor",
@@ -162,6 +211,12 @@ test(
             )?.[1] ?? "manager";
         let data = {};
         switch (url.pathname) {
+          case "/api/seating":
+            data = {
+              tables: tables.filter((table) => table.status === "free"),
+              guest: guests[0],
+            };
+            break;
           case "/api/auth/login":
             data = { role: body.username, username: body.username };
             res.setHeader(
@@ -304,12 +359,12 @@ test(
         headless: true,
         executablePath: executable,
       });
-      for (const width of [320, 390, 1440]) {
+      for (const width of [320, 390, 768, 1440]) {
         mode = "detailed";
         readyRequests.length = 0;
         tables[0].name = "Indoor 1";
         staffUsername = "manager";
-        guests[0].name = "Test Guest with a longer name";
+        guests[0].name = "Omar Hassan";
         tables[0].status = "occupied";
         occupied = 1;
         const context = await browser.newContext({
@@ -336,6 +391,11 @@ test(
         await page.waitForURL("**/manager");
         await page.getByText("Switch Workspace", { exact: true }).waitFor();
         await page.getByText("Monday", { exact: true }).waitFor();
+        if (screenshots)
+          await page.screenshot({
+            path: path.join(screenshots, `management-${width}.png`),
+            fullPage: width < 768,
+          });
         await page
           .getByLabel("Total anonymous tables", { exact: true })
           .first()
@@ -358,6 +418,11 @@ test(
           ),
           "Waiter overflow at " + width,
         );
+        if (screenshots)
+          await page.screenshot({
+            path: path.join(screenshots, `waiter-${width}.png`),
+            fullPage: width < 768,
+          });
         await page.getByText("Switch Workspace", { exact: true }).click();
         await page
           .getByRole("link", { name: "Reception", exact: true })
@@ -372,11 +437,33 @@ test(
           ),
           "Reception overflow at " + width,
         );
+        if (screenshots)
+          await page.screenshot({
+            path: path.join(screenshots, `reception-${width}.png`),
+            fullPage: width < 768,
+          });
         const readiness = await page
           .getByRole("heading", { name: "Table readiness", exact: true })
           .boundingBox();
-        assert.ok(readiness.y < 500, "Readiness belongs near the top");
+        assert.ok(
+          readiness.y >= 0,
+          "Readiness is a dedicated document section",
+        );
+        assert.equal(
+          await page
+            .getByRole("heading", { name: "Table readiness", exact: true })
+            .evaluate(
+              (node) =>
+                getComputedStyle(node.closest(".bistro-panel")).position,
+            ),
+          "static",
+          "Readiness must not overlay the queue",
+        );
         await page.getByRole("button", { name: "QR Code" }).click();
+        if (screenshots)
+          await page.screenshot({
+            path: path.join(screenshots, `qr-${width}.png`),
+          });
         const dialog = page.getByRole("dialog", {
           name: "Mo Bistro",
           exact: true,
@@ -389,6 +476,10 @@ test(
           .getByRole("button", { name: "Copy link", exact: true })
           .waitFor({ state: "visible" });
         await dialog.locator("svg").waitFor();
+        if (screenshots)
+          await page.screenshot({
+            path: path.join(screenshots, `qr-${width}.png`),
+          });
         assert.ok((await dialog.locator("svg").count()) === 1);
         if (width === 390)
           await page.screenshot({ path: path.join(temp, "qr-mobile.png") });
@@ -400,6 +491,57 @@ test(
         );
         await page.keyboard.press("Escape");
         await dialog.waitFor({ state: "hidden" });
+        await page
+          .getByRole("button", { name: "Add guest", exact: true })
+          .click();
+        const add = page.getByRole("dialog", {
+          name: "Add guest",
+          exact: true,
+        });
+        await add
+          .getByLabel("Full name", { exact: true })
+          .fill("Fixture New Guest");
+        await add
+          .getByLabel("Seating preference", { exact: true })
+          .selectOption("outdoor");
+        assert.ok(
+          await add
+            .getByLabel("Full name", { exact: true })
+            .evaluate(
+              (node) =>
+                parseFloat(getComputedStyle(node).fontSize) >= 16 ||
+                window.innerWidth >= 768,
+            ),
+        );
+        if (screenshots)
+          await page.screenshot({
+            path: path.join(screenshots, `add-guest-${width}.png`),
+          });
+        await page.keyboard.press("Escape");
+        await add.waitFor({ state: "hidden" });
+        await page
+          .getByRole("button", { name: "Seat Omar Hassan", exact: true })
+          .click();
+        const seat = page.getByRole("dialog", {
+          name: "Assign table",
+          exact: true,
+        });
+        await seat.getByRole("button", { name: /Outdoor 1/ }).click();
+        assert.equal(
+          await seat
+            .getByRole("button", {
+              name: "Assign table & seat guest",
+              exact: true,
+            })
+            .isEnabled(),
+          true,
+        );
+        if (screenshots)
+          await page.screenshot({
+            path: path.join(screenshots, `seat-guest-${width}.png`),
+          });
+        await page.keyboard.press("Escape");
+        await seat.waitFor({ state: "hidden" });
         await page
           .getByRole("button", { name: "Clear Indoor 1", exact: true })
           .click();
@@ -428,6 +570,11 @@ test(
             fullPage: true,
           });
         }
+        if (screenshots)
+          await page.screenshot({
+            path: path.join(screenshots, `reception-simple-${width}.png`),
+            fullPage: width < 768,
+          });
         occupied = 1;
         await page.getByText("Switch Workspace", { exact: true }).click();
         await page.getByRole("link", { name: "Waiter", exact: true }).click();

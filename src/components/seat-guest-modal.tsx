@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useStaffDialog } from "@/lib/use-staff-dialog";
 import { X, Armchair } from "lucide-react";
 
 type Table = {
@@ -41,6 +42,9 @@ export default function SeatGuestModal({
   const [selected, setSelected] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const dialog = useRef<HTMLDivElement>(null);
+  useStaffDialog(true, dialog, onClose);
 
   useEffect(() => {
     fetch(`/api/seating?guest_id=${guest.id}`, { cache: "no-store" })
@@ -54,7 +58,9 @@ export default function SeatGuestModal({
         setTables(data.tables ?? []);
         setAreas(data.areas ?? []);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+    // Loading is distinct from an actual empty inventory response.
   }, [guest.id]);
 
   async function confirm() {
@@ -89,8 +95,10 @@ export default function SeatGuestModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4">
+    <div className="bistro-dialog-scope fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4">
       <div
+        ref={dialog}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="Assign table"
@@ -108,6 +116,11 @@ export default function SeatGuestModal({
           {guest.seating_preference || "any"} preference
         </p>
 
+        {loading && (
+          <p role="status" className="mt-5 text-sm text-slate-400">
+            Finding the right table…
+          </p>
+        )}
         {mode === "simple" && (
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             {areas.map((area) => (
@@ -164,7 +177,8 @@ export default function SeatGuestModal({
         </div>
 
         {(mode === "simple" ? areas.length === 0 : tables.length === 0) &&
-          !error && (
+          !error &&
+          !loading && (
             <p className="mt-5 text-sm text-slate-400">
               No suitable free tables currently available.
             </p>

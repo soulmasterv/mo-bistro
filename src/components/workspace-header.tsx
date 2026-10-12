@@ -43,8 +43,8 @@ export default function WorkspaceHeader({
     }
   }
   return (
-    <header className="workspace-header">
-      <div className="workspace-header-inner">
+    <header className="workspace-header bistro-workspace-header">
+      <div className="workspace-header-inner bistro-header-inner">
         <div className="flex min-w-0 items-center gap-3">
           <UtensilsCrossed
             className="shrink-0 text-[#C5A77B]"
@@ -53,7 +53,9 @@ export default function WorkspaceHeader({
           />
           <div>
             <p className="text-sm font-semibold tracking-wide">Mo Bistro</p>
-            <p className="text-xs text-slate-400">{workspace}</p>
+            <p className="bistro-header-subtitle">
+              DISTRICT 5 <span>· {workspace}</span>
+            </p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -94,7 +96,7 @@ export default function WorkspaceHeader({
             type="button"
             disabled={busy}
             onClick={() => void logout()}
-            className="workspace-signout"
+            className="workspace-signout bistro-signout"
             aria-label="Sign out"
           >
             <LogOut size={18} aria-hidden="true" />

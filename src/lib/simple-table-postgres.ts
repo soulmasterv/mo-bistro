@@ -3,6 +3,8 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { getPostgres } from "@/lib/postgres-db";
 import type { TransactionSql } from "postgres";
+import { whatsappEnabled } from "@/lib/whatsapp/policy";
+import { scheduleReview } from "@/lib/whatsapp/service";
 export type Area = "indoor" | "outdoor";
 export type SimpleCapacity = {
   area: Area;
@@ -100,7 +102,13 @@ export async function assignSimpleTable(
     )
       throw new WorkflowError("Area does not match seating preference.");
     await tx`UPDATE simple_table_capacity SET occupied_tables=occupied_tables+1 WHERE area=${area}`;
-    await tx`UPDATE guests SET status='seated',table_id=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=${guestId}`;
+    if (whatsappEnabled()) {
+      const [seated] = await tx`UPDATE guests SET status='seated',table_id=NULL,
+        seated_at=COALESCE(seated_at,NOW()),updated_at=CURRENT_TIMESTAMP WHERE id=${guestId} RETURNING seated_at`;
+      await scheduleReview(tx, guestId, new Date(seated.seated_at));
+    } else {
+      await tx`UPDATE guests SET status='seated',table_id=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=${guestId}`;
+    }
     await tx`INSERT INTO simple_table_events(operation_id,area,kind,actor_id,guest_id)
       VALUES (${randomUUID()},${area},'occupied',${actorId},${guestId})`;
     return { success: true, area, guest_id: guestId, inventory_mode: "simple" };

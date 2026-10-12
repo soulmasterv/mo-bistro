@@ -424,7 +424,7 @@ export default function ReceptionTableRequests() {
         />
       )}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#C5A77B]/20 bg-[#17202A] p-4">
+      <div className="bistro-panel bistro-readiness-heading">
         {error && !notificationPanelOpen && (
           <p
             role="alert"
@@ -475,7 +475,7 @@ export default function ReceptionTableRequests() {
       {notificationPanelOpen && (
         <section
           id="table-request-notifications"
-          className="mb-5 max-h-[65dvh] w-full overflow-y-auto rounded-2xl border border-[#D6B681] bg-[#293126] p-4 text-white shadow-2xl"
+          className="bistro-panel bistro-request-panel"
         >
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-semibold">

@@ -7,6 +7,7 @@ import SeatGuestModal from "@/components/seat-guest-modal";
 import { guestDialHref } from "@/lib/guest-phone";
 import TableAvailability from "@/components/table-availability";
 import RestaurantWaitSlider from "@/components/restaurant-wait-slider";
+import { useStaffDialog } from "@/lib/use-staff-dialog";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
@@ -54,8 +55,13 @@ export default function Home() {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [seatingGuest, setSeatingGuest] = useState<Guest | null>(null);
   const [search, setSearch] = useState("");
+  const [queueFilter, setQueueFilter] = useState<"all" | "waiting" | "called">(
+    "all",
+  );
   const [openGuestMenu, setOpenGuestMenu] = useState<number | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const addDialog = useRef<HTMLDivElement>(null);
+  useStaffDialog(showAdd, addDialog, () => setShowAdd(false));
   const qrDialog = useRef<HTMLDivElement>(null);
   const [showQR, setShowQR] = useState(false);
   const [registrationUrl, setRegistrationUrl] = useState("");
@@ -273,272 +279,322 @@ export default function Home() {
   const called = guests.filter((g) => g.status === "called").length;
   const seated = guests.filter((g) => g.status === "seated").length;
   const active = guests.filter((g) => ["waiting", "called"].includes(g.status));
-  const filtered = active.filter((g) =>
-    `${g.name} ${g.phone}`.toLowerCase().includes(search.toLowerCase()),
+  const filtered = active.filter(
+    (g) =>
+      `${g.name} ${g.phone}`.toLowerCase().includes(search.toLowerCase()) &&
+      (queueFilter === "all" || g.status === queueFilter),
   );
 
   return (
-    <main className="min-h-screen bg-[#0D1218] text-white">
-      <div className="mx-auto max-w-7xl px-3 py-4 sm:px-5 md:px-10">
-        <header className="mb-5 flex flex-wrap items-center justify-between gap-4">
+    <main className="bistro-app">
+      <div className="bistro-container">
+        <header className="bistro-page-heading">
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-[#C5A77B]">
-              Mo Bistro
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              Waitlist
+            <p className="bistro-eyebrow">GUEST EXPERIENCE / RECEPTION</p>
+            <h1>
+              A warm welcome.
+              <br />
+              <span>A smooth service.</span>
             </h1>
-            <p className="mt-2 text-sm text-slate-400">
-              Reception management dashboard
-            </p>
+            <p>Every arrival, every table, all in one place.</p>
           </div>
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <div className="bistro-toolbar">
+            <span className="bistro-live">
+              <i /> Live service
+            </span>
             <button
-              onClick={() => void loadGuests()}
-              className="rounded-xl border border-white/10 bg-white/5 p-3 hover:bg-white/10"
+              className="bistro-icon-button"
+              onClick={() => void loadGuests(true)}
               title="Refresh queue"
+              aria-label="Refresh queue"
             >
-              <RefreshCw size={20} />
+              <RefreshCw size={18} />
             </button>
-
             <button
               type="button"
               onClick={openQR}
-              className="flex items-center gap-2 rounded-xl bg-[#C5A77B] px-5 py-3 font-semibold text-[#101820] hover:bg-[#D8BC91]"
+              className="bistro-button bistro-button-secondary"
             >
               <QrCode size={18} /> QR Code
             </button>
-          </div>
-        </header>
-
-        <ReceptionTableRequests />
-        <section className="mb-6 grid gap-4 grid-cols-3">
-          {[
-            { label: "Waiting guests", value: waiting, icon: Users },
-            { label: "Called guests", value: called, icon: Bell },
-            { label: "Seated guests", value: seated, icon: CheckCircle2 },
-          ].map((stat) => (
-            <div
-              key={stat.label}
-              className="rounded-2xl border border-white/10 bg-[#17202A] p-3 sm:p-5"
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <span className="text-xs text-slate-400 sm:text-sm">
-                  {stat.label}
-                </span>
-                <stat.icon size={20} className="text-[#C5A77B]" />
-              </div>
-              <div className="text-2xl font-semibold sm:text-3xl">
-                {stat.value}
-              </div>
-            </div>
-          ))}
-        </section>
-
-        {error && (
-          <div
-            role="alert"
-            className="mb-5 flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200"
-          >
-            <span>{error}</span>
-            <button onClick={() => setError("")}>Dismiss</button>
-          </div>
-        )}
-
-        <section className="min-w-0 rounded-xl border border-white/10 bg-[#17202A]">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 p-3">
-            <div>
-              <h2 className="text-xl font-semibold">Waiting queue</h2>
-              <p className="mt-1 text-sm text-slate-400">
-                {waiting} waiting · {called} called
-              </p>
-            </div>
             <button
+              type="button"
               onClick={() => {
                 setAddError("");
                 setShowAdd(true);
               }}
-              className="flex items-center gap-2 rounded-xl bg-[#C5A77B] px-4 py-3 text-sm font-semibold text-[#101820] hover:bg-[#D8BC91]"
+              className="bistro-button"
             >
               <Plus size={18} /> Add guest
             </button>
           </div>
-
-          <div className="border-b border-white/10 p-3">
-            <div className="flex max-w-md items-center gap-3 rounded-xl border border-white/10 bg-[#0D1218] px-4 py-3">
-              <Search size={18} className="text-slate-500" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search name or phone..."
-                className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
-              />
-            </div>
+        </header>
+        <section className="bistro-stat-grid" aria-label="Service statistics">
+          {[
+            {
+              label: "Waiting guests",
+              value: waiting,
+              caption: "Ready for a warm welcome",
+              icon: Users,
+              tone: "gold",
+            },
+            {
+              label: "Called guests",
+              value: called,
+              caption: "On their way to reception",
+              icon: Bell,
+              tone: "blue",
+            },
+            {
+              label: "Seated guests",
+              value: seated,
+              caption: "Enjoying their visit",
+              icon: CheckCircle2,
+              tone: "green",
+            },
+            {
+              label: "Active parties",
+              value: active.length,
+              caption: "In today’s live queue",
+              icon: Users,
+              tone: "forest",
+            },
+          ].map((stat) => (
+            <article
+              className={`bistro-stat bistro-stat-${stat.tone}`}
+              key={stat.label}
+            >
+              <div className="bistro-stat-top">
+                <span>{stat.label}</span>
+                <stat.icon size={18} />
+              </div>
+              <strong>{stat.value.toString().padStart(2, "0")}</strong>
+              <p>{stat.caption}</p>
+            </article>
+          ))}
+        </section>
+        {error && (
+          <div role="alert" className="bistro-alert">
+            <span>{error}</span>
+            <button onClick={() => setError("")}>Dismiss</button>
           </div>
-
-          <div className="max-h-[65dvh] sm:max-h-[560px] divide-y divide-white/10 overflow-y-auto overscroll-contain touch-pan-y px-3 pb-16">
-            {filtered.map((guest) => {
-              const position = active.findIndex((g) => g.id === guest.id) + 1;
-              const dialHref = guestDialHref(guest.phone);
-              return (
-                <div
-                  key={guest.id}
-                  className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2 py-3 sm:gap-3"
-                >
-                  <span
-                    className="text-lg font-bold text-[#C5A77B]"
-                    aria-label={"Queue position " + position}
+        )}
+        <div className="bistro-reception-grid">
+          <section className="bistro-panel bistro-queue">
+            <div className="bistro-panel-heading">
+              <div>
+                <p className="bistro-eyebrow">THE NEXT GREAT EXPERIENCE</p>
+                <h2>
+                  Waiting queue{" "}
+                  <span className="bistro-count">{active.length}</span>
+                </h2>
+              </div>
+              <span className="bistro-muted">Arrival order</span>
+            </div>
+            <div className="bistro-queue-controls">
+              <div className="bistro-search">
+                <Search size={18} />
+                <input
+                  aria-label="Search guests"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search a guest or phone number"
+                />
+              </div>
+              <div className="bistro-tabs" aria-label="Queue status">
+                {(
+                  [
+                    ["all", "All guests"],
+                    ["waiting", "Waiting"],
+                    ["called", "Called"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    aria-pressed={queueFilter === value}
+                    onClick={() => setQueueFilter(value)}
                   >
-                    #{position}
-                  </span>
-                  <div className="min-w-0">
-                    <h3 className="break-words font-semibold leading-tight">
-                      {guest.name}
-                    </h3>
-                    <p className="mt-1 text-xs text-slate-300">
-                      {guest.party_size} guests ·{" "}
-                      {guest.seating_preference === "any"
-                        ? "Any seating"
-                        : guest.seating_preference === "indoor"
-                          ? "Indoor"
-                          : "Outdoor"}
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="bistro-guest-list">
+              {filtered.map((guest) => {
+                const position = active.findIndex((g) => g.id === guest.id) + 1;
+                const dialHref = guestDialHref(guest.phone);
+                return (
+                  <article
+                    key={guest.id}
+                    className={`bistro-guest-card ${guest.status === "called" ? "is-called" : ""}`}
+                  >
+                    <div className="bistro-guest-main">
                       <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-semibold ${guest.status === "called" ? "bg-[#C5A77B]/20 text-[#E9CFA8]" : "bg-white/10 text-slate-200"}`}
+                        className="bistro-position"
+                        aria-label={"Queue position " + position}
                       >
-                        <Bell size={15} aria-hidden="true" />
+                        {position.toString().padStart(2, "0")}
+                      </span>
+                      <div className="bistro-avatar">
+                        {guest.name
+                          .split(" ")
+                          .map((s) => s[0])
+                          .slice(0, 2)
+                          .join("")}
+                      </div>
+                      <div className="bistro-guest-copy">
+                        <h3>{guest.name}</h3>
+                        <p>
+                          <Users size={13} /> {guest.party_size} guests{" "}
+                          <span>·</span>{" "}
+                          {guest.seating_preference === "any"
+                            ? "Any seating"
+                            : guest.seating_preference === "indoor"
+                              ? "Indoor"
+                              : "Outdoor"}
+                        </p>
+                        <span className="bistro-phone">{guest.phone}</span>
+                      </div>
+                      <span
+                        className={`bistro-status ${guest.status === "called" ? "status-called" : "status-waiting"}`}
+                      >
+                        <i />
                         {guest.status === "waiting"
                           ? "Uncalled"
                           : labels[guest.status]}
                       </span>
-                      {guest.confirmed === 1 && (
-                        <span className="text-xs text-emerald-300">
-                          Confirmed
-                        </span>
-                      )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {dialHref ? (
-                      <a
-                        href={dialHref}
-                        aria-label={"Call " + guest.name}
-                        className="flex min-h-11 min-w-11 items-center gap-1 rounded-lg border border-white/15 px-2 text-xs text-white hover:bg-white/10 sm:min-h-11 sm:px-3"
-                      >
-                        <Phone size={14} />
-                        <span className="hidden min-[390px]:inline">Call</span>
-                      </a>
-                    ) : (
-                      <span className="px-1 text-xs text-slate-500">
-                        No phone
+                    <div className="bistro-guest-bottom">
+                      <span className="bistro-muted">
+                        {guest.confirmed === 1 ? (
+                          <>
+                            <CheckCircle2 size={14} /> Confirmed booking
+                          </>
+                        ) : (
+                          <>Awaiting confirmation</>
+                        )}
+                        {guest.eta_at && (
+                          <>
+                            {" "}
+                            · ETA{" "}
+                            {new Date(guest.eta_at).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </>
+                        )}
                       </span>
-                    )}
-
-                    <div className="relative" data-guest-menu>
-                      <button
-                        type="button"
-                        aria-label={"More actions for " + guest.name}
-                        aria-expanded={openGuestMenu === guest.id}
-                        onClick={() =>
-                          setOpenGuestMenu((current) =>
-                            current === guest.id ? null : guest.id,
-                          )
-                        }
-                        className="flex min-h-11 min-w-10 items-center justify-center rounded-lg border border-white/10 text-xl hover:bg-white/10"
-                      >
-                        ···
-                      </button>
-                      {openGuestMenu === guest.id && (
-                        <div className="absolute right-0 top-full z-30 mt-1 w-48 origin-top-right animate-in fade-in duration-150 rounded-xl border border-white/15 bg-[#17202A] p-1 shadow-xl">
-                          {guest.status === "waiting" && (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => {
-                                setOpenGuestMenu(null);
-                                void performAction(guest.id, "call");
-                              }}
-                              className="block min-h-11 w-full rounded-lg px-3 text-left text-sm hover:bg-white/10 disabled:opacity-40"
-                            >
-                              Mark called
-                            </button>
-                          )}
-                          {guest.confirmed !== 1 && (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => {
-                                setOpenGuestMenu(null);
-                                void performAction(guest.id, "confirm");
-                              }}
-                              className="block min-h-11 w-full rounded-lg px-3 text-left text-sm hover:bg-white/10 disabled:opacity-40"
-                            >
-                              Confirm booking
-                            </button>
-                          )}
-                          <div className="my-1 border-t border-white/10" />
+                      <div className="bistro-guest-actions">
+                        {dialHref && (
+                          <a
+                            href={dialHref}
+                            aria-label={"Call " + guest.name}
+                            className="bistro-button bistro-button-secondary"
+                          >
+                            <Phone size={15} /> Call
+                          </a>
+                        )}
+                        <button
+                          disabled={busy}
+                          onClick={() => void performAction(guest.id, "seat")}
+                          aria-label={"Seat " + guest.name}
+                          className="bistro-button"
+                        >
+                          Seat guest <ArrowUpRight size={15} />
+                        </button>
+                        <div className="bistro-guest-menu" data-guest-menu>
                           <button
                             type="button"
-                            disabled={busy}
-                            onClick={() => {
-                              setOpenGuestMenu(null);
-                              void performAction(guest.id, "no_show");
-                            }}
-                            className="block min-h-11 w-full rounded-lg px-3 text-left text-sm text-amber-200 hover:bg-white/10 disabled:opacity-40"
+                            className="bistro-icon-button"
+                            aria-label={"More actions for " + guest.name}
+                            aria-expanded={openGuestMenu === guest.id}
+                            onClick={() =>
+                              setOpenGuestMenu((current) =>
+                                current === guest.id ? null : guest.id,
+                              )
+                            }
                           >
-                            No-show
+                            ···
                           </button>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => {
-                              setOpenGuestMenu(null);
-                              void performAction(guest.id, "cancel");
-                            }}
-                            className="block min-h-11 w-full rounded-lg px-3 text-left text-sm text-red-300 hover:bg-white/10 disabled:opacity-40"
-                          >
-                            Cancel booking
-                          </button>
+                          {openGuestMenu === guest.id && (
+                            <div className="bistro-dropdown">
+                              {guest.status === "waiting" && (
+                                <button
+                                  disabled={busy}
+                                  onClick={() => {
+                                    setOpenGuestMenu(null);
+                                    void performAction(guest.id, "call");
+                                  }}
+                                >
+                                  Mark called
+                                </button>
+                              )}
+                              {guest.confirmed !== 1 && (
+                                <button
+                                  disabled={busy}
+                                  onClick={() => {
+                                    setOpenGuestMenu(null);
+                                    void performAction(guest.id, "confirm");
+                                  }}
+                                >
+                                  Confirm booking
+                                </button>
+                              )}
+                              <button
+                                disabled={busy}
+                                onClick={() => {
+                                  setOpenGuestMenu(null);
+                                  void performAction(guest.id, "no_show");
+                                }}
+                              >
+                                No-show
+                              </button>
+                              <button
+                                className="bistro-danger"
+                                disabled={busy}
+                                onClick={() => {
+                                  setOpenGuestMenu(null);
+                                  void performAction(guest.id, "cancel");
+                                }}
+                              >
+                                Cancel booking
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
-
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void performAction(guest.id, "seat")}
-                      className="min-h-11 rounded-lg bg-[#C5A77B] px-3 text-sm font-semibold text-[#101820] disabled:opacity-40"
-                      aria-label={"Seat " + guest.name}
-                    >
-                      Seat
-                    </button>
-                  </div>
+                  </article>
+                );
+              })}
+              {filtered.length === 0 && (
+                <div className="bistro-empty">
+                  <Users size={30} />
+                  <h3>A little room to breathe.</h3>
+                  <p>No active guests found. New arrivals will appear here.</p>
                 </div>
-              );
-            })}
-
-            {filtered.length === 0 && (
-              <p className="p-8 text-center text-sm text-slate-400">
-                No active guests found.
-              </p>
-            )}
-          </div>
-        </section>
-
-        <div className="mt-8">
-          <RestaurantWaitSlider />
-          <TableAvailability />
+              )}
+            </div>
+            <footer className="bistro-panel-footer">
+              <span>{filtered.length} parties shown</span>
+              <span>
+                <i className="bistro-dot" /> Refreshes every 5 seconds
+              </span>
+            </footer>
+          </section>
+          <aside className="bistro-service-column">
+            <ReceptionTableRequests />
+            <TableAvailability />
+            <RestaurantWaitSlider />
+          </aside>
         </div>
-
-        <footer className="mt-8 flex items-center justify-between text-xs text-slate-500">
-          <span>Mo Bistro · Reception</span>
-          <span className="flex items-center gap-1">
-            <ArrowUpRight size={13} /> Auto-refresh every 5s
+        <footer className="bistro-page-footer">
+          <span>
+            MO BISTRO <span> / District 5</span>
           </span>
+          <span>Thoughtful service, from arrival to goodbye.</span>
         </footer>
       </div>
-
       {showQR &&
         createPortal(
           <div
@@ -549,9 +605,9 @@ export default function Home() {
             aria-describedby="qr-instructions"
             aria-modal="true"
             aria-label="Guest registration QR code"
-            className="fixed inset-0 z-[9999] flex h-[100dvh] w-full items-center justify-center overflow-y-auto bg-black/80 p-4 text-white"
+            className="bistro-dialog-scope bistro-qr-overlay fixed inset-0 z-[9999] flex h-[100dvh] w-full items-center justify-center overflow-y-auto bg-black/80 p-4 text-white"
           >
-            <div className="my-auto w-full max-w-md rounded-3xl border border-white/10 bg-[#17202A] p-5 text-center shadow-2xl sm:p-7">
+            <div className="bistro-qr-card my-auto w-full max-w-md rounded-3xl border border-white/10 bg-[#17202A] p-5 text-center shadow-2xl sm:p-7">
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#C5A77B]">
                 Welcome to the table
               </p>
@@ -613,12 +669,20 @@ export default function Home() {
         )}
 
       {showAdd && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#17202A] p-6 shadow-2xl">
+        <div className="bistro-dialog-scope fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div
+            ref={addDialog}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add guest"
+            className="bistro-add-card w-full max-w-md rounded-2xl border border-white/10 bg-[#17202A] p-6 shadow-2xl"
+          >
             <div className="mb-6 flex items-center justify-between">
               <h2 className="text-xl font-semibold">Add guest</h2>
               <button
                 onClick={() => setShowAdd(false)}
+                aria-label="Close add guest"
                 className="text-slate-400 hover:text-white"
               >
                 <XCircle size={22} />
@@ -668,6 +732,25 @@ export default function Home() {
                   className="mt-2 w-full rounded-xl border border-white/10 bg-[#0D1218] p-3 outline-none focus:border-[#C5A77B]"
                 />
               </label>
+              <div className="block text-sm">
+                <label htmlFor="staff-seating-preference">
+                  Seating preference
+                </label>
+                <select
+                  id="staff-seating-preference"
+                  className="mt-2 w-full rounded-xl p-3"
+                  value={seatingPreference}
+                  onChange={(e) =>
+                    setSeatingPreference(
+                      e.target.value as typeof seatingPreference,
+                    )
+                  }
+                >
+                  <option value="any">No preference</option>
+                  <option value="indoor">Indoor</option>
+                  <option value="outdoor">Outdoor</option>
+                </select>
+              </div>
               <button
                 disabled={busy}
                 type="submit"

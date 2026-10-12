@@ -2,7 +2,7 @@
 import Link from "next/link";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock3, RefreshCw, UtensilsCrossed } from "lucide-react";
+import { CheckCircle2, RefreshCw, UtensilsCrossed } from "lucide-react";
 
 type RestaurantTable = {
   id: number;
@@ -221,267 +221,273 @@ export default function WaiterPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0D1218] text-white">
-      <header className="bg-[#17202A] px-4 pb-4 pt-4 text-[#F9F4E9] sm:px-8">
-        <div className="mx-auto max-w-6xl">
-          <div className="flex items-center justify-between gap-3">
-            <span className="rounded-full border border-[#777D6B] px-3 py-2 text-[10px] font-semibold tracking-[0.2em]">
-              DISTRICT 5
-            </span>
-          </div>
-
-          <div className="mt-7 flex items-center gap-3">
-            <UtensilsCrossed size={22} className="text-[#D6B681]" />
-            <span className="text-xs font-semibold tracking-[0.25em] text-[#D6B681]">
-              MO BISTRO
-            </span>
-          </div>
-
-          <h1 className="mt-4 font-serif text-4xl sm:text-5xl">
-            Waiter workspace
-          </h1>
-
-          <p className="mt-3 max-w-lg text-sm leading-6 text-[#D9D9CF]">
-            Keep reception informed. Mark a table ready once it has been cleared
-            and prepared for the next guests.
-          </p>
-
-          <div className="mt-7 grid grid-cols-3 gap-2 sm:max-w-xl sm:gap-4">
-            {[
-              { label: "Total", value: total },
-              { label: "Available", value: free },
-              { label: "Occupied", value: occupied },
-            ].map((stat) => (
-              <div
-                key={stat.label}
-                className="rounded-xl border border-[#666D5E] bg-[#3D4436] p-3 sm:p-5"
-              >
-                <div className="font-serif text-3xl text-[#F9F4E9]">
-                  {stat.value}
-                </div>
-                <div className="mt-1 text-xs text-[#D5D4C7]">{stat.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </header>
-
-      <section className="mx-auto max-w-6xl px-4 py-6 sm:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+    <main className="bistro-app">
+      <div className="bistro-container">
+        <header className="bistro-page-heading">
           <div>
-            <h2 id="restaurant-floor" className="text-2xl font-semibold">
-              Table is ready
-            </h2>
-            <p className="mt-1 text-xs text-slate-400">
-              Live updates · Every 3 seconds
-            </p>
+            <p className="bistro-eyebrow">SERVICE OPERATIONS / WAITER</p>
+            <h1>
+              The floor,
+              <br />
+              <span>at a glance.</span>
+            </h1>
+            <p>A clear view of every table. A better flow for every guest.</p>
           </div>
-
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            className="flex min-h-11 items-center gap-2 rounded-full border border-[#C9C8BD] px-4 text-sm"
-          >
-            <RefreshCw size={16} />
-            Refresh
-          </button>
-        </div>
-
-        <p className="mt-5 text-xs text-slate-400">
-          {viewMode === "simple" ? "Simple view" : "Detailed view"}
-          {" · "}Controlled by management
-        </p>
-
-        {viewMode === "detailed" && (
-          <>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {(
-                [
-                  ["all", "All tables"],
-                  ["occupied", "Occupied"],
-                  ["free", "Available"],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setFilter(value)}
-                  className={`min-h-11 shrink-0 rounded-full px-5 text-sm font-medium ${
-                    filter === value
-                      ? "bg-[#17202A] text-white"
-                      : "border border-white/15 bg-[#17202A] text-white"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+          <div className="bistro-toolbar">
+            <span className="bistro-live">
+              <i /> Live floor
+            </span>
+            <button
+              className="bistro-button bistro-button-secondary"
+              onClick={() => void refresh()}
+            >
+              <RefreshCw size={17} /> Refresh
+            </button>
+          </div>
+        </header>
+        <section className="bistro-stat-grid" aria-label="Floor statistics">
+          {[
+            {
+              label: "Total tables",
+              value: total,
+              tone: "forest",
+              caption: "Across both seating areas",
+            },
+            {
+              label: "Available",
+              value: free,
+              tone: "green",
+              caption: "Ready for the next arrival",
+            },
+            {
+              label: "Occupied",
+              value: occupied,
+              tone: "gold",
+              caption: "Guests are enjoying their visit",
+            },
+            {
+              label: "Pending approval",
+              value:
+                viewMode === "simple"
+                  ? pendingAreas.length
+                  : pendingTableIds.length,
+              tone: "blue",
+              caption: "Waiting for Reception",
+            },
+          ].map((stat) => (
+            <article
+              key={stat.label}
+              className={`bistro-stat bistro-stat-${stat.tone}`}
+            >
+              <div className="bistro-stat-top">
+                <span>{stat.label}</span>
+                <UtensilsCrossed size={18} />
+              </div>
+              <strong>{stat.value.toString().padStart(2, "0")}</strong>
+              <p>{stat.caption}</p>
+            </article>
+          ))}
+        </section>
+        <section className="bistro-panel bistro-floor-panel">
+          <div className="bistro-panel-heading">
+            <div>
+              <p className="bistro-eyebrow">CLEAR. PREPARE. WELCOME.</p>
+              <h2 id="restaurant-floor">Table is ready</h2>
             </div>
-
-            <div className="mt-2 flex flex-wrap gap-2">
-              {(
-                [
-                  ["all", "All areas"],
-                  ["indoor", "Indoor"],
-                  ["outdoor", "Outdoor"],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setAreaFilter(value)}
-                  className={`min-h-11 shrink-0 rounded-full px-5 text-sm font-medium ${
-                    areaFilter === value
-                      ? "bg-[#17202A] text-white"
-                      : "border border-white/15 bg-[#17202A] text-white"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-        {error && (
-          <div
-            role="alert"
-            className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
-          >
-            {error}
-            {unauthorized && (
-              <Link href="/login" className="ml-2 font-semibold underline">
-                Sign in
-              </Link>
+            <span className="bistro-status status-waiting">
+              {viewMode === "simple" ? "Simple view" : "Detailed view"}
+            </span>
+          </div>
+          <div className="bistro-floor-toolbar">
+            <p className="bistro-muted">
+              Send a readiness request once the table has been cleared.
+            </p>
+            {viewMode === "detailed" && (
+              <div className="bistro-filter-groups">
+                <div className="bistro-tabs" aria-label="Table status">
+                  {(
+                    [
+                      ["all", "All tables"],
+                      ["occupied", "Occupied"],
+                      ["free", "Available"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      aria-pressed={filter === value}
+                      onClick={() => setFilter(value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="bistro-tabs" aria-label="Seating area">
+                  {(
+                    [
+                      ["all", "All areas"],
+                      ["indoor", "Indoor"],
+                      ["outdoor", "Outdoor"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      aria-pressed={areaFilter === value}
+                      onClick={() => setAreaFilter(value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
-        )}
-
-        {notice && (
-          <div
-            role="status"
-            className="mt-4 rounded-xl border border-[#CBD8BE] bg-[#E8F1DF] p-4 text-sm"
-          >
-            {notice}
-          </div>
-        )}
-
-        {loading ? (
-          <p className="py-12 text-center text-sm">Loading tables...</p>
-        ) : (viewMode === "detailed" ? visible.length === 0 : total === 0) ? (
-          <p className="py-12 text-center text-sm text-slate-400">
-            No tables in this category.
-          </p>
-        ) : viewMode === "simple" ? (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {(["indoor", "outdoor"] as const).map((area) => {
-              const pool = pools.find((item) => item.area === area);
-              const areaFree = pool?.free_tables ?? 0;
-              const areaOccupied = pool?.occupied_tables ?? 0;
-
-              return (
-                <article
-                  key={area}
-                  className="rounded-xl border border-white/10 bg-[#17202A] p-3 shadow-sm"
-                >
-                  <h3 className="font-serif text-2xl capitalize">{area}</h3>
-                  <p className="mt-2 text-2xl font-semibold text-[#55704B]">
-                    {areaFree}
-                    <span className="ml-2 text-sm font-normal text-slate-400">
-                      available
-                    </span>
-                  </p>
-                  <p className="mt-2 text-sm text-slate-400">
-                    {areaOccupied} occupied · {pool?.total_tables ?? 0} total
-                  </p>
-                  <button
-                    type="button"
-                    disabled={
-                      areaOccupied === 0 ||
-                      busyArea !== null ||
-                      pendingAreas.includes(area)
-                    }
-                    onClick={() => void requestAreaReady(area)}
-                    className="mt-3 min-h-12 w-full rounded-xl bg-[#17202A] px-3 text-sm font-semibold text-white disabled:opacity-40"
-                  >
-                    {busyArea === area
-                      ? "Sending..."
-                      : pendingAreas.includes(area)
-                        ? "Awaiting Reception approval"
-                        : `Table is ready — ${area === "indoor" ? "Indoor" : "Outdoor"}`}
-                  </button>
-                </article>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="mt-5 grid grid-cols-1 gap-3 min-[390px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {visible.map((table) => {
-              const isOccupied = table.status === "occupied";
-              const isPending =
-                isOccupied && pendingTableIds.includes(table.id);
-
-              return (
-                <article
-                  key={table.id}
-                  className="flex min-w-0 flex-col rounded-xl border border-white/10 bg-[#17202A] p-4 shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h3 className="break-words font-serif text-2xl">
-                        {table.name}
-                      </h3>
-                      <p className="mt-1 text-xs capitalize text-slate-400">
-                        {table.area} · {table.seats} seats
-                      </p>
+          {error && (
+            <div role="alert" className="bistro-alert">
+              {error}
+              {unauthorized && <Link href="/login">Sign in</Link>}
+            </div>
+          )}
+          {notice && (
+            <div role="status" className="bistro-success">
+              <CheckCircle2 size={17} />
+              {notice}
+            </div>
+          )}
+          {loading ? (
+            <div className="bistro-empty">Loading your restaurant floor…</div>
+          ) : (viewMode === "detailed" ? visible.length === 0 : total === 0) ? (
+            <div className="bistro-empty">
+              <UtensilsCrossed size={30} />
+              <h3>No tables in this category.</h3>
+              <p>Choose another filter to see the rest of the floor.</p>
+            </div>
+          ) : viewMode === "simple" ? (
+            <div className="bistro-area-grid">
+              {(["indoor", "outdoor"] as const).map((area) => {
+                const pool = pools.find((item) => item.area === area);
+                const available = pool?.free_tables ?? 0;
+                const used = pool?.occupied_tables ?? 0;
+                return (
+                  <article key={area} className="bistro-area-card">
+                    <div className="bistro-area-top">
+                      <span className="bistro-area-emblem">
+                        {area === "indoor" ? "I" : "O"}
+                      </span>
+                      <span className="bistro-status status-free">
+                        {available} available
+                      </span>
                     </div>
-
-                    {isOccupied ? (
-                      <Clock3 size={22} className="shrink-0 text-[#B28B55]" />
-                    ) : (
-                      <CheckCircle2
-                        size={22}
-                        className="shrink-0 text-[#66815E]"
+                    <h3>
+                      {area === "indoor" ? "The dining room" : "The terrace"}
+                    </h3>
+                    <p className="bistro-muted capitalize">
+                      {area} · {pool?.total_tables ?? 0} tables
+                    </p>
+                    <div className="bistro-area-figures">
+                      <strong>
+                        {available.toString().padStart(2, "0")}
+                        <span>Available</span>
+                      </strong>
+                      <strong>
+                        {used.toString().padStart(2, "0")}
+                        <span>Occupied</span>
+                      </strong>
+                    </div>
+                    <div className="bistro-capacity-track">
+                      <span
+                        style={{
+                          width: `${pool?.total_tables ? (used / pool.total_tables) * 100 : 0}%`,
+                        }}
                       />
-                    )}
-                  </div>
-
-                  <div
-                    className={`mt-5 rounded-lg px-3 py-2 text-center text-xs font-semibold ${
-                      isOccupied
-                        ? "bg-[#F5E9D8] text-[#8D6234]"
-                        : "bg-[#E9F0E3] text-[#55704B]"
-                    }`}
+                    </div>
+                    <button
+                      className="bistro-button"
+                      disabled={
+                        used === 0 ||
+                        busyArea !== null ||
+                        pendingAreas.includes(area)
+                      }
+                      onClick={() => void requestAreaReady(area)}
+                    >
+                      {busyArea === area
+                        ? "Sending..."
+                        : pendingAreas.includes(area)
+                          ? "Awaiting Reception approval"
+                          : `Table is ready — ${area === "indoor" ? "Indoor" : "Outdoor"}`}
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="bistro-floor-grid">
+              {visible.map((table) => {
+                const occupied = table.status === "occupied";
+                const pending = occupied && pendingTableIds.includes(table.id);
+                return (
+                  <article
+                    key={table.id}
+                    className={`bistro-table-card ${occupied ? "table-occupied" : "table-free"}`}
                   >
-                    {isPending
-                      ? "Awaiting reception approval"
-                      : isOccupied
-                        ? "Occupied"
-                        : "Available"}
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={!isOccupied || isPending || busyId !== null}
-                    onClick={() => void markReady(table)}
-                    className={`mt-3 min-h-12 w-full rounded-xl text-sm font-semibold ${
-                      isOccupied
-                        ? "bg-[#C5A77B] text-[#101820] disabled:opacity-50"
-                        : "cursor-default bg-[#E8E8E0] text-[#7B8175]"
-                    }`}
-                  >
-                    {busyId === table.id
-                      ? "Sending request..."
-                      : isPending
-                        ? "Awaiting approval"
-                        : isOccupied
-                          ? "Table is ready"
-                          : "Already ready"}
-                  </button>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </section>
+                    <div className="bistro-table-top">
+                      <span
+                        className={`bistro-status ${pending ? "status-called" : occupied ? "status-waiting" : "status-free"}`}
+                      >
+                        <i />
+                        {pending
+                          ? "Awaiting approval"
+                          : occupied
+                            ? "Occupied"
+                            : "Available"}
+                      </span>
+                      <span className="bistro-muted">{table.seats} seats</span>
+                    </div>
+                    <div className="bistro-table-visual" aria-hidden="true">
+                      <span className="table-chair chair-n" />
+                      <span className="table-chair chair-s" />
+                      <span className="table-chair chair-e" />
+                      <span className="table-chair chair-w" />
+                      <span className="table-surface">
+                        <UtensilsCrossed size={23} />
+                      </span>
+                    </div>
+                    <h3>{table.name}</h3>
+                    <p className="bistro-muted capitalize">
+                      {table.area === "indoor" ? "Dining room" : "Terrace"} ·{" "}
+                      {table.area}
+                    </p>
+                    <button
+                      disabled={!occupied || pending || busyId !== null}
+                      onClick={() => void markReady(table)}
+                      className={`bistro-button ${occupied ? "" : "bistro-button-secondary"}`}
+                    >
+                      {busyId === table.id
+                        ? "Sending request..."
+                        : pending
+                          ? "Awaiting approval"
+                          : occupied
+                            ? "Table is ready"
+                            : "Already ready"}
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+          <footer className="bistro-panel-footer">
+            <span>Reception approves table-readiness requests.</span>
+            <span>
+              <i className="bistro-dot" /> Updates every 3 seconds
+            </span>
+          </footer>
+        </section>
+        <footer className="bistro-page-footer">
+          <span>
+            MO BISTRO <span>/ District 5</span>
+          </span>
+          <span>Good service starts with a clear floor.</span>
+        </footer>
+      </div>
     </main>
   );
 }
