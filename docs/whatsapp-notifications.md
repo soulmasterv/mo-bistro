@@ -176,3 +176,7 @@ Provider references:
 * [Meta webhook authenticity](https://whatsapp.github.io/WhatsApp-Nodejs-SDK/api-reference/webhooks/start/)
 * [QStash signature verification](https://upstash.com/docs/qstash/howto/signature)
 * [QStash scheduling/publishing](https://upstash.com/docs/qstash/api-reference/messages/publish-a-message)
+
+Customer-facing opt-out wording (including approved Meta templates when managed in Meta):
+"To unsubscribe at any time, reply UNSUBSCRIBE or STOP on WhatsApp."
+Both commands are matched case-insensitively. Meta-hosted template text must be updated and approved in Meta separately; this repository cannot edit those approvals.

@@ -143,15 +143,19 @@ export async function deliverNotification(id: string, revision: number): Promise
 export async function subscriptionState(trackingToken: string) {
   if (!whatsappEnabled()) return { available: false };
   const sql = getPostgres();
-  const [booking] = await sql`SELECT c.*,g.tracking_token_hash,g.status,g.seated_at FROM whatsapp_booking_consents c
+  const [booking] = await sql`SELECT c.*,g.tracking_token_hash,g.status,g.seated_at,
+    EXISTS (SELECT 1 FROM whatsapp_notifications n WHERE n.guest_id=c.guest_id AND n.kind='review'
+      AND n.status IN ('sent','sending','unknown')) AS review_dispatched FROM whatsapp_booking_consents c
     JOIN guests g ON g.id=c.guest_id WHERE g.tracking_token_hash=${hashCode(trackingToken)}`;
   if (!booking) return { available: false };
   const subscribed = !!booking.subscribed_at && !booking.unsubscribed_at;
   const number = process.env.WHATSAPP_BUSINESS_NUMBER;
   const available = !!number && /^[1-9]\d{7,14}$/.test(number) &&
-    new Date(booking.subscription_expires_at).getTime() > Date.now() &&
+    (subscribed || new Date(booking.subscription_expires_at).getTime() > Date.now()) &&
     ["waiting","called","seated"].includes(booking.status);
-  const code = subscriptionCode(booking.guest_id,booking.tracking_token_hash);
-  return { available,subscribed,feedbackConsent: booking.feedback_consent,
-    url: available ? `https://wa.me/${number}?text=${encodeURIComponent(`SUBSCRIBE ${booking.guest_id} ${code}`)}` : null };
+  const code = available && !subscribed ? subscriptionCode(booking.guest_id,booking.tracking_token_hash) : null;
+  const feedbackEditable = subscribed && available && !booking.review_dispatched &&
+    (!booking.seated_at || new Date(booking.seated_at).getTime() + 60*60_000 > Date.now());
+  return { available,subscribed,feedbackConsent: booking.feedback_consent,feedbackEditable,
+    url: available && !subscribed ? `https://wa.me/${number}?text=${encodeURIComponent(`SUBSCRIBE ${booking.guest_id} ${code}`)}` : null };
 }

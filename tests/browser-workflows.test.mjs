@@ -104,6 +104,8 @@ test(
     assert.ok(!viewport.includes("maximum-scale=1"));
     let mode = "detailed",
       occupied = 1;
+    let subscriptionSubscribed = true;
+    let feedbackEditable = true;
     let staffUsername = "manager";
     const errors = [];
     const readyRequests = [];
@@ -243,6 +245,9 @@ test(
             break;
           case "/api/qr/permit":
             data = { valid: true, expiresAt: null };
+            break;
+          case "/api/whatsapp/subscription":
+            data = {available:true,subscribed:subscriptionSubscribed,feedbackConsent:true,feedbackEditable,url:"https://wa.me/201000000000?text=SUBSCRIBE"};
             break;
           case "/api/track":
             data = {confirmation_required:true, guest:{name:"Omar Hassan",party_size:2,status:"waiting",confirmed:true,created_at:new Date().toISOString()}, queue_position:3,guests_ahead:2};
@@ -1045,7 +1050,18 @@ test(
         await guestPage.waitForURL("**/status?token=*");
         await guestPage.getByText("Omar Hassan", {exact:true}).waitFor();
         await guestPage.waitForFunction(() => document.documentElement.dataset.theme === "guest-light");
-        if(screenshots) await guestPage.screenshot({path:path.join(screenshots,"status-restored.png"),fullPage:true});
+        await guestPage.getByText("WhatsApp updates enabled",{exact:true}).waitFor();
+        assert.equal(await guestPage.getByRole("link",{name:"Subscribe to WhatsApp updates"}).count(),0);
+        assert.equal(await guestPage.getByRole("checkbox").count(),1); // Relevant review preference only.
+        await guestPage.getByText("To unsubscribe at any time, reply UNSUBSCRIBE or STOP on WhatsApp.",{exact:true}).waitFor();
+        feedbackEditable=false; await guestPage.reload();
+        await guestPage.getByText("WhatsApp updates enabled",{exact:true}).waitFor();
+        assert.equal(await guestPage.getByRole("checkbox").count(),0);
+        if(screenshots) await guestPage.screenshot({path:path.join(screenshots,"whatsapp-updates-enabled.png"),fullPage:true});
+        subscriptionSubscribed=false; await guestPage.reload();
+        await guestPage.getByRole("link",{name:"Subscribe to WhatsApp updates"}).waitFor();
+        assert.equal(await guestPage.getByRole("checkbox").count(),0);
+        subscriptionSubscribed=true; feedbackEditable=true;
         assert.equal(submittedBooking.whatsapp_confirmation_consent, consent);
         assert.equal(submittedBooking.whatsapp_feedback_consent, consent);
         await guestContext.close();

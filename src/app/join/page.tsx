@@ -437,7 +437,7 @@ export default function JoinPage() {
                     <input type="checkbox" checked={whatsappConfirmation} onChange={e => setWhatsappConfirmation(e.target.checked)} />
                     <span>Send me one WhatsApp booking confirmation. If I reply to subscribe, send me queue updates and one review request 60 minutes after seating.</span>
                   </label>
-                  <p className="text-xs text-[#777367]">Booking is available without these options. Reply STOP to unsubscribe.</p>
+                  <p className="text-xs text-[#777367]">Booking is available without these options. To unsubscribe at any time, reply UNSUBSCRIBE or STOP on WhatsApp.</p>
                 </fieldset>}
 
                 {error && (

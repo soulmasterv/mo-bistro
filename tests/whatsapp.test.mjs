@@ -935,3 +935,25 @@ for (const [name, fn] of cases)
     await reset();
     await fn();
   });
+test("STOP and UNSUBSCRIBE remain case-insensitive received-message opt-outs", async()=>{
+  for(const command of ["STOP","stop","StOp","UNSUBSCRIBE","unsubscribe","UnSuBsCrIbE"]) {
+    await reset(); const b=await booking();
+    await webhook.processMetaWebhook(envelope(inbound(b)));
+    assert.equal((await service.subscriptionState(b.token)).subscribed,true);
+    await webhook.processMetaWebhook(envelope(inbound(b,randomUUID(),{text:{body:command}})));
+    assert.equal((await service.subscriptionState(b.token)).subscribed,false);
+  }
+});
+test("review preference is relevant only for subscribers before review dispatch or deadline",async()=>{
+  await reset(); const b=await booking({whatsapp_confirmation_consent:true,whatsapp_feedback_consent:true});
+  assert.equal((await service.subscriptionState(b.token)).feedbackEditable,false);
+  await webhook.processMetaWebhook(envelope(inbound(b)));
+  assert.equal((await service.subscriptionState(b.token)).feedbackEditable,true);
+  await sql`UPDATE whatsapp_booking_consents SET subscription_expires_at=NOW()-INTERVAL '1 hour' WHERE guest_id=${b.id}`;
+  assert.equal((await service.subscriptionState(b.token)).available,true);
+  await sql`UPDATE guests SET status='seated',seated_at=NOW()-INTERVAL '61 minutes' WHERE id=${b.id}`;
+  assert.equal((await service.subscriptionState(b.token)).feedbackEditable,false);
+  await sql`UPDATE guests SET seated_at=NOW() WHERE id=${b.id}`;
+  await sql`UPDATE whatsapp_notifications SET kind='review',status='sent' WHERE guest_id=${b.id}`;
+  assert.equal((await service.subscriptionState(b.token)).feedbackEditable,false);
+});
