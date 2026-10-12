@@ -7,6 +7,8 @@
 html { min-width: 0; scroll-padding-top: 6rem; }
 body { margin: 0; background: var(--background); color: var(--foreground); font-family: var(--font-geist-sans), Arial, sans-serif; -webkit-text-size-adjust: 100%; }
 main, section, form { min-width: 0; }
+/* Long staff/table/guest names must wrap instead of widening mobile layouts. */
+:where(h1, h2, h3, h4, p) { overflow-wrap: anywhere; }
 button, summary, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 button, summary { touch-action: manipulation; }
 :focus-visible { outline: 2px solid #C5A77B; outline-offset: 4px; }

@@ -124,3 +124,9 @@ scripts/import-production-guests.mjs was not executed, modified, staged or delet
 - tests/handler-harness.mjs
 - tests/postgres-workflows.test.mjs
 - tests/regressions.test.mjs
+
+## Follow-up: unnecessary side scrolling
+
+Long unbroken guest/staff/table names could widen mobile pages and introduce a horizontal scrollbar in the request panel. Mobile innerWidth can expand to accommodate that overflow, so the previous document-width-versus-innerWidth assertion could miss it. Headings and paragraphs now use overflow-wrap:anywhere; overflow is corrected at the text layout instead of hidden globally.
+
+The browser suite now compares both page width and innerWidth with the configured 320px, 390px and 1440px screen width, and detects internal auto/scroll containers whose content is wider than their available width. Native input text scrolling is intentionally excluded. Stress data includes 100-character guest names, 40-character table names and 32-character staff usernames. Checks cover loaded Manager forms, Reception and Waiter, expanded workspace and guest menus, request panels, QR and seating dialogs, staff PIN assignment and PIN login. All checks passed. The local build and application/test lint also passed. This follow-up remains local; no new migration is required.

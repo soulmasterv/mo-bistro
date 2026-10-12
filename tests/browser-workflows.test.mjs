@@ -26,6 +26,12 @@ test(
       "import Login from " +
       component("src/app/login/page.tsx") +
       ";" +
+      "import PinLogin from " +
+      component("src/app/login/pin/page.tsx") +
+      ";" +
+      "import StaffPins from " +
+      component("src/app/management/staff-pins/staff-pins-client.tsx") +
+      ";" +
       "import Reception from " +
       component("src/app/reception-dashboard.tsx") +
       ";" +
@@ -39,8 +45,8 @@ test(
       component("src/components/workspace-header.tsx") +
       ";" +
       'const p=location.pathname;const role=document.cookie.match(/fixture_role=(manager|reception|waiter)/)?.[1] ?? "manager";' +
-      'const title=p==="/waiter"?"Waiter":p==="/management"||p==="/manager"?"Management":"Reception";' +
-      'createRoot(document.getElementById("root")).render(p==="/login"?<Login/>:<><Header role={role} workspace={title}/>{title==="Waiter"?<Waiter/>:title==="Management"?<Management/>:<Reception/>}</>);';
+      'const title=p==="/waiter"?"Waiter":p.startsWith("/management")||p==="/manager"?"Management":"Reception";' +
+      'createRoot(document.getElementById("root")).render(p==="/login"?<Login/>:p==="/login/pin"?<PinLogin/>:<><Header role={role} workspace={title}/>{title==="Waiter"?<Waiter/>:title==="Management"?(p==="/management/staff-pins"?<StaffPins/>:<Management/>):<Reception/>}</>);';
     await esbuild.build({
       stdin: { contents: source, loader: "tsx", resolveDir: root },
       bundle: true,
@@ -89,6 +95,7 @@ test(
     assert.ok(!viewport.includes("maximum-scale=1"));
     let mode = "detailed",
       occupied = 1;
+    let staffUsername = "manager";
     const errors = [];
     const readyRequests = [];
     const guests = [
@@ -171,6 +178,13 @@ test(
           case "/api/guests":
             data = guests;
             break;
+          case "/api/seating":
+            data = {
+              mode,
+              guest: guests[0],
+              tables: tables.filter((table) => table.status === "free"),
+            };
+            break;
           case "/api/qr":
             data = { url: "http://localhost/join?code=test-qr" };
             break;
@@ -195,15 +209,31 @@ test(
             data = { requests: readyRequests };
             break;
           case "/api/waiter/area-requests":
-            readyRequests.push({id:1,table_id:null,request_area:body.area,area:body.area,inventory_mode:"simple",table_name:"Indoor area",status:"pending",requested_by:"manager"});
+            readyRequests.push({
+              id: 1,
+              table_id: null,
+              request_area: body.area,
+              area: body.area,
+              inventory_mode: "simple",
+              table_name: "Indoor area",
+              status: "pending",
+              requested_by: "manager",
+            });
             data = { success: true, request_id: 1 };
             break;
           case "/api/reception/table-requests/1":
-            readyRequests[0].status=body.action === "approve" ? "approved" : "rejected";
-            if(body.action === "approve") occupied=Math.max(0,occupied-1);
-            data={success:true,inventory_mode:"simple",area:"indoor",table_id:null};break;
+            readyRequests[0].status =
+              body.action === "approve" ? "approved" : "rejected";
+            if (body.action === "approve") occupied = Math.max(0, occupied - 1);
+            data = {
+              success: true,
+              inventory_mode: "simple",
+              area: "indoor",
+              table_id: null,
+            };
+            break;
           case "/api/reception/table-requests":
-            data = readyRequests.filter(item=>item.status === "pending");
+            data = readyRequests.filter((item) => item.status === "pending");
             break;
           case "/api/wait-estimate":
             data = { minutes: 30 };
@@ -224,7 +254,7 @@ test(
               users: [
                 {
                   id: 1,
-                  username: "manager",
+                  username: staffUsername,
                   role: "manager",
                   active: 1,
                   has_pin: true,
@@ -276,7 +306,10 @@ test(
       });
       for (const width of [320, 390, 1440]) {
         mode = "detailed";
-        readyRequests.length=0;
+        readyRequests.length = 0;
+        tables[0].name = "Indoor 1";
+        staffUsername = "manager";
+        guests[0].name = "Test Guest with a longer name";
         tables[0].status = "occupied";
         occupied = 1;
         const context = await browser.newContext({
@@ -302,8 +335,11 @@ test(
           .click();
         await page.waitForURL("**/manager");
         await page.getByText("Switch Workspace", { exact: true }).waitFor();
-        await page.getByText("Monday",{exact:true}).waitFor();
-        await page.getByLabel("Total anonymous tables",{exact:true}).first().waitFor();
+        await page.getByText("Monday", { exact: true }).waitFor();
+        await page
+          .getByLabel("Total anonymous tables", { exact: true })
+          .first()
+          .waitFor();
         assert.ok(
           await page.evaluate(
             () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -354,7 +390,8 @@ test(
           .waitFor({ state: "visible" });
         await dialog.locator("svg").waitFor();
         assert.ok((await dialog.locator("svg").count()) === 1);
-        if(width === 390) await page.screenshot({path:path.join(temp,"qr-mobile.png")});
+        if (width === 390)
+          await page.screenshot({ path: path.join(temp, "qr-mobile.png") });
         await page.keyboard.press("Tab");
         assert.ok(
           await dialog.evaluate((node) =>
@@ -391,17 +428,147 @@ test(
             fullPage: true,
           });
         }
-        occupied=1;
-        await page.getByText("Switch Workspace",{exact:true}).click();
-        await page.getByRole("link",{name:"Waiter",exact:true}).click();await page.waitForURL("**/waiter");
-        await page.getByRole("button",{name:"Table is ready — Indoor",exact:true}).click();
-        await page.getByText("Indoor request sent to Reception.",{exact:true}).waitFor();
-        await page.getByText("Switch Workspace",{exact:true}).click();
-        await page.getByRole("link",{name:"Reception",exact:true}).click();await page.waitForURL(origin+"/");
-        await page.getByRole("button",{name:/Table requests: 1 pending/}).click();
-        assert.equal(await page.getByText("Select the occupied indoor table",{exact:true}).count(),0);
-        await page.getByRole("button",{name:"Approve",exact:true}).click();
-        await page.getByRole("heading",{name:"Table is free!",exact:true}).waitFor();assert.equal(occupied,0);
+        occupied = 1;
+        await page.getByText("Switch Workspace", { exact: true }).click();
+        await page.getByRole("link", { name: "Waiter", exact: true }).click();
+        await page.waitForURL("**/waiter");
+        await page
+          .getByRole("button", { name: "Table is ready — Indoor", exact: true })
+          .click();
+        await page
+          .getByText("Indoor request sent to Reception.", { exact: true })
+          .waitFor();
+        await page.getByText("Switch Workspace", { exact: true }).click();
+        await page
+          .getByRole("link", { name: "Reception", exact: true })
+          .click();
+        await page.waitForURL(origin + "/");
+        await page
+          .getByRole("button", { name: /Table requests: 1 pending/ })
+          .click();
+        assert.equal(
+          await page
+            .getByText("Select the occupied indoor table", { exact: true })
+            .count(),
+          0,
+        );
+        await page
+          .getByRole("button", { name: "Approve", exact: true })
+          .click();
+        await page
+          .getByRole("heading", { name: "Table is free!", exact: true })
+          .waitFor();
+        assert.equal(occupied, 0);
+        mode = "detailed";
+        tables[0].name = "W".repeat(40);
+        staffUsername = "W".repeat(32);
+        guests[0].name = "W".repeat(100);
+        readyRequests.length = 0;
+        readyRequests.push({
+          id: 1,
+          table_id: 1,
+          table_name: tables[0].name,
+          requested_by: staffUsername,
+          inventory_mode: "detailed",
+          status: "pending",
+        });
+        async function assertNoSideScroll(label) {
+          const result = await page.evaluate(() => ({
+            viewport: window.innerWidth,
+            width: document.documentElement.scrollWidth,
+            scrollers: [...document.querySelectorAll("body *")]
+              .filter(
+                (element) =>
+                  !["INPUT", "SELECT", "TEXTAREA"].includes(element.tagName) &&
+                  element.clientWidth > 0 &&
+                  element.scrollWidth > element.clientWidth + 1 &&
+                  ["auto", "scroll"].includes(
+                    getComputedStyle(element).overflowX,
+                  ),
+              )
+              .map((element) => ({
+                tag: element.tagName,
+                class: element.className,
+                width: element.scrollWidth,
+                available: element.clientWidth,
+              })),
+            offenders: [...document.querySelectorAll("body *")]
+              .filter((element) => {
+                const box = element.getBoundingClientRect();
+                return (
+                  box.width > 0 &&
+                  (box.right > window.innerWidth + 1 || box.left < -1)
+                );
+              })
+              .map((element) => ({
+                tag: element.tagName,
+                class: element.className,
+                right: element.getBoundingClientRect().right,
+              }))
+              .slice(0, 8),
+          }));
+          assert.ok(
+            result.width <= width &&
+              result.viewport <= width &&
+              result.scrollers.length === 0,
+            label + " at " + width + "px: " + JSON.stringify(result),
+          );
+        }
+        await page.goto(origin + "/management");
+        await page.getByText(staffUsername, { exact: true }).first().waitFor();
+        await page.getByText("Monday", { exact: true }).waitFor();
+        await assertNoSideScroll("Long Manager content");
+        await page.getByText("Switch Workspace", { exact: true }).click();
+        await assertNoSideScroll("Open workspace selector");
+        await page.goto(origin + "/waiter");
+        await page
+          .getByRole("heading", { name: tables[0].name, exact: true })
+          .waitFor();
+        await assertNoSideScroll("Long Waiter content");
+        await page.goto(origin + "/");
+        await page
+          .getByRole("heading", { name: guests[0].name, exact: true })
+          .waitFor();
+        await assertNoSideScroll("Long Reception content");
+        await page
+          .getByRole("button", { name: /Table requests: 1 pending/ })
+          .click();
+        await page
+          .getByRole("button", { name: "Approve", exact: true })
+          .waitFor();
+        await assertNoSideScroll("Open request panel");
+        await page
+          .getByRole("button", { name: /Table requests: 1 pending/ })
+          .click();
+        await page
+          .getByRole("button", {
+            name: "More actions for " + guests[0].name,
+            exact: true,
+          })
+          .click();
+        await assertNoSideScroll("Open guest menu");
+        await page
+          .getByRole("button", { name: "Seat " + guests[0].name, exact: true })
+          .click();
+        await page
+          .getByRole("dialog", { name: "Assign table", exact: true })
+          .waitFor();
+        await assertNoSideScroll("Seating dialog");
+        await page.getByRole("button", { name: "Close", exact: true }).click();
+        await page.getByRole("button", { name: "QR Code" }).click();
+        await page
+          .getByRole("dialog", { name: "Mo Bistro", exact: true })
+          .waitFor();
+        await assertNoSideScroll("QR dialog");
+        await page.goto(origin + "/management/staff-pins");
+        await page.getByRole("combobox").selectOption("1");
+        await page.getByLabel("New six-digit PIN", { exact: true }).waitFor();
+        await assertNoSideScroll("Staff PIN form");
+        await page.goto(origin + "/login/pin");
+        await page
+          .getByLabel("Staff username", { exact: true })
+          .fill(staffUsername);
+        await assertNoSideScroll("PIN login");
         await context.close();
       }
       for (const role of ["reception", "waiter"]) {
