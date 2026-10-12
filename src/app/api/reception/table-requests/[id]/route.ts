@@ -73,9 +73,8 @@ export async function PATCH(
         return { error: "Request already processed", status: 409 };
       }
 
+      let selectedTableId = pending.table_id;
       if (action === "approve") {
-        let selectedTableId = pending.table_id;
-
         if (pending.area) {
           const supplied = Number(body?.table_id);
 
@@ -123,6 +122,10 @@ export async function PATCH(
         `;
       }
 
+      if (action === "approve") {
+        await tx`UPDATE table_ready_requests SET status='cancelled', reviewed_by=${staff.id}, reviewed_at=NOW()
+          WHERE table_id=${selectedTableId} AND id <> ${requestId} AND status='pending'`;
+      }
       const newStatus = action === "approve" ? "approved" : "rejected";
 
       await tx`
@@ -137,7 +140,7 @@ export async function PATCH(
         success: true,
         request_id: requestId,
         status: newStatus,
-        table_id: action === "approve" ? Number(body?.table_id || pending.table_id) : pending.table_id
+        table_id: action === "approve" ? Number(selectedTableId) : pending.table_id
       };
     });
 

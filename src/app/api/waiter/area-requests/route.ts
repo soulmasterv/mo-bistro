@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { currentStaff } from "@/lib/staff-auth";
 import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
+import { databaseFailure, databaseErrorCode } from "@/lib/database-errors";
 import { getPostgres } from "@/lib/postgres-db";
 
 export const runtime = "nodejs";
@@ -72,9 +73,12 @@ export async function POST(request: Request) {
       const [created] = await tx`
         INSERT INTO table_ready_requests(area, requested_by)
         VALUES (${area}, ${staff.id})
+        ON CONFLICT (area, requested_by) WHERE status = 'pending' AND area IS NOT NULL
+        DO NOTHING
         RETURNING id
       `;
 
+      if (!created) return { error: "You already have a pending request for this area", status: 409 };
       return { success: true, request_id: created.id };
     });
 
@@ -87,11 +91,12 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    console.error("Area request failed:", error);
+    console.error("Area request failed:", databaseErrorCode(error) ?? "unavailable");
+    const failure = databaseFailure(error, "Unable to submit area request.", "migrations/20261012_request_schema_repair.sql");
 
     return NextResponse.json(
-      { error: "Unable to submit area request. Check that the migration has been applied." },
-      { status: 503 }
+      { error: failure.error },
+      { status: failure.status }
     );
   }
 }

@@ -1,13 +1,10 @@
-import { hashCredential, verifyCredential, setSessionCookie } from "@/lib/staff-auth-utils";
 export { hashCredential, verifyCredential, setSessionCookie } from "@/lib/staff-auth-utils";
-import { currentStaffPostgres, getSettingPostgres } from "@/lib/staff-auth-postgres";
+import { currentStaffPostgres } from "@/lib/staff-auth-postgres";
 import "server-only";
 import db from "@/lib/db";
 import {
   createHmac,
   randomBytes,
-  scryptSync,
-  timingSafeEqual,
 } from "node:crypto";
 import { cookies } from "next/headers";
 

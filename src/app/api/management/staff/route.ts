@@ -1,3 +1,4 @@
+import { databaseErrorCode, databaseFailure } from "@/lib/database-errors";
 import { getPostgres } from "@/lib/postgres-db";
 import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
@@ -55,8 +56,13 @@ export async function POST(request: Request) {
         RETURNING id
       `;
       return NextResponse.json({ id: row.id, username, role }, { status: 201 });
-    } catch {
-      return NextResponse.json({ error: "Username already exists or could not be created" }, { status: 409 });
+    } catch (error) {
+      if (databaseErrorCode(error) === "23505") {
+        return NextResponse.json({ error: "Username already exists." }, { status: 409 });
+      }
+      console.error("Staff creation failed:", databaseErrorCode(error) ?? "unavailable");
+      const failure = databaseFailure(error, "Unable to create staff account.", "migrations/20261010_staff_pin_login.sql");
+      return NextResponse.json({ error: failure.error }, { status: failure.status });
     }
   }
 

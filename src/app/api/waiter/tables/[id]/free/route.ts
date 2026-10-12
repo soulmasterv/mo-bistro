@@ -1,3 +1,4 @@
+import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { NextResponse } from "next/server";
 import { currentStaff } from "@/lib/staff-auth";
@@ -16,22 +17,8 @@ export async function POST(
   if (licenseError) return licenseError;
 
 
-  const origin = request.headers.get("origin");
-  const host = request.headers.get("host");
-
-  if (origin) {
-    let originHost: string;
-
-    try {
-      originHost = new URL(origin).host;
-    } catch {
-      return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
-    }
-
-    if (!host || originHost !== host) {
-      return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
-    }
-  }
+  const originError = rejectCrossOrigin(request);
+  if (originError) return originError;
 
   const { id } = await context.params;
   const tableId = Number(id);

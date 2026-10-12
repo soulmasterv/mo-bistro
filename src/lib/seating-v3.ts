@@ -160,10 +160,11 @@ export function releaseTable(tableId: number) {
 
   const transaction = db.transaction(() => {
     const table = db.prepare(
-      "SELECT id FROM restaurant_tables WHERE id=?"
-    ).get(tableId);
+      "SELECT id,status FROM restaurant_tables WHERE id=?"
+    ).get(tableId) as { id: number; status: string } | undefined;
 
     if (!table) throw new Error("Table not found");
+    if (table.status !== "occupied") throw new Error("Table is no longer occupied");
 
     db.prepare(`
       UPDATE seating_history

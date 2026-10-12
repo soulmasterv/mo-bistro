@@ -1,3 +1,4 @@
+import { databaseFailure, databaseErrorCode } from "@/lib/database-errors";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { currentStaff } from "@/lib/staff-auth";
@@ -11,8 +12,8 @@ const shiftSchema = z.object({
   staff_id: z.number().int().positive(),
   weekday: z.number().int().min(0).max(6),
   is_off: z.boolean(),
-  start_time: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/).nullable(),
-  end_time: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/).nullable(),
+  start_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(),
+  end_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(),
 }).refine(value =>
   value.is_off
     ? value.start_time === null && value.end_time === null
@@ -25,6 +26,8 @@ export async function GET() {
   if (staff?.role !== "manager") {
     return NextResponse.json({ error: "Manager access required." }, { status: 403 });
   }
+  const licenseError = await requireActiveLicense();
+  if (licenseError) return licenseError;
   if (process.env.MO_BISTRO_DB !== "postgres") {
     return NextResponse.json({ error: "PostgreSQL required." }, { status: 503 });
   }
@@ -38,10 +41,11 @@ export async function GET() {
       FROM staff_shifts
       ORDER BY staff_id, weekday
     `;
-    return NextResponse.json({ shifts });
+    return NextResponse.json({ shifts }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    console.error("Staff shifts load failed:", error);
-    return NextResponse.json({ error: "Unable to load shifts. Apply the test migration first." }, { status: 500 });
+    console.error("Staff shifts load failed:", databaseErrorCode(error) ?? "unavailable");
+    const failure = databaseFailure(error, "Unable to load shifts.", "migrations/20261011_staff_shifts.sql");
+    return NextResponse.json({ error: failure.error }, { status: failure.status });
   }
 }
 
@@ -89,7 +93,8 @@ export async function PUT(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Staff shift save failed:", error);
-    return NextResponse.json({ error: "Unable to save shift." }, { status: 500 });
+    console.error("Staff shift save failed:", databaseErrorCode(error) ?? "unavailable");
+    const failure = databaseFailure(error, "Unable to save shift.", "migrations/20261011_staff_shifts.sql");
+    return NextResponse.json({ error: failure.error }, { status: failure.status });
   }
 }

@@ -1,3 +1,5 @@
+import { getSetting } from "@/lib/staff-auth";
+import { getSettingPostgres } from "@/lib/staff-auth-postgres";
 import { hasGuestEtaColumn } from "@/lib/guest-eta-support";
 import { getPostgres } from "@/lib/postgres-db";
 import { NextResponse } from "next/server";
@@ -46,6 +48,10 @@ export async function GET(request: Request) {
     return json({ error: "Invalid tracking link." }, 400);
   }
 
+  const confirmationRequired = (process.env.MO_BISTRO_DB === "postgres"
+    ? await getSettingPostgres("approval_required", "true")
+    : getSetting("approval_required", "true")) === "true";
+
   if (process.env.MO_BISTRO_DB === "postgres") {
     const sql = getPostgres();
     const hasEta = await hasGuestEtaColumn();
@@ -65,6 +71,7 @@ export async function GET(request: Request) {
            OR (created_at = ${guest.created_at} AND id < ${guest.id}))
     `)[0].count) : null;
     return json({
+      confirmation_required: confirmationRequired,
       guest: { name: guest.name, party_size: guest.party_size,
         status: guest.status, confirmed: Boolean(guest.confirmed),
         created_at: guest.created_at },
@@ -98,6 +105,7 @@ export async function GET(request: Request) {
     : null;
 
   return json({
+    confirmation_required: confirmationRequired,
     guest: {
       name: guest.name,
       party_size: guest.party_size,

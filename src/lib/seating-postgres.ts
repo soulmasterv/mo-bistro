@@ -49,11 +49,18 @@ export async function releaseTablePostgres(tableId: number) {
   const sql = getPostgres();
   return sql.begin(async tx => {
     await tx`SELECT pg_advisory_xact_lock(741122)`;
-    const [table] = await tx`SELECT id FROM restaurant_tables WHERE id=${tableId} FOR UPDATE`;
+    const [table] = await tx`SELECT id,status FROM restaurant_tables WHERE id=${tableId} FOR UPDATE`;
     if (!table) throw new Error("Table not found");
+    if (table.status !== "occupied") throw new Error("Table is no longer occupied");
     await tx`UPDATE seating_history SET released_at=CURRENT_TIMESTAMP WHERE table_id=${tableId} AND released_at IS NULL`;
     await tx`UPDATE guests SET table_id=NULL,updated_at=CURRENT_TIMESTAMP WHERE table_id=${tableId} AND status='seated'`;
     await tx`UPDATE restaurant_tables SET status='free',updated_at=CURRENT_TIMESTAMP WHERE id=${tableId}`;
+    // Older databases may not yet have the optional request workflow installed.
+    const [schema] = await tx`SELECT to_regclass('public.table_ready_requests') IS NOT NULL AS available`;
+    if (schema.available) {
+      await tx`UPDATE table_ready_requests SET status='cancelled',reviewed_at=NOW()
+        WHERE table_id=${tableId} AND status='pending'`;
+    }
     return { success: true, table_id: tableId, status: "free" };
   });
 }

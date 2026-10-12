@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentStaff } from "@/lib/staff-auth";
 import { getPostgres } from "@/lib/postgres-db";
-import { getSettingPostgres } from "@/lib/staff-auth-postgres";
+
 
 export const runtime = "nodejs";
 
@@ -29,7 +29,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Table is not available" }, { status: 409 });
     }
 
-    const override = (await getSettingPostgres("allow_area_override", "false")) === "true";
+    const [setting] = await sql`SELECT value FROM seating_settings WHERE key = 'allow_area_override'`;
+    const override = (setting?.value ?? "true") === "true";
     const guests = await sql`
       SELECT id, name, party_size, seating_preference
       FROM guests
