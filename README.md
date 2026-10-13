@@ -8,6 +8,8 @@ Development is on `feature/mo-bistro-ui-rebuild`. Preview and Production require
 
 Latest plan reconciliation and verification: `docs/stabilization-readiness-20261013.md`. Missing Preview customer-window table procedure: `docs/preview-window-migration-procedure.md` (prepared only, separate approval required).
 
+Migration-backed QA harness preparation and current test evidence: `docs/migration-backed-harness-readiness.md`.
+
 ## Local setup
 
 Install dependencies from the lockfile with `npm ci`. Use `npm run dev` for the application, `npm run build` for compilation and TypeScript validation, and `npm run lint` for lint. See `.env.example` for variable names; do not commit `.env` files or real credentials.
@@ -46,7 +48,7 @@ The canonical confirmation key is `approval_required`. Existing `require_confirm
 - Mock-only checks: `node --test tests/core-stabilization.test.mjs tests/next-guest.test.mjs tests/regressions.test.mjs tests/whatsapp-customer-window.test.mjs tests/whatsapp-preview-test.test.mjs tests/whatsapp-webhook-failure.test.mjs tests/whatsapp-webhook-verification.test.mjs`.
 - `tests/browser-workflows.test.mjs` renders actual components with synthetic APIs; this is not a deployed Preview/database test.
 - Existing `tests/postgres-workflows.test.mjs` and `tests/whatsapp.test.mjs` use in-memory PGlite. They do not prove Neon connection/lock behavior.
-- `tests/isolated-postgres-concurrency.test.mjs` is a distinct opt-in real PostgreSQL harness. Its database cases remain skipped without an explicitly approved dedicated target; pure safety-gate assertions still run. Use a secure config-file argument without environment changes, as documented in `docs/isolated-postgres-concurrency-plan.md`. Existing dedicated test URL/ack variables remain supported. Only an empty, verified `mo_bistro_qa_*` database is accepted; mo_bistro_2 and app URL matches are refused. It creates/removes only a generated schema. No actual PostgreSQL run occurred in this task.
+- `tests/isolated-postgres-concurrency.test.mjs` is a distinct opt-in real PostgreSQL harness. Its database cases remain skipped without an explicitly approved dedicated target; pure safety-gate assertions still run. Use a secure config-file argument without environment changes, as documented in `docs/isolated-postgres-concurrency-plan.md`. Existing dedicated test URL/ack variables remain supported. Only an empty, verified `mo_bistro_qa_*` database is accepted; mo_bistro_2 and app URL matches are refused. It applies the six documented core migrations unchanged to public, then uses synthetic fixtures. It closes connections without dropping schemas/databases; a populated database cannot be reused. No actual PostgreSQL run occurred during harness preparation.
 
 ## Workflows and operational limitations
 
