@@ -1,5 +1,6 @@
 import "server-only";
 import { recordPreviewInbound, recordPreviewDelivery } from "@/lib/whatsapp/preview-test";
+import { recordCustomerWindow } from "@/lib/whatsapp/customer-window";
 import { getPostgres } from "@/lib/postgres-db";
 import { hashCode, isStop, normalizePhone, parseSubscription } from "@/lib/whatsapp/policy";
 import { scheduleAlmostReady, scheduleReview } from "@/lib/whatsapp/service";
@@ -26,6 +27,7 @@ export async function processMetaWebhook(payload: MetaPayload) {
       const phone = normalizePhone(message.from);
       const timestamp = Number(message.timestamp);
       if (!Number.isSafeInteger(timestamp) || timestamp <= 0 || timestamp * 1000 > Date.now()+300_000) continue;
+      await recordCustomerWindow(sql, phone, timestamp);
       if (await recordPreviewInbound(message.id, phone, timestamp)) continue;
       const text = message.type === "button" ? message.button?.payload || "" :
         message.type === "text" ? message.text?.body || "" : "";

@@ -71,3 +71,15 @@ test('isolated signed test webhook never drains the customer outbox',async()=>{
   const r=await h.route('whatsapp/webhook').POST(request('POST',{object:'whatsapp_business_account',entry:[]}));
   assert.equal(r.status,200);assert.equal(processed,1);assert.equal(dispatched,0);
 });
+
+test('Management GET reports blocked schema visibly and does not send',async()=>{
+  let sends=0;
+  const globals={process:{env:{VERCEL_ENV:'preview',META_WHATSAPP_ACCESS_TOKEN:'synthetic',META_GRAPH_API_VERSION:'v1.0',META_WHATSAPP_PHONE_NUMBER_ID:'1234'}}};
+  const h=harness();h.mocks['@/lib/whatsapp/preview-test']={previewTestRecipient:()=> '201000000000',previewTestState:async()=>{throw Error('missing relation');},sendPreviewTest:()=>{sends++;}};
+  const endpoint=load('src/app/api/whatsapp/test/route.ts',h.mocks,globals);
+  const body=await(await endpoint.GET()).json();assert.equal(body.visible,true);assert.equal(body.enabled,false);assert.match(body.reason,/20261012_whatsapp_preview_test/);assert.equal(sends,0);
+});
+test('Management GET remains hidden outside Preview',async()=>{
+ const h=harness();const endpoint=load('src/app/api/whatsapp/test/route.ts',h.mocks,{process:{env:{VERCEL_ENV:'production'}}});
+ assert.deepEqual(await(await endpoint.GET()).json(),{visible:false,enabled:false});
+});

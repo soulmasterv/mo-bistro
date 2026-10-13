@@ -4,7 +4,8 @@ import type { TransactionSql } from "postgres";
 import { getPostgres } from "@/lib/postgres-db";
 import { CONSENT_VERSION, whatsappEnabled, normalizePhone, subscriptionCode, hashCode,
   eligible, dueTime, type NotificationKind, type Eligibility } from "@/lib/whatsapp/policy";
-import { publishJob, sendTemplate, templatePayload } from "@/lib/whatsapp/transport";
+import { sendWindowNotification } from "@/lib/whatsapp/customer-window";
+import { publishJob } from "@/lib/whatsapp/transport";
 type DeliveryBooking = Eligibility & { id: string; guest_id: number; name: string; phone: string;
   revision: number; attempts: number; tracking_token_hash: string; subscription_expires_at: Date };
 
@@ -126,9 +127,9 @@ export async function deliverNotification(id: string, revision: number): Promise
     }
     let result;
     try {
-      result = await sendTemplate(templatePayload({ id,kind,guest_id:booking.guest_id },booking,
-        subscriptionCode(booking.guest_id,booking.tracking_token_hash)));
-    } catch { result = { state: "failed" as const,error: "template_configuration_missing" }; }
+      result = await sendWindowNotification(tx,{ id,kind,guest_id:booking.guest_id },booking,
+        subscriptionCode(booking.guest_id,booking.tracking_token_hash));
+    } catch { result = { state: "failed" as const,error: "notification_configuration_missing" }; }
     const retry = result.state === "pending" && booking.attempts < 6;
     const state = result.state === "pending" && !retry ? "failed" : result.state;
     await tx`UPDATE whatsapp_notifications SET status=${state},provider_message_id=${result.messageId ?? null},

@@ -248,6 +248,10 @@ test(
               guest: guests[0],
             };
             break;
+          case "/api/whatsapp/test":
+            if(req.method!=="GET")throw Error("Browser checks must never attempt a WhatsApp send");
+            data={visible:true,enabled:false,reason:"Check Preview test migration."};
+            break;
           case "/api/whatsapp/config":
             data = { available: true };
             break;
@@ -447,6 +451,8 @@ test(
         await page.waitForURL("**/manager");
         await page.getByLabel("Open menu", { exact: true }).waitFor();
         await page.getByText("Monday", { exact: true }).waitFor();
+        await page.getByRole("button",{name:"Send Test WhatsApp",exact:true}).waitFor();
+        assert.equal(await page.getByRole("button",{name:"Send Test WhatsApp",exact:true}).isDisabled(),true);
         async function chooseTheme(value) {
           if (
             !(await page

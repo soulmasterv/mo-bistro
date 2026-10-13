@@ -72,7 +72,6 @@ export default function ManagementPage() {
 
   return (
     <main className="bistro-app bistro-management">
-      <WhatsAppPreviewTest />
       <div className="bistro-container">
         <header className="bistro-page-heading">
           <div>
@@ -84,6 +83,7 @@ export default function ManagementPage() {
             <i /> Manager workspace
           </span>
         </header>
+        <WhatsAppPreviewTest />
         <section className="bistro-management-overview">
           <article>
             <span className="bistro-overview-icon">

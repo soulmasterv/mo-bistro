@@ -50,7 +50,7 @@ export async function verifyQstash(raw: string, signature: string | null, path: 
     .verify({ signature, body: raw, url: callbackUrl(path) }); } catch { return false; }
 }
 
-export type SendResult = { state: "sent" | "simulated" | "pending" | "failed" | "unknown";
+export type SendResult = { state: "sent" | "simulated" | "pending" | "failed" | "unknown" | "skipped";
   messageId?: string; providerStatus?: number; error?: string };
 export async function sendTemplate(payload: ReturnType<typeof templatePayload>): Promise<SendResult> {
   if (!liveSendingEnabled()) return { state: "simulated" };
