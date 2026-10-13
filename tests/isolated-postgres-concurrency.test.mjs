@@ -31,6 +31,13 @@ test("actual isolated PostgreSQL booking, permits, seating and queue concurrency
   const admin=postgres({...options,max:1});
   let sql,reserved;
   try {
+    // With fetch_types disabled, postgres.js can leave a cold reserve pending.
+    // Open the connection with a read-only identity check before reserving it.
+    const [initialIdentity]=await admin`SELECT current_database() AS database_name,
+      current_user AS role_name,current_schema() AS schema_name`;
+    assert.equal(initialIdentity.database_name,target.database);
+    assert.equal(initialIdentity.role_name,target.user);
+    assert.equal(initialIdentity.schema_name,"public");
     reserved=await admin.reserve();
     const applied=await initializeQa(reserved,target,migrations);
     console.log("QA migrations applied in documented order:",applied.join(", "));
