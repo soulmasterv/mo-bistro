@@ -35,8 +35,13 @@ export async function GET(request: Request) {
   });
 }
 export async function POST(request: Request) {
-  if (!whatsappEnabled())
+  if (!whatsappEnabled()) {
+    console.error("WhatsApp webhook disabled", {
+      integrationEnabled: process.env.WHATSAPP_ENABLED === "true",
+      postgresMode: process.env.MO_BISTRO_DB === "postgres",
+    });
     return Response.json({ error: "Disabled" }, { status: 503 });
+  }
   let raw;
   try {
     raw = await readWebhookBody(request);
@@ -67,7 +72,12 @@ export async function POST(request: Request) {
       }
     });
     return Response.json({ received: true });
-  } catch {
+  } catch (error) {
+    // Log only a bounded database error code; never payloads, phones, tokens,
+    // connection strings, SQL text or the provider's raw error message.
+    const candidate = error && typeof error === "object" && "code" in error ? error.code : null;
+    const code = typeof candidate === "string" && /^[A-Z0-9]{5}$/.test(candidate) ? candidate : "unavailable";
+    console.error("WhatsApp webhook processing failed", { code });
     return Response.json(
       { error: "Webhook processing unavailable" },
       { status: 503 },
