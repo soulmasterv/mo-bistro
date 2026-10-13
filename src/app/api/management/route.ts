@@ -1,3 +1,4 @@
+import { confirmationRequired } from "@/lib/confirmation-policy";
 import { getPostgres } from "@/lib/postgres-db";
 import { getSettingPostgres, initStaffPostgres } from "@/lib/staff-auth-postgres";
 import { requireActiveLicense } from "@/lib/licensing/enforce";
@@ -39,7 +40,7 @@ export async function GET() {
       settings: {
         qr_rotation_seconds: await getSettingPostgres("qr_rotation_seconds", "300"),
         qr_required: (await getSettingPostgres("qr_required", "false")) === "true",
-        approval_required: (await getSettingPostgres("approval_required", "true")) === "true",
+        approval_required: await confirmationRequired(),
         queue_capacity: Number(await getSettingPostgres("queue_capacity", "50")),
         restaurant_name: await getSettingPostgres("restaurant_name", "The Restaurant"),
       },
@@ -60,7 +61,7 @@ export async function GET() {
       qr_rotation_seconds: getSetting("qr_rotation_seconds", "300"),
       qr_required: getSetting("qr_required", "false") === "true",
       approval_required:
-        getSetting("approval_required", "true") === "true",
+        await confirmationRequired(),
       queue_capacity: Number(getSetting("queue_capacity", "50")),
       restaurant_name: getSetting("restaurant_name", "The Restaurant"),
     },
@@ -93,6 +94,7 @@ export async function PATCH(request: Request) {
     if (process.env.MO_BISTRO_DB === "postgres") {
       const sql = getPostgres();
       await sql.begin(async (tx) => {
+        await tx`SELECT pg_advisory_xact_lock(91401283)`;
         for (const [key, value] of Object.entries(parsed.data)) {
           await tx`
             INSERT INTO restaurant_settings(key,value) VALUES (${key},${String(value)})

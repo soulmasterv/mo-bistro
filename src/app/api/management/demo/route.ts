@@ -1,3 +1,4 @@
+import { testEnvironmentAllowed } from "@/lib/test-environment";
 import { getPostgres } from "@/lib/postgres-db";
 import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { NextResponse } from "next/server";
@@ -5,6 +6,7 @@ import db from "@/lib/db";
 import { currentStaff } from "@/lib/staff-auth";
 
 export async function POST(request: Request) {
+  if(!testEnvironmentAllowed())return NextResponse.json({error:"Not found"},{status:404});
   const staff = await currentStaff();
 
   if (staff?.role !== "manager") {

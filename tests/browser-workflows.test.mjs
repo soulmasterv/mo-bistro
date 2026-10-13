@@ -262,7 +262,7 @@ test(
             data = {available:true,subscribed:subscriptionSubscribed,feedbackConsent:true,feedbackEditable,url:"https://wa.me/201000000000?text=SUBSCRIBE"};
             break;
           case "/api/reception/next-guest":
-            data={area:new URL(req.url,"http://fixture.test").searchParams.get("area"),available:true,guest:{id:guests[0].id,name:guests[0].name,party_size:guests[0].party_size}};
+            data={areas:[{area:"indoor",available:true,guest:{id:guests[0].id,name:guests[0].name,party_size:guests[0].party_size}},{area:"outdoor",available:true,guest:null}]};
             break;
           case "/api/track":
             data = {confirmation_required:true, guest:{name:"Omar Hassan",party_size:2,status:trackingStatus,confirmed:true,created_at:new Date().toISOString()}, queue_position:3,guests_ahead:2};
@@ -284,7 +284,11 @@ test(
           case "/api/auth/me":
             data = { id: 1, role, username: role };
             break;
+          case "/api/guests/4/eta":
+          case "/api/guests/1/eta":
+            data={success:true,eta_at:null};break;
           case "/api/guests":
+            if(req.method==="POST"){data={success:true,id:900,token:"f".repeat(64)};break;}
             data = guests.map((guest) => ({
               ...guest,
               confirmation_required: false,
@@ -630,6 +634,12 @@ test(
             .getAttribute("href"),
           "https://wa.me/2" + unconfirmed.phone,
         );
+        await sheet.getByText("Expected table readiness",{exact:true}).click();
+        await sheet.getByLabel("Minutes from now",{exact:true}).fill("20");
+        await sheet.getByRole("button",{name:"Save ETA",exact:true}).click();
+        await sheet.getByText("Expected readiness saved.",{exact:true}).waitFor();
+        await sheet.getByRole("button",{name:"Clear ETA",exact:true}).click();
+        await sheet.getByText("Expected readiness cleared.",{exact:true}).waitFor();
         await page.keyboard.press("Escape");
         await sheet.waitFor({ state: "hidden" });
 
@@ -755,8 +765,13 @@ test(
           await page.screenshot({
             path: path.join(screenshots, `add-guest-${width}.png`),
           });
-        await page.keyboard.press("Escape");
+        await add.getByLabel("Phone number",{exact:true}).fill("01012345677");
+        await add.getByRole("button",{name:"Add to waitlist",exact:true}).click();
         await add.waitFor({ state: "hidden" });
+        const handoff=page.getByRole("dialog",{name:"Guest tracking link",exact:true});await handoff.waitFor();
+        assert.equal(await handoff.locator("svg").count(),1);
+        if(screenshots)await page.screenshot({path:path.join(screenshots,`tracking-handoff-${width}.png`)});
+        await page.keyboard.press("Escape");await handoff.waitFor({state:"hidden"});
         await page
           .getByRole("button", { name: "Seat Omar Hassan", exact: true })
           .click();
@@ -1125,7 +1140,7 @@ test(
           if(status==="seated") {
             await guest.getByRole("heading",{name:"You’re seated!",exact:true}).waitFor();
             assert.equal(await guest.getByText("Queue position",{exact:true}).count(),0);
-            assert.equal(await guest.getByText("Guests ahead",{exact:true}).count(),0);
+            assert.equal(await guest.getByText("Parties ahead",{exact:true}).count(),0);
             assert.equal(await guest.getByRole("button",{name:"Refresh status"}).count(),0);
             assert.equal(await guest.getByRole("link",{name:"Subscribe to WhatsApp updates"}).count(),0);
           }

@@ -1,4 +1,5 @@
 "use client";
+import GuestEtaEditor from "@/components/guest-eta-editor";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Phone, Users, MessageCircle, Clock } from "lucide-react";
@@ -32,11 +33,13 @@ export default function GuestDetailSheet({
   onClose,
   onSeat,
   onAction,
+  onRefresh,
 }: {
   guest: Guest;
   busy: boolean;
   error: string;
   onClose: () => void;
+  onRefresh: () => void;
   onSeat: () => void;
   onAction: (action: "call" | "confirm" | "cancel" | "no_show") => void;
 }) {
@@ -214,6 +217,7 @@ export default function GuestDetailSheet({
             automatically.
           </p>
         </details>
+        {["waiting","called"].includes(guest.status) && <GuestEtaEditor guestId={guest.id} onSaved={onRefresh} />}
         {guest.status === "waiting" && (
           <button
             type="button"

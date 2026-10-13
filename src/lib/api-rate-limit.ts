@@ -7,7 +7,8 @@ export async function checkRateLimit(
   request: Request,
   endpoint: string,
   maxRequests: number,
-  windowSeconds: number
+  windowSeconds: number,
+  subject?: string
 ) {
   if (process.env.MO_BISTRO_DB !== "postgres") return null;
 
@@ -30,7 +31,7 @@ export async function checkRateLimit(
   }
 
   const key = createHmac("sha256", secret)
-    .update(`${endpoint}:${ip}`)
+    .update(`${endpoint}:${subject ?? ip}`)
     .digest("hex");
 
   const now = Date.now();

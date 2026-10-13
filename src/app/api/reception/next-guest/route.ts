@@ -1,3 +1,4 @@
+import { nextGuestsByArea } from "@/lib/next-guest-suggestions";
 import { NextResponse } from "next/server";
 import { currentStaff } from "@/lib/staff-auth";
 import { getPostgres } from "@/lib/postgres-db";
@@ -15,6 +16,10 @@ export async function GET(request: Request) {
   }
 
   const params = new URL(request.url).searchParams;
+  if(params.get("areas")==="all") {
+    try{return NextResponse.json({areas:await nextGuestsByArea()},{headers:{"Cache-Control":"no-store"}});}
+    catch{return NextResponse.json({error:"Unable to find next guests"},{status:503});}
+  }
   const area = params.get("area");
   if (area !== null) {
     if (!["indoor","outdoor"].includes(area)) return NextResponse.json({error:"Invalid area"},{status:400});

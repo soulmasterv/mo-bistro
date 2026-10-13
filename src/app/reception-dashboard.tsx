@@ -1,4 +1,5 @@
 "use client";
+import TrackingHandoff from "@/components/tracking-handoff";
 import NextGuestPanel from "@/components/next-guest-panel";
 import ReceptionTableRequests from "@/components/reception-table-requests";
 import TableReadyNotifications from "@/components/table-ready-notifications";
@@ -74,6 +75,7 @@ export default function Home() {
   >("all");
   const [openGuestMenu, setOpenGuestMenu] = useState<number | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [trackingUrl,setTrackingUrl]=useState("");
   const addDialog = useRef<HTMLDivElement>(null);
   useStaffDialog(showAdd, addDialog, () => setShowAdd(false));
   const qrDialog = useRef<HTMLDivElement>(null);
@@ -265,6 +267,7 @@ export default function Home() {
       setParty(2);
       setSeatingPreference("any");
       setShowAdd(false);
+      if(typeof result.token==="string" && /^[a-f0-9]{64}$/.test(result.token))setTrackingUrl(`${window.location.origin}/status?token=${encodeURIComponent(result.token)}`);
       await loadGuests(true);
     } catch (err) {
       setAddError(err instanceof Error ? err.message : "Unable to add guest");
@@ -663,6 +666,7 @@ export default function Home() {
       </nav>
       {selectedGuest && (
         <GuestDetailSheet
+          onRefresh={()=>void loadGuests(true)}
           key={selectedGuest.id}
           guest={selectedGuest}
           busy={busy}
@@ -875,6 +879,7 @@ export default function Home() {
         </div>
       )}
 
+      {trackingUrl && <TrackingHandoff url={trackingUrl} onClose={()=>setTrackingUrl("")}/>}
       {seatingGuest && (
         <SeatGuestModal
           guest={seatingGuest}

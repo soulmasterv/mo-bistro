@@ -1,3 +1,10 @@
+import { createBookingPostgres } from "@/lib/booking-creation";
+import { confirmationRequired } from "@/lib/confirmation-policy";
+import {
+  initializeTracking,
+  newTrackingToken,
+  hashTrackingToken,
+} from "@/lib/guest-tracking";
 import { hasGuestEtaColumn } from "@/lib/guest-eta-support";
 import { getPostgres } from "@/lib/postgres-db";
 import { requireActiveLicense } from "@/lib/licensing/enforce";
@@ -39,12 +46,11 @@ export async function GET() {
         confirmed, table_id, created_at, updated_at, NULL AS eta_at FROM guests
       ORDER BY created_at ASC, id ASC
     `;
-    const [confirmation] =
-      await sql`SELECT value FROM restaurant_settings WHERE key='require_confirmation'`;
+    const required = await confirmationRequired();
     return NextResponse.json(
       guests.map((guest) => ({
         ...guest,
-        confirmation_required: confirmation?.value !== "false",
+        confirmation_required: required,
       })),
       { headers: { "Cache-Control": "no-store" } },
     );
@@ -58,13 +64,11 @@ export async function GET() {
     )
     .all();
 
-  const confirmation = db
-    .prepare("SELECT value FROM restaurant_settings WHERE key = ?")
-    .get("require_confirmation") as { value: string } | undefined;
+  const required = await confirmationRequired();
   return NextResponse.json(
     guests.map((guest) => ({
       ...(guest as Record<string, unknown>),
-      confirmation_required: confirmation?.value !== "false",
+      confirmation_required: required,
     })),
     {
       headers: { "Cache-Control": "no-store" },
@@ -93,61 +97,73 @@ export async function POST(request: Request) {
     const { name, phone, party_size, seating_preference } = body.data;
 
     if (process.env.MO_BISTRO_DB === "postgres") {
-      const sql = getPostgres();
-      const rows = await sql.begin(async (tx) => {
-        // Serialize registrations by phone, preventing concurrent duplicates.
-        await tx`SELECT pg_advisory_xact_lock(hashtext(${phone}))`;
-        const existing = await tx`
-          SELECT id FROM guests WHERE phone = ${phone}
-          AND status IN ('waiting', 'called') LIMIT 1
-        `;
-        if (existing.length) return null;
-        const created = await tx`
-          INSERT INTO guests (name, phone, party_size, seating_preference, confirmed)
-          VALUES (${name}, ${phone}, ${party_size}, ${seating_preference}, 1)
-          RETURNING id
-        `;
-        return created[0];
+      const result = await createBookingPostgres(body.data, {
+        source: "staff",
       });
-      return rows
-        ? NextResponse.json({ id: rows.id, success: true }, { status: 201 })
-        : NextResponse.json(
-            { error: "This phone number is already on the active waitlist." },
+      return "error" in result
+        ? NextResponse.json(
+            {
+              error:
+                result.error === "full"
+                  ? "The waitlist is currently full."
+                  : "This phone number is already on the active waitlist.",
+            },
             { status: 409 },
+          )
+        : NextResponse.json(
+            { success: true, ...result },
+            {
+              status: 201,
+              headers: {
+                "Cache-Control": "no-store",
+                "Referrer-Policy": "no-referrer",
+              },
+            },
           );
     }
 
-    const duplicate = db
-      .prepare(
-        `
-      SELECT id FROM guests
-      WHERE phone = ?
-        AND status IN ('waiting', 'called')
-      LIMIT 1
-    `,
-      )
-      .get(phone);
-
-    if (duplicate) {
-      return NextResponse.json(
-        { error: "This phone number is already on the active waitlist." },
-        { status: 409 },
-      );
-    }
-
-    const result = db
-      .prepare(
-        `
-      INSERT INTO guests (name, phone, party_size, seating_preference, confirmed)
-      VALUES (?, ?, ?, ?, 1)
-    `,
-      )
-      .run(name, phone, party_size, seating_preference);
-
-    return NextResponse.json(
-      { id: result.lastInsertRowid, success: true },
-      { status: 201 },
-    );
+    initializeTracking();
+    const token = newTrackingToken();
+    const result = db.transaction(() => {
+      const [capacityRow] = db
+        .prepare(
+          "SELECT value FROM restaurant_settings WHERE key='queue_capacity'",
+        )
+        .all() as { value: string }[];
+      const capacity = Number(capacityRow?.value ?? 50);
+      const active = db
+        .prepare(
+          "SELECT COUNT(*) AS count FROM guests WHERE status IN ('waiting','called')",
+        )
+        .get() as { count: number };
+      if (active.count >= capacity)
+        return { error: "The waitlist is currently full." };
+      const duplicate = db
+        .prepare(
+          "SELECT id FROM guests WHERE phone=? AND status IN ('waiting','called') LIMIT 1",
+        )
+        .get(phone);
+      if (duplicate)
+        return {
+          error: "This phone number is already on the active waitlist.",
+        };
+      const created = db
+        .prepare(
+          "INSERT INTO guests(name,phone,party_size,seating_preference,confirmed,source,tracking_token_hash) VALUES (?,?,?,?,1,'staff',?)",
+        )
+        .run(
+          name,
+          phone,
+          party_size,
+          seating_preference,
+          hashTrackingToken(token),
+        );
+      return { id: Number(created.lastInsertRowid), token, success: true };
+    })();
+    return NextResponse.json(result, {
+      status: "error" in result ? 409 : 201,
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch {
     return NextResponse.json({ error: "Unable to add guest" }, { status: 500 });
   }

@@ -61,7 +61,7 @@ export function initStaff() {
 
   db.prepare(`
     INSERT OR IGNORE INTO restaurant_settings(key,value)
-    VALUES ('approval_required','true')
+    VALUES ('approval_required',COALESCE((SELECT value FROM restaurant_settings WHERE key='require_confirmation'),'true'))
   `).run();
 
   db.prepare(`

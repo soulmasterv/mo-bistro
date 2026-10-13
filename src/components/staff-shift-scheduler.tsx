@@ -148,7 +148,7 @@ export default function StaffShiftScheduler() {
     <section className="mt-6 rounded-2xl border border-white/10 bg-[#17202A] p-5 text-white sm:p-6">
       <h2 className="text-xl font-semibold">Employee shifts</h2>
       <p className="mt-2 text-sm text-slate-400">
-        Set weekly working hours and days off. Overnight shifts are supported.
+        Set weekly working hours and days off. Overnight shifts are supported. This schedule is for planning and does not restrict sign-in.
       </p>
 
       {loading ? (

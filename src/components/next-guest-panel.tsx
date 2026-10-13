@@ -9,11 +9,9 @@ export default function NextGuestPanel() {
   async function refresh() {
    controller?.abort();const current=new AbortController();controller=current;
    try {
-    const results=await Promise.all(["indoor","outdoor"].map(async area=>{
-     const response=await fetch(`/api/reception/next-guest?area=${area}`,{cache:"no-store",signal:current.signal});
-     if(!response.ok)throw Error("Next guest recommendations unavailable.");
-     return response.json();
-    }));
+    const response=await fetch("/api/reception/next-guest?areas=all",{cache:"no-store",signal:current.signal});
+    if(!response.ok)throw Error("Next guest recommendations unavailable.");
+    const results=(await response.json()).areas;
     if(!current.signal.aborted){setItems(results);setError("");}
    }catch{if(!current.signal.aborted){setItems([]);setError("Next guest recommendations unavailable.");}}
   }

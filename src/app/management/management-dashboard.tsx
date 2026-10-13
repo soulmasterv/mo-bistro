@@ -25,7 +25,7 @@ type Settings = {
   restaurant_name: string;
 };
 
-export default function ManagementPage() {
+export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -279,7 +279,7 @@ export default function ManagementPage() {
               </div>
               <ManagementExtras />
               <SeatingSettings />
-              <DemoControls />
+              {showDemo && <DemoControls />}
             </section>
           </div>
         </div>

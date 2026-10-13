@@ -35,6 +35,12 @@ export async function initStaffPostgres() {
   ];
 
   for (const [key, value] of defaults) {
+    if(key==="approval_required") {
+      await sql`INSERT INTO restaurant_settings(key,value)
+        VALUES ('approval_required',COALESCE((SELECT value FROM restaurant_settings WHERE key='require_confirmation'),'true'))
+        ON CONFLICT(key) DO NOTHING`;
+      continue;
+    }
     await sql`
       INSERT INTO restaurant_settings (key, value)
       VALUES (${key}, ${value})

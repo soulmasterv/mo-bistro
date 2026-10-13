@@ -657,6 +657,9 @@ test(
         "INSERT INTO guests(name,phone,party_size,confirmed) VALUES ('Unconfirmed','01012345678',2,0); INSERT INTO restaurant_settings(key,value) VALUES ('require_confirmation','false')",
       );
       const h = routes(db);
+      h.mocks["@/lib/staff-auth-postgres"]={getSettingPostgres:async(key,fallback)=>{
+        const rows=await db.query("SELECT value FROM restaurant_settings WHERE key=$1",[key]);return rows.rows[0]?.value ?? fallback;
+      }};
       const data = await (await h.route("guests").GET()).json();
       assert.equal(data[0].confirmation_required, false);
       assert.equal(data[0].confirmed, 0);

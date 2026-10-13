@@ -206,7 +206,7 @@ function StatusContent() {
                         </dd>
                       </div>
                       <div>
-                        <dt>Guests ahead</dt>
+                        <dt>Parties ahead</dt>
                         <dd>{data.guests_ahead ?? "—"}</dd>
                       </div>
                       <div>

@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mo Bistro
 
-## Getting Started
+A single-restaurant waitlist and seating website: guest registration/tracking, Reception, Waiter, Management, Indoor/Outdoor inventory and optional WhatsApp notifications.
 
-First, run the development server:
+## Source and environments
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Development is on `feature/mo-bistro-ui-rebuild`. Preview and Production require different databases and credentials. Never infer that a Vercel build applies SQL migrations. General WhatsApp defaults to disabled/simulation; do not change live-send flags while validating core workflows.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Local setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Install dependencies from the lockfile with `npm ci`. Use `npm run dev` for the application, `npm run build` for compilation and TypeScript validation, and `npm run lint` for lint. See `.env.example` for variable names; do not commit `.env` files or real credentials.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The cloud feature set uses `MO_BISTRO_DB=postgres`, `MO_BISTRO_POSTGRES_URL` pointing to the selected isolated database, and `STAFF_SESSION_SECRET` of at least 32 characters. Licensing also needs its schema and configuration; `LICENSE_ENFORCEMENT=false` only bypasses enforcement in development, not Preview/Production.
 
-## Learn More
+PostgreSQL public endpoint rate limiting trusts Vercel's `x-vercel-forwarded-for` header. An arbitrary local/reverse-proxy setup cannot spoof an untrusted header as a replacement; missing trusted-edge evidence returns 503 on those endpoints. The Meta webhook does not use that IP limiter.
 
-To learn more about Next.js, take a look at the following resources:
+## Fresh database installation - operator review required
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The following is the proposed schema sequence for an EMPTY, approved isolated database. This sequence has not been executed against Neon by this implementation. Check results with `docs/core-schema-preflight.sql`. Do not run every dated repair file automatically.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. `migrations/001_postgres_schema.sql`
+2. `migrations/002_licensing.sql`
+3. `migrations/20261010_guest_manual_eta.sql`
+4. `migrations/20261012_staff_schema_repair.sql` (PINs, waiter role, shifts)
+5. `migrations/20261012_simple_inventory.sql` (named/area requests and anonymous inventory)
+6. `migrations/20261013_core_support.sql` (QR permits, request limits and integration-independent seating time)
 
-## Deploy on Vercel
+Provision the initial manager through a reviewed administrative procedure using the existing salted credential format. No default password/account is created by this guide. Establish the restaurant's approved license before testing protected mutations.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Optional WhatsApp requires `20261012_whatsapp_notifications.sql`; this migration is NOT safely rerunnable when its tables already exist. Isolated Preview testing additionally uses `20261012_whatsapp_preview_test.sql`. Window-aware notifications use `20261013_whatsapp_customer_windows.sql`. Existing schema must be checked before any of these are executed.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Existing database upgrades
+
+Keep historical migrations intact. First inspect relation/column types, constraints, indexes, and migration history. The new core support migration adds missing objects and `guests.seated_at`; it does not fix incompatible existing definitions, rewrite consent, clean duplicates, reset credentials or invent historical seating times. Review any discrepancy separately. No migration was run during implementation.
+
+The canonical confirmation key is `approval_required`. Existing `require_confirmation` is read only as a fallback when the canonical key is absent. When both conflict, Management's canonical value wins; the preflight query reports both values for operator review. Saved guest confirmation is not rewritten.
+
+## Verification
+
+- Mock-only checks: `node --test tests/core-stabilization.test.mjs tests/next-guest.test.mjs tests/regressions.test.mjs tests/whatsapp-customer-window.test.mjs tests/whatsapp-preview-test.test.mjs tests/whatsapp-webhook-failure.test.mjs tests/whatsapp-webhook-verification.test.mjs`.
+- `tests/browser-workflows.test.mjs` renders actual components with synthetic APIs; this is not a deployed Preview/database test.
+- Existing `tests/postgres-workflows.test.mjs` and `tests/whatsapp.test.mjs` use in-memory PGlite. They do not prove Neon connection/lock behavior.
+- `tests/isolated-postgres-concurrency.test.mjs` is a distinct opt-in test using real PostgreSQL connections. It stays skipped unless BOTH `MO_BISTRO_ISOLATED_TEST_URL` and `MO_BISTRO_ISOLATED_DB_TEST_ACK=I_APPROVE_SYNTHETIC_SCHEMA_WRITES` are supplied. The operator must confirm the URL is an isolated test database before approval. It creates and removes only a generated test schema. Do not supply application/Production connection variables. It was not run by this task.
+
+## Workflows and operational limitations
+
+All guests shows waiting/called only; Seated has its own tab. Managers configure Simple anonymous Indoor/Outdoor inventory or Detailed named tables. Reception owns seating/release and readiness approval; waiter actions request approval. Mode changes require reconciled occupancy/requests.
+
+Public and staff PostgreSQL creation share the capacity lock. Walk-ins remain staff-confirmed, receive a one-time private tracking-link/QR handoff, and start without WhatsApp permissions. Staff cannot set customer opt-ins. Guest subscriptions still require an actual verified incoming WhatsApp reply. A token lost after the creation response cannot be recovered from its database hash; do not expose a token through guest listing or public lookup.
+
+ETA editing is inside guest details; restaurant-wide estimated wait remains separate. Next-guest suggestions are distinct across areas within one read-only snapshot but are advisory, not reservations. Shifts are planning information, not sign-in restrictions. Public lookup returns only whether an active registration exists for an exact Egyptian mobile number; it cannot recover private tracking access and still reveals limited presence information.
+
+Demo generation and diagnostic pages are allowed only in explicit development/Preview environments. Production refuses them server-side. Operational pages retain the neutral palette.
+
+## Service fallback
+
+Keep the current operational record available while validating a release. On database/network failure, stop retrying uncertain seat/release actions blindly, switch to the agreed paper process, record times/actions, and reconcile occupancy before resuming the app. License failure remains enforced; no automatic fail-open/grace bypass is introduced. A service-night shadow test, device/load tests and license-expiry policy still require operational review.
+
+## WhatsApp
+
+Keep `WHATSAPP_MODE=test` and `WHATSAPP_ALLOW_LIVE_SEND=false` during stabilization. See `docs/whatsapp-customer-window.md`, `docs/whatsapp-preview-test.md` and `docs/whatsapp-notifications.md` for provider, consent, QStash and configuration requirements. Do not run the dispatcher, migration or live provider tests merely because the feature is built.
+
+See `docs/stabilization-handoff.md` for delivered changes, unresolved validation and a safe Co-work task prompt.

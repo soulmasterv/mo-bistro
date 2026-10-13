@@ -4,7 +4,6 @@ import SimpleCapacitySettings from "@/components/simple-capacity-settings";
 import { useEffect, useState } from "react";
 
 export default function SeatingSettings() {
-  const [required, setRequired] = useState(true);
   const [override, setOverride] = useState(true);
   const [message, setMessage] = useState("");
   const [tableMode, setTableMode] = useState<"simple" | "detailed">("detailed");
@@ -14,8 +13,6 @@ export default function SeatingSettings() {
     fetch("/api/management/seating-settings")
       .then(r => r.json())
       .then(d => {
-        if (typeof d.require_table_assignment === "boolean")
-          setRequired(d.require_table_assignment);
         if (typeof d.allow_area_override === "boolean")
           setOverride(d.allow_area_override);
       })
@@ -69,7 +66,6 @@ export default function SeatingSettings() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        require_table_assignment: required,
         allow_area_override: override
       })
     });
@@ -107,15 +103,6 @@ export default function SeatingSettings() {
       </div>
 
       <SimpleCapacitySettings />
-      <label className="mt-5 flex items-center gap-3 text-sm">
-        <input
-          type="checkbox"
-          checked={required}
-          onChange={e => setRequired(e.target.checked)}
-        />
-        Require table assignment before seating a guest
-      </label>
-
       <label className="mt-4 flex items-center gap-3 text-sm">
         <input
           type="checkbox"
