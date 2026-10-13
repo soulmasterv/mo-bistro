@@ -1,4 +1,5 @@
 "use client";
+import NextGuestPanel from "@/components/next-guest-panel";
 import ReceptionTableRequests from "@/components/reception-table-requests";
 import TableReadyNotifications from "@/components/table-ready-notifications";
 
@@ -282,7 +283,9 @@ export default function Home() {
   const filtered = queueGuests.filter(
     (g) =>
       `${g.name} ${g.phone}`.toLowerCase().includes(search.toLowerCase()) &&
-      (queueFilter === "all" || g.status === queueFilter),
+      (queueFilter === "all"
+        ? g.status === "waiting" || g.status === "called"
+        : g.status === queueFilter),
   );
 
   const selectedGuest = queueGuests.find((guest) => guest.id === openGuestMenu);
@@ -413,6 +416,7 @@ export default function Home() {
             <button onClick={() => setError("")}>Dismiss</button>
           </div>
         )}
+        <NextGuestPanel />
         <div className="bistro-reception-grid">
           <section id="reception-queue" className="bistro-panel bistro-queue">
             <div className="bistro-panel-heading">
@@ -420,7 +424,7 @@ export default function Home() {
                 <p className="bistro-eyebrow">THE NEXT GREAT EXPERIENCE</p>
                 <h2>
                   Waiting queue{" "}
-                  <span className="bistro-count">{queueGuests.length}</span>
+                  <span className="bistro-count">{active.length}</span>
                 </h2>
               </div>
               <span className="bistro-muted">
@@ -453,7 +457,7 @@ export default function Home() {
                   >
                     {label} (
                     {value === "all"
-                      ? queueGuests.length
+                      ? active.length
                       : value === "waiting"
                         ? waiting
                         : value === "called"
@@ -480,7 +484,7 @@ export default function Home() {
             >
               {filtered.map((guest) => {
                 const position =
-                  queueGuests.findIndex((g) => g.id === guest.id) + 1;
+                  (guest.status === "seated" ? queueGuests.filter((g) => g.status === "seated") : active).findIndex((g) => g.id === guest.id) + 1;
                 const dialHref = guestDialHref(guest.phone);
                 return (
                   <article

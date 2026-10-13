@@ -24,7 +24,7 @@ export default function MenuPage() {
           </a>
         </div>
       </div>
-      <section className="guest-menu-pages" aria-label="Mo Bistro menu pages">
+      <section className="guest-menu-pages" role="region" aria-label="Mo Bistro menu pages" tabIndex={0}>
         <p className="guest-small-note">
           Browse the menu below. Tap a page to view it full size, or open the
           PDF above.

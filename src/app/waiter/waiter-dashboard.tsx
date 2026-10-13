@@ -221,7 +221,7 @@ export default function WaiterPage() {
   }
 
   return (
-    <main className="bistro-app">
+    <main className="bistro-app bistro-waiter">
       <div className="bistro-container">
         <header className="bistro-page-heading">
           <div>

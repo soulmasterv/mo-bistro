@@ -70,10 +70,10 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-[#EDECE5] px-4 py-10">
       <form
         onSubmit={submit}
-        className="w-full max-w-md rounded-3xl bg-[#2D352A] p-7 text-[#F5F0E7] shadow-2xl sm:p-10"
+        className="w-full max-w-md rounded-3xl bg-[#252525] p-7 text-[#F5F0E7] shadow-2xl sm:p-10"
       >
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#46513F]">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#393735]">
             <UtensilsCrossed size={27} className="text-[#D6B681]" />
           </div>
 

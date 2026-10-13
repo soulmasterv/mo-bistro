@@ -2,7 +2,7 @@ import { ArrowUpRight, BookOpen, MapPin } from "lucide-react";
 
 export default function MoBistroMenuCard() {
   return (
-    <aside className="overflow-hidden rounded-[26px] border border-[#DED6C8] bg-[#34382E] text-[#F9F4E9] shadow-[0_14px_35px_rgba(44,43,34,0.08)]">
+    <aside className="overflow-hidden rounded-[26px] border border-[#DED6C8] bg-[#252525] text-[#F9F4E9] shadow-[0_14px_35px_rgba(44,43,34,0.08)]">
       <div className="relative overflow-hidden px-7 pb-8 pt-9 sm:px-9">
         <div
           aria-hidden="true"

@@ -261,6 +261,9 @@ test(
           case "/api/whatsapp/subscription":
             data = {available:true,subscribed:subscriptionSubscribed,feedbackConsent:true,feedbackEditable,url:"https://wa.me/201000000000?text=SUBSCRIBE"};
             break;
+          case "/api/reception/next-guest":
+            data={area:new URL(req.url,"http://fixture.test").searchParams.get("area"),available:true,guest:{id:guests[0].id,name:guests[0].name,party_size:guests[0].party_size}};
+            break;
           case "/api/track":
             data = {confirmation_required:true, guest:{name:"Omar Hassan",party_size:2,status:trackingStatus,confirmed:true,created_at:new Date().toISOString()}, queue_position:3,guests_ahead:2};
             break;
@@ -477,7 +480,7 @@ test(
           await page
             .locator(".bistro-app")
             .evaluate((el) => getComputedStyle(el).backgroundColor),
-          "rgb(16, 28, 22)",
+          "rgb(16, 17, 17)",
         );
         if (screenshots)
           await page.screenshot({
@@ -488,7 +491,7 @@ test(
           await page
             .locator(".bistro-settings-card")
             .evaluate((el) => getComputedStyle(el).backgroundColor),
-          "rgb(28, 42, 36)",
+          "rgb(23, 25, 25)",
         );
         await page.reload();
         await page.waitForFunction(
@@ -558,6 +561,10 @@ test(
           ),
           "Waiter overflow at " + width,
         );
+        await chooseTheme("dark");
+        await page.waitForFunction(()=>getComputedStyle(document.querySelector(".bistro-waiter")).backgroundColor === "rgb(16, 17, 17)");
+        if(screenshots) await page.screenshot({path:path.join(screenshots,`waiter-dark-${width}.png`)});
+        await chooseTheme("light");
         if (screenshots)
           await page.screenshot({
             path: path.join(screenshots, `waiter-${width}.png`),
@@ -668,6 +675,15 @@ test(
             path: path.join(screenshots, `reception-dark-${width}.png`),
             fullPage: width < 768,
           });
+        await page.getByRole("button",{name:"QR Code",exact:true}).click();
+        await page.getByText("Scan this QR code to join the waitlist.",{exact:true}).waitFor();
+        assert.equal(await page.locator(".bistro-qr-overlay").evaluate(el=>getComputedStyle(el).backgroundColor),"rgb(16, 17, 17)");
+        if(screenshots) await page.screenshot({path:path.join(screenshots,`qr-dark-${width}.png`)});
+        await page.getByRole("button",{name:"Close",exact:true}).click();
+        await page.getByRole("button",{name:"Seat Omar Hassan",exact:true}).click();
+        await page.getByRole("dialog",{name:"Assign table"}).waitFor();
+        if(screenshots) await page.screenshot({path:path.join(screenshots,`seat-dark-${width}.png`)});
+        await page.getByRole("dialog",{name:"Assign table"}).getByRole("button",{name:/close/i}).click();
         await chooseTheme("light");
         assert.equal(
           await page
@@ -1083,6 +1099,10 @@ test(
       const seatedStaff=await browser.newPage();
       guests[0].status="seated";
       await seatedStaff.goto(origin+"/");
+      const activeCount=guests.filter(g=>g.status==="waiting"||g.status==="called").length;
+      await seatedStaff.getByRole("button",{name:`All guests (${activeCount})`,exact:true}).waitFor();
+      assert.equal(await seatedStaff.getByRole("button",{name:"Guest details for "+guests[0].name,exact:true}).count(),0);
+      assert.equal(await seatedStaff.locator(".bistro-count").textContent(),String(activeCount));
       await seatedStaff.getByRole("button",{name:/^Seated \(/}).click();
       await seatedStaff.getByRole("button",{name:"Seat "+guests[0].name,exact:true}).waitFor();
       assert.equal(await seatedStaff.getByRole("button",{name:"Seat "+guests[0].name,exact:true}).isDisabled(),true);
@@ -1120,6 +1140,12 @@ test(
         assert.ok(await guest.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
         const firstPage=guest.getByRole("img",{name:"Mo Bistro menu, page 1 of 27",exact:true});
         await firstPage.waitFor(); await firstPage.evaluate(image=>image.decode());
+        const menuScroll=guest.getByRole("region",{name:"Mo Bistro menu pages"});
+        assert.ok(await menuScroll.evaluate(el=>el.scrollHeight>el.clientHeight));
+        await menuScroll.evaluate(el=>{el.scrollTop=500;});
+        assert.ok(await menuScroll.evaluate(el=>el.scrollTop>0));
+        assert.ok(await guest.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+1));
+        await menuScroll.evaluate(el=>{el.scrollTop=0;});
         assert.equal(await guest.getByRole("img").count(),27);
         if(screenshots) await guest.screenshot({path:path.join(screenshots,`menu-${width}.png`)});
         await guestContext.close();
