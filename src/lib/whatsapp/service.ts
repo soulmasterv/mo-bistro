@@ -154,7 +154,7 @@ export async function subscriptionState(trackingToken: string) {
     (subscribed || new Date(booking.subscription_expires_at).getTime() > Date.now()) &&
     ["waiting","called","seated"].includes(booking.status);
   const code = available && !subscribed ? subscriptionCode(booking.guest_id,booking.tracking_token_hash) : null;
-  const feedbackEditable = subscribed && available && !booking.review_dispatched &&
+  const feedbackEditable = available && !booking.review_dispatched &&
     (!booking.seated_at || new Date(booking.seated_at).getTime() + 60*60_000 > Date.now());
   return { available,subscribed,feedbackConsent: booking.feedback_consent,feedbackEditable,
     url: available && !subscribed ? `https://wa.me/${number}?text=${encodeURIComponent(`SUBSCRIBE ${booking.guest_id} ${code}`)}` : null };

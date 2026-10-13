@@ -45,6 +45,16 @@ type Guest = {
 
 type Action = "call" | "seat" | "no_show" | "cancel" | "confirm";
 
+function elapsedWait(guest: Guest, clock: number) {
+  if (guest.status === "seated") return "—";
+  const joined = new Date(guest.created_at).getTime();
+  if (!clock || !Number.isFinite(joined)) return "—";
+  const minutes = Math.max(0, Math.floor((clock - joined) / 60000));
+  return minutes >= 60
+    ? `${Math.floor(minutes / 60)}h ${minutes % 60}m`
+    : `${minutes} min`;
+}
+
 const labels: Record<GuestStatus, string> = {
   waiting: "Waiting",
   called: "Called",
@@ -58,9 +68,9 @@ export default function Home() {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [seatingGuest, setSeatingGuest] = useState<Guest | null>(null);
   const [search, setSearch] = useState("");
-  const [queueFilter, setQueueFilter] = useState<"all" | "waiting" | "called">(
-    "all",
-  );
+  const [queueFilter, setQueueFilter] = useState<
+    "all" | "waiting" | "called" | "seated"
+  >("all");
   const [openGuestMenu, setOpenGuestMenu] = useState<number | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const addDialog = useRef<HTMLDivElement>(null);
@@ -78,6 +88,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [addError, setAddError] = useState("");
   const [showTables, setShowTables] = useState(false);
+  const [queueClock, setQueueClock] = useState(0);
   const tablesDialog = useRef<HTMLDivElement>(null);
   useStaffDialog(showTables, tablesDialog, () => setShowTables(false));
   const loadGuests = useCallback(async (force = false) => {
@@ -92,7 +103,10 @@ export default function Home() {
       });
       if (!response.ok) throw new Error("Unable to load guests");
       const data = await response.json();
-      if (!controller.signal.aborted) setGuests(data);
+      if (!controller.signal.aborted) {
+        setGuests(data);
+        setQueueClock(Date.now());
+      }
     } catch {
       if (!controller.signal.aborted)
         setError("Could not refresh the waitlist.");
@@ -262,15 +276,40 @@ export default function Home() {
   const called = guests.filter((g) => g.status === "called").length;
   const seated = guests.filter((g) => g.status === "seated").length;
   const active = guests.filter((g) => ["waiting", "called"].includes(g.status));
-  const filtered = active.filter(
+  const queueGuests = guests.filter((g) =>
+    ["waiting", "called", "seated"].includes(g.status),
+  );
+  const filtered = queueGuests.filter(
     (g) =>
       `${g.name} ${g.phone}`.toLowerCase().includes(search.toLowerCase()) &&
       (queueFilter === "all" || g.status === queueFilter),
   );
 
-  const selectedGuest = active.find((guest) => guest.id === openGuestMenu);
+  const selectedGuest = queueGuests.find((guest) => guest.id === openGuestMenu);
   return (
-    <main className="bistro-app bistro-reception queue-first">
+    <main className="bistro-app bistro-reception queue-first reception-reference">
+      <nav className="reception-sidebar" aria-label="Reception sections">
+        <a href="#reception-queue" aria-current="page">
+          <Users size={20} /> Queue
+        </a>
+        <button type="button" onClick={() => setShowTables(true)}>
+          <Armchair size={20} /> Active Tables
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const menu = document.querySelector<HTMLDetailsElement>(
+              ".bistro-workspace-header details",
+            );
+            if (menu) {
+              menu.open = true;
+              menu.querySelector<HTMLElement>("summary")?.focus();
+            }
+          }}
+        >
+          Settings
+        </button>
+      </nav>
       <div className="bistro-container">
         <section
           className="bistro-notification-center"
@@ -375,16 +414,18 @@ export default function Home() {
           </div>
         )}
         <div className="bistro-reception-grid">
-          <section className="bistro-panel bistro-queue">
+          <section id="reception-queue" className="bistro-panel bistro-queue">
             <div className="bistro-panel-heading">
               <div>
                 <p className="bistro-eyebrow">THE NEXT GREAT EXPERIENCE</p>
                 <h2>
                   Waiting queue{" "}
-                  <span className="bistro-count">{active.length}</span>
+                  <span className="bistro-count">{queueGuests.length}</span>
                 </h2>
               </div>
-              <span className="bistro-muted">Arrival order</span>
+              <span className="bistro-muted">
+                Manage the waiting queue and seating.
+              </span>
             </div>
             <div className="bistro-queue-controls">
               <div className="bistro-search">
@@ -402,6 +443,7 @@ export default function Home() {
                     ["all", "All guests"],
                     ["waiting", "Waiting"],
                     ["called", "Called"],
+                    ["seated", "Seated"],
                   ] as const
                 ).map(([value, label]) => (
                   <button
@@ -409,10 +451,26 @@ export default function Home() {
                     aria-pressed={queueFilter === value}
                     onClick={() => setQueueFilter(value)}
                   >
-                    {label}
+                    {label} (
+                    {value === "all"
+                      ? queueGuests.length
+                      : value === "waiting"
+                        ? waiting
+                        : value === "called"
+                          ? called
+                          : seated}
+                    )
                   </button>
                 ))}
               </div>
+            </div>
+            <div className="reception-table-head" aria-hidden="true">
+              <span># · Guest</span>
+              <span>Party size</span>
+              <span>Preference</span>
+              <span>Wait time</span>
+              <span>Status</span>
+              <span>Actions</span>
             </div>
             <div
               className="bistro-guest-list"
@@ -421,7 +479,8 @@ export default function Home() {
               tabIndex={0}
             >
               {filtered.map((guest) => {
-                const position = active.findIndex((g) => g.id === guest.id) + 1;
+                const position =
+                  queueGuests.findIndex((g) => g.id === guest.id) + 1;
                 const dialHref = guestDialHref(guest.phone);
                 return (
                   <article
@@ -468,12 +527,30 @@ export default function Home() {
                         <span className="bistro-phone">{guest.phone}</span>
                       </div>
                       <span
-                        className={`bistro-status ${guest.status === "called" ? "status-called" : "status-waiting"}`}
+                        className={`bistro-status ${guest.status === "called" ? "status-called" : guest.status === "seated" ? "status-seated" : "status-waiting"}`}
                       >
                         <i />
                         {guest.status === "waiting"
-                          ? "Uncalled"
+                          ? "Waiting"
                           : labels[guest.status]}
+                      </span>
+                    </div>
+                    <div className="reception-row-facts">
+                      <span>
+                        <Users size={14} /> {guest.party_size}
+                      </span>
+                      <span>
+                        {guest.seating_preference === "any"
+                          ? "Any"
+                          : guest.seating_preference === "indoor"
+                            ? "Indoor"
+                            : "Outdoor"}
+                      </span>
+                      <span>{elapsedWait(guest, queueClock)}</span>
+                      <span
+                        className={`reception-status-pill pill-${guest.status}`}
+                      >
+                        {labels[guest.status]}
                       </span>
                     </div>
                     <div className="bistro-guest-bottom">
@@ -509,7 +586,7 @@ export default function Home() {
                           </a>
                         )}
                         <button
-                          disabled={busy}
+                          disabled={busy || guest.status === "seated"}
                           onClick={() => void performAction(guest.id, "seat")}
                           aria-label={"Seat " + guest.name}
                           className="bistro-button"

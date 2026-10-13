@@ -476,7 +476,7 @@ export default function JoinPage() {
 
               <div className="mt-9 flex items-center justify-center gap-5 border-t border-[#EAE4DA] pt-6 text-[12px] text-[#777064]">
                 <a
-                  href="https://www.elmenus.com/cairo/mo-bistro-2z83"
+                  href="/menu"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 hover:text-[#A17E4E]"

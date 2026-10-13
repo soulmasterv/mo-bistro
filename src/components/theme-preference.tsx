@@ -46,7 +46,7 @@ export function ThemePreference() {
   useEffect(() => {
     // Keep the existing guest booking palette independent of staff preferences.
     document.documentElement.dataset.theme =
-      ["/join", "/status", "/lookup", "/login", "/login/pin"].includes(pathname)
+      ["/join", "/status", "/lookup", "/menu", "/login", "/login/pin"].includes(pathname)
         ? "guest-light" : current.split(":")[1];
   }, [current, pathname]);
   return null;

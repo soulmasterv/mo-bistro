@@ -91,7 +91,7 @@ export default function GuestDetailSheet({
           <div>
             <h2 id="guest-sheet-title">{guest.name}</h2>
             <p>
-              {guest.status === "called" ? "Called" : "Waiting"} · Booking #
+              {guest.status === "seated" ? "Seated" : guest.status === "called" ? "Called" : "Waiting"} · Booking #
               {guest.id}
             </p>
           </div>
@@ -159,7 +159,7 @@ export default function GuestDetailSheet({
         <button
           type="button"
           className="bistro-button queue-sheet-seat"
-          disabled={busy}
+          disabled={busy || guest.status === "seated"}
           onClick={onSeat}
         >
           Seat guest
@@ -227,7 +227,7 @@ export default function GuestDetailSheet({
         {guest.confirmation_required !== false && guest.confirmed !== 1 && (
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || guest.status === "seated"}
             className="queue-sheet-text-action"
             onClick={() => onAction("confirm")}
           >
@@ -242,14 +242,14 @@ export default function GuestDetailSheet({
         <div className="queue-sheet-destructive">
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || guest.status === "seated"}
             onClick={() => onAction("no_show")}
           >
             No-show
           </button>
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || guest.status === "seated"}
             onClick={() => onAction("cancel")}
           >
             Cancel booking

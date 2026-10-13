@@ -1,5 +1,4 @@
 "use client";
-import MoBistroMenuCard from "@/components/mo-bistro-menu-card";
 import RestaurantWaitDisplay from "@/components/restaurant-wait-display";
 import WhatsappSubscription from "@/components/whatsapp-subscription";
 
@@ -30,7 +29,6 @@ type Tracking = {
   guests_ahead: number | null;
 };
 
-
 function StatusContent() {
   const router = useRouter();
   const params = useSearchParams();
@@ -51,7 +49,7 @@ function StatusContent() {
     try {
       const response = await fetch(
         `/api/track?token=${encodeURIComponent(token)}`,
-        { cache: "no-store" }
+        { cache: "no-store" },
       );
 
       if (!response.ok) {
@@ -63,9 +61,7 @@ function StatusContent() {
       setError("");
       localStorage.setItem(STORAGE_KEY, token);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Unable to refresh."
-      );
+      setError(err instanceof Error ? err.message : "Unable to refresh.");
     } finally {
       setLoading(false);
     }
@@ -78,10 +74,13 @@ function StatusContent() {
       void refresh();
     }, 5000);
 
-    return () => { window.clearTimeout(initial); clearInterval(timer); };
+    return () => {
+      window.clearTimeout(initial);
+      clearInterval(timer);
+    };
   }, [refresh]);
 
-async function cancel() {
+  async function cancel() {
     if (!token || busy) return;
 
     if (!window.confirm("Leave the restaurant waitlist?")) {
@@ -105,9 +104,7 @@ async function cancel() {
 
       await refresh();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Cancellation failed."
-      );
+      setError(err instanceof Error ? err.message : "Cancellation failed.");
     } finally {
       setBusy(false);
     }
@@ -125,171 +122,182 @@ async function cancel() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F7F4EE] px-5 py-10 text-[#242424]">
-      <div className="w-full max-w-md rounded-3xl border border-[#E3DBCE] bg-white p-8 shadow-xl">
-        <div className="mb-8 text-center">
-          <UtensilsCrossed
-            className="mx-auto mb-4 text-[#A78A60]"
-            size={32}
-          />
-          <p className="text-xs uppercase tracking-[0.3em] text-[#A78A60]">
-            Mo Bistro
-          </p>
-          <h1 className="mt-3 text-2xl font-semibold">
-            Your table is worth the wait
-          </h1>
-        </div>
-
-        <RestaurantWaitDisplay />
-
-        {loading && !data ? (
-          <p className="text-center text-sm text-[#77716A]">
-            Loading your registration...
-          </p>
-        ) : error && !data ? (
-          <p role="alert" className="text-center text-red-600">
-            {error}
-          </p>
-        ) : data ? (
-          <div className="space-y-6">
-            <div className="rounded-2xl bg-[#F7F4EE] p-6 text-center">
-              {status === "called" ? (
-                <Bell
-                  className="mx-auto mb-3 text-[#A78A60]"
-                  size={36}
-                />
-              ) : status === "seated" ? (
-                <CheckCircle2
-                  className="mx-auto mb-3 text-emerald-600"
-                  size={36}
-                />
-              ) : active ? (
-                <Clock3
-                  className="mx-auto mb-3 text-[#A78A60]"
-                  size={36}
-                />
-              ) : (
-                <XCircle
-                  className="mx-auto mb-3 text-[#77716A]"
-                  size={36}
-                />
-              )}
-
-              <h2 className="text-xl font-semibold">
-                {statusText[status || ""] || "Status unavailable"}
-              </h2>
-
-              <p className="mt-2 text-sm text-[#77716A]">
-                {status === "called"
-                  ? "Please approach reception."
-                  : status === "waiting"
-                    ? "We'll update this page when reception calls you."
-                    : "Thank you for visiting."}
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex justify-between border-b border-[#EAE4D9] pb-3">
-                <span className="text-[#77716A]">Guest</span>
-                <strong>{data.guest.name}</strong>
-              </div>
-
-              <div className="flex justify-between border-b border-[#EAE4D9] pb-3">
-                <span className="flex items-center gap-2 text-[#77716A]">
-                  <Users size={16} /> Party size
-                </span>
-                <strong>{data.guest.party_size}</strong>
-              </div>
-
-              <div className="flex justify-between border-b border-[#EAE4D9] pb-3">
-                <span className="text-[#77716A]">
-                  Queue position
-                </span>
-                <strong>
-                  {data.queue_position === null
-                    ? "—"
-                    : `#${data.queue_position}`}
-                </strong>
-              </div>
-
-              <div className="flex justify-between border-b border-[#EAE4D9] pb-3">
-                <span className="text-[#77716A]">
-                  Guests ahead
-                </span>
-                <strong>
-                  {data.guests_ahead === null
-                    ? "—"
-                    : data.guests_ahead}
-                </strong>
-              </div>
-
-
-              <div className="flex justify-between">
-                <span className="text-[#77716A]">
-                  Reception confirmation
-                </span>
-                <strong>
-                  {data.guest.confirmed ? "Confirmed" : data.confirmation_required ? "Pending" : "Not required"}
-                </strong>
-              </div>
-            </div>
-
-            <p className="text-center text-xs text-[#88817A]">
-              Queue information refreshes every 5 seconds.
-              Seating order is determined by reception.
+    <main className="guest-status-page">
+      <div className="guest-status-shell">
+        <header className="guest-brand">
+          <UtensilsCrossed size={30} />
+          <span>MO BISTRO</span>
+        </header>
+        <div className="guest-status-layout">
+          <section className="guest-status-main">
+            <h1>
+              {status === "seated"
+                ? "You’re seated!"
+                : active || !data
+                  ? "Your table is worth the wait"
+                  : statusText[status || ""] || "Your booking"}
+            </h1>
+            <p className="guest-intro">
+              {status === "seated"
+                ? "Enjoy your visit."
+                : active
+                  ? "We’ll let you know when your table is ready."
+                  : "Thank you for choosing Mo Bistro."}
             </p>
-
-            {error && (
-              <p role="alert" className="text-sm text-red-600">
-                {error}
-              </p>
-            )}
-
-            <button
-              type="button"
-              onClick={() => void refresh()}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#DDD5C9] p-3 font-medium"
-            >
-              <RefreshCw size={17} /> Refresh status
-            </button>
-
             {active && (
-              <button
-                type="button"
-                onClick={() => window.alert("Our menu is coming soon.")}
-                className="w-full rounded-xl border border-[#DDD5C9] p-3 font-medium text-[#A78A60]"
-              >
-                Explore Mo Bistro&apos;s menu
-              </button>
+              <div className="guest-estimate">
+                <RestaurantWaitDisplay />
+              </div>
             )}
-
-            {active && (
-              <button
-                type="button"
-                onClick={() => void cancel()}
-                disabled={busy}
-                className="w-full rounded-xl p-3 text-sm font-medium text-red-600 disabled:opacity-50"
-              >
-                {busy ? "Cancelling..." : "Leave waitlist"}
-              </button>
+            {loading && !data ? (
+              <p role="status">Loading your booking…</p>
+            ) : error && !data ? (
+              <p role="alert">{error}</p>
+            ) : data ? (
+              <>
+                <div
+                  className={`guest-current-status ${status === "seated" ? "is-seated" : ""}`}
+                >
+                  {status === "seated" ? (
+                    <CheckCircle2 size={42} />
+                  ) : status === "called" ? (
+                    <Bell size={30} />
+                  ) : active ? (
+                    <Clock3 size={28} />
+                  ) : (
+                    <XCircle size={28} />
+                  )}
+                  <div>
+                    <h2>
+                      {status === "seated"
+                        ? "Your table is ready"
+                        : statusText[status || ""]}
+                    </h2>
+                    <p>
+                      {status === "seated"
+                        ? "Our team has seated you. Enjoy your meal!"
+                        : status === "called"
+                          ? "Please make your way to reception."
+                          : active
+                            ? "Your place is saved. We’ll update this page when you’re called."
+                            : "This booking is now closed."}
+                    </p>
+                  </div>
+                </div>
+                <dl className="guest-booking-facts">
+                  <div>
+                    <dt>Guest</dt>
+                    <dd>{data.guest.name}</dd>
+                  </div>
+                  <div>
+                    <dt>
+                      <Users size={16} /> Party size
+                    </dt>
+                    <dd>{data.guest.party_size}</dd>
+                  </div>
+                  {active && (
+                    <>
+                      <div>
+                        <dt>Queue position</dt>
+                        <dd>
+                          {data.queue_position === null
+                            ? "—"
+                            : `#${data.queue_position}`}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Guests ahead</dt>
+                        <dd>{data.guests_ahead ?? "—"}</dd>
+                      </div>
+                      <div>
+                        <dt>Reception confirmation</dt>
+                        <dd
+                          className={
+                            data.guest.confirmed ? "guest-confirmed" : ""
+                          }
+                        >
+                          {data.guest.confirmed
+                            ? "Confirmed"
+                            : data.confirmation_required
+                              ? "Pending"
+                              : "Not required"}
+                        </dd>
+                      </div>
+                    </>
+                  )}
+                </dl>
+                {active && (
+                  <>
+                    <p className="guest-small-note">
+                      Queue information updates automatically. Seating order is
+                      managed by your host team.
+                    </p>
+                    <button
+                      type="button"
+                      className="guest-outline-button"
+                      onClick={() => void refresh()}
+                    >
+                      <RefreshCw size={17} /> Refresh status
+                    </button>
+                  </>
+                )}
+                {status === "seated" && (
+                  <div className="guest-help">
+                    <UtensilsCrossed size={24} />
+                    <div>
+                      <strong>Need anything?</strong>
+                      <p>
+                        Our team is here to help. Enjoy your dining experience
+                        at Mo Bistro.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {error && <p role="alert">{error}</p>}
+                <a href="/menu" className="guest-outline-button">
+                  Explore Mo Bistro’s menu
+                </a>
+                {active && (
+                  <button
+                    type="button"
+                    onClick={() => void cancel()}
+                    disabled={busy}
+                    className="guest-leave-button"
+                  >
+                    {busy ? "Leaving…" : "Leave waitlist"}
+                  </button>
+                )}
+                {!active && status !== "seated" && (
+                  <button
+                    className="guest-outline-button"
+                    onClick={() => {
+                      localStorage.removeItem(STORAGE_KEY);
+                      router.push("/join");
+                    }}
+                  >
+                    New registration
+                  </button>
+                )}
+              </>
+            ) : null}
+          </section>
+          <aside className="guest-status-aside">
+            <div className="guest-welcome-card">
+              <UtensilsCrossed size={38} />
+              <p>MO BISTRO · DISTRICT 5</p>
+              <h2>
+                Good food.
+                <br />
+                Good company.
+              </h2>
+              <p>A little time, well spent.</p>
+              <a href="/menu">Discover our menu →</a>
+            </div>
+            {token && data && (
+              <WhatsappSubscription token={token} allowSubscribe={active} />
             )}
-
-            {token && <WhatsappSubscription token={token} />}
-
-            {!active && (
-              <button
-                type="button"
-                onClick={() => {
-                  localStorage.removeItem(STORAGE_KEY);
-                  router.push("/join");
-                }}
-                className="w-full rounded-xl bg-[#242424] p-3 font-medium text-white"
-              >
-                New registration
-              </button>
-            )}
-          </div>
-        ) : null}
+          </aside>
+        </div>
       </div>
     </main>
   );
@@ -297,16 +305,13 @@ async function cancel() {
 
 export default function StatusPage() {
   return (
-    <Suspense fallback={
-      <main className="min-h-screen bg-[#F4F0E9] px-4 py-8 text-[#302D28] sm:px-6 lg:py-16">
-      <div className="mx-auto grid max-w-[1050px] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="min-w-0">
-        Loading...
-              </div>
-        <MoBistroMenuCard />
-      </div>
-    </main>
-    }>
+    <Suspense
+      fallback={
+        <main className="guest-status-page">
+          <p role="status">Loading your booking…</p>
+        </main>
+      }
+    >
       <StatusContent />
     </Suspense>
   );

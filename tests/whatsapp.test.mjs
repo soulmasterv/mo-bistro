@@ -944,9 +944,9 @@ test("STOP and UNSUBSCRIBE remain case-insensitive received-message opt-outs", a
     assert.equal((await service.subscriptionState(b.token)).subscribed,false);
   }
 });
-test("review preference is relevant only for subscribers before review dispatch or deadline",async()=>{
+test("review preference is relevant before review dispatch or deadline",async()=>{
   await reset(); const b=await booking({whatsapp_confirmation_consent:true,whatsapp_feedback_consent:true});
-  assert.equal((await service.subscriptionState(b.token)).feedbackEditable,false);
+  assert.equal((await service.subscriptionState(b.token)).feedbackEditable,true);
   await webhook.processMetaWebhook(envelope(inbound(b)));
   assert.equal((await service.subscriptionState(b.token)).feedbackEditable,true);
   await sql`UPDATE whatsapp_booking_consents SET subscription_expires_at=NOW()-INTERVAL '1 hour' WHERE guest_id=${b.id}`;

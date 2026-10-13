@@ -36,7 +36,7 @@ export default function MoBistroMenuCard() {
           </p>
 
           <a
-            href="https://www.elmenus.com/cairo/mo-bistro-2z83"
+            href="/menu"
             target="_blank"
             rel="noopener noreferrer"
             className="mt-7 flex w-full items-center justify-between rounded-xl bg-[#D6B681] px-5 py-4 text-[13px] font-semibold text-[#2C3028] transition hover:bg-[#E8C997]"

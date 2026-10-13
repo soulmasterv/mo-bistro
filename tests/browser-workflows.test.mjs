@@ -28,6 +28,7 @@ test(
       "import Join from " +
       component("src/app/join/page.tsx") +
       ";" +
+      "import Menu from " + component("src/app/menu/page.tsx") + ";" +
       "import Status from " + component("src/app/status/page.tsx") + ";" +
       "import Login from " +
       component("src/app/login/page.tsx") +
@@ -55,7 +56,7 @@ test(
       ";" +
       'const p=location.pathname;const role=document.cookie.match(/fixture_role=(manager|reception|waiter)/)?.[1] ?? "manager";' +
       'const title=p==="/waiter"?"Waiter":p.startsWith("/management")||p==="/manager"?"Management":"Reception";' +
-      'createRoot(document.getElementById("root")).render(p==="/join"?<><ThemePreference/><Join/></>:p==="/status"?<><ThemePreference/><Status/></>:p==="/login"?<><ThemePreference/><Login/></>:p==="/login/pin"?<><ThemePreference/><PinLogin/></>:<><ThemePreference/><Header role={role} workspace={p==="/workspace-fixture"?"Workspaces":title}/>{title==="Waiter"?<Waiter/>:title==="Management"?(p==="/management/staff-pins"?<StaffPins/>:<Management/>):<Reception/>}</>);';
+      'createRoot(document.getElementById("root")).render(p==="/join"?<><ThemePreference/><Join/></>:p==="/menu"?<><ThemePreference/><Menu/></>:p==="/status"?<><ThemePreference/><Status/></>:p==="/login"?<><ThemePreference/><Login/></>:p==="/login/pin"?<><ThemePreference/><PinLogin/></>:<><ThemePreference/><Header role={role} workspace={p==="/workspace-fixture"?"Workspaces":title}/>{title==="Waiter"?<Waiter/>:title==="Management"?(p==="/management/staff-pins"?<StaffPins/>:<Management/>):<Reception/>}</>);';
     await esbuild.build({
       stdin: { contents: source, loader: "tsx", resolveDir: root },
       bundle: true,
@@ -104,6 +105,7 @@ test(
     assert.ok(!viewport.includes("maximum-scale=1"));
     let mode = "detailed",
       occupied = 1;
+    let trackingStatus = "waiting";
     let subscriptionSubscribed = true;
     let feedbackEditable = true;
     let staffUsername = "manager";
@@ -200,6 +202,12 @@ test(
       },
     ];
     const server = http.createServer(async (req, res) => {
+      if(/^\/menus\/menu-page-\d{2}\.jpg$/.test(req.url)) {
+        res.setHeader("content-type","image/jpeg");res.end(fs.readFileSync("public"+req.url));return;
+      }
+      if(req.url === "/menus/mo-bistro-menu.pdf") {
+        res.setHeader("content-type","application/pdf");res.end(fs.readFileSync("public/menus/mo-bistro-menu.pdf"));return;
+      }
       const url = new URL(req.url, "http://localhost");
       if (url.pathname === "/app.js") {
         res.setHeader("content-type", "application/javascript");
@@ -250,7 +258,7 @@ test(
             data = {available:true,subscribed:subscriptionSubscribed,feedbackConsent:true,feedbackEditable,url:"https://wa.me/201000000000?text=SUBSCRIBE"};
             break;
           case "/api/track":
-            data = {confirmation_required:true, guest:{name:"Omar Hassan",party_size:2,status:"waiting",confirmed:true,created_at:new Date().toISOString()}, queue_position:3,guests_ahead:2};
+            data = {confirmation_required:true, guest:{name:"Omar Hassan",party_size:2,status:trackingStatus,confirmed:true,created_at:new Date().toISOString()}, queue_position:3,guests_ahead:2};
             break;
           case "/api/join":
             submittedBooking = body;
@@ -636,7 +644,7 @@ test(
             '[aria-label="Seat Omar Hassan"]',
           );
           return (
-            getComputedStyle(button).backgroundColor === "rgb(214, 182, 129)"
+            getComputedStyle(button).backgroundColor === "rgb(234, 196, 131)"
           );
         });
         assert.deepEqual(
@@ -646,7 +654,7 @@ test(
               background: getComputedStyle(el).backgroundColor,
               color: getComputedStyle(el).color,
             })),
-          { background: "rgb(214, 182, 129)", color: "rgb(41, 49, 38)" },
+          { background: "rgb(234, 196, 131)", color: "rgb(23, 23, 23)" },
         );
         await page.evaluate(() => window.scrollTo(0, 0));
         if (screenshots)
@@ -1052,7 +1060,7 @@ test(
         await guestPage.waitForFunction(() => document.documentElement.dataset.theme === "guest-light");
         await guestPage.getByText("WhatsApp updates enabled",{exact:true}).waitFor();
         assert.equal(await guestPage.getByRole("link",{name:"Subscribe to WhatsApp updates"}).count(),0);
-        assert.equal(await guestPage.getByRole("checkbox").count(),1); // Relevant review preference only.
+        assert.equal(await guestPage.getByRole("checkbox").count(),0); // Review preference is collapsed for subscribers.
         await guestPage.getByText("To unsubscribe at any time, reply UNSUBSCRIBE or STOP on WhatsApp.",{exact:true}).waitFor();
         feedbackEditable=false; await guestPage.reload();
         await guestPage.getByText("WhatsApp updates enabled",{exact:true}).waitFor();
@@ -1066,11 +1074,50 @@ test(
         assert.equal(submittedBooking.whatsapp_feedback_consent, consent);
         await guestContext.close();
       }
+      const seatedStaff=await browser.newPage();
+      guests[0].status="seated";
+      await seatedStaff.goto(origin+"/");
+      await seatedStaff.getByRole("button",{name:/^Seated \(/}).click();
+      await seatedStaff.getByRole("button",{name:"Seat "+guests[0].name,exact:true}).waitFor();
+      assert.equal(await seatedStaff.getByRole("button",{name:"Seat "+guests[0].name,exact:true}).isDisabled(),true);
+      await seatedStaff.getByRole("button",{name:"More actions for "+guests[0].name,exact:true}).click();
+      assert.equal(await seatedStaff.getByRole("dialog").getByRole("button",{name:"Seat guest",exact:true}).isDisabled(),true);
+      await seatedStaff.close();
       const menuPage = await browser.newPage();
       await menuPage.goto(origin + "/workspace-fixture");
       await menuPage.getByLabel("Open menu",{exact:true}).click();
       assert.equal(await menuPage.getByRole("navigation",{name:"Workspace menu"}).getByRole("link").count(),0);
       await menuPage.close();
+      for(const width of [320,390,768,1024,1440]) {
+        const guestContext=await browser.newContext({viewport:{width,height:900}});
+        const guest=await guestContext.newPage();
+        for(const status of ["waiting","called","seated","cancelled"]) {
+          trackingStatus=status; subscriptionSubscribed=true;
+          await guest.goto(origin+"/status?token="+"a".repeat(64));
+          await guest.getByText("Omar Hassan",{exact:true}).waitFor();
+          assert.ok(await guest.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+          if(status==="seated") {
+            await guest.getByRole("heading",{name:"You’re seated!",exact:true}).waitFor();
+            assert.equal(await guest.getByText("Queue position",{exact:true}).count(),0);
+            assert.equal(await guest.getByText("Guests ahead",{exact:true}).count(),0);
+            assert.equal(await guest.getByRole("button",{name:"Refresh status"}).count(),0);
+            assert.equal(await guest.getByRole("link",{name:"Subscribe to WhatsApp updates"}).count(),0);
+          }
+          if(screenshots) await guest.screenshot({path:path.join(screenshots,`guest-${status}-${width}.png`),fullPage:true});
+        }
+        subscriptionSubscribed=false;trackingStatus="seated";await guest.reload();
+        await guest.getByRole("heading",{name:"You’re seated!",exact:true}).waitFor();
+        assert.equal(await guest.getByRole("link",{name:"Subscribe to WhatsApp updates"}).count(),0);
+        await guest.goto(origin+"/menu");
+        await guest.getByRole("heading",{name:"Something delicious awaits."}).waitFor();
+        assert.equal(await guest.getByRole("link",{name:"Open menu",exact:true}).getAttribute("href"),"/menus/mo-bistro-menu.pdf");
+        assert.ok(await guest.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+        const firstPage=guest.getByRole("img",{name:"Mo Bistro menu, page 1 of 27",exact:true});
+        await firstPage.waitFor(); await firstPage.evaluate(image=>image.decode());
+        assert.equal(await guest.getByRole("img").count(),27);
+        if(screenshots) await guest.screenshot({path:path.join(screenshots,`menu-${width}.png`)});
+        await guestContext.close();
+      }
       assert.deepEqual(errors, []);
       console.log("Browser evidence directory: " + temp);
     } finally {
