@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "check:sqlite": "node scripts/sqlite-native.mjs",
+    "setup:sqlite": "node scripts/sqlite-native.mjs --repair",
+    "test:isolated-postgres": "node --test tests/isolated-postgres-concurrency.test.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

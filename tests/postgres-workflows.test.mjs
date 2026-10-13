@@ -11,7 +11,7 @@ import {
   requireDependency,
 } from "./handler-harness.mjs";
 
-const packagePath = process.env.MO_BISTRO_TEST_PGLITE;
+const packagePath = process.env.MO_BISTRO_TEST_PGLITE || "@electric-sql/pglite";
 const PGlite = packagePath ? requireDependency(packagePath).PGlite : null;
 // No URL accepted: the test engine is always an empty in-memory database.
 function sqlAdapter(database) {
@@ -34,6 +34,7 @@ function sqlAdapter(database) {
 async function setup() {
   const db = new PGlite();
   await db.exec(fs.readFileSync("migrations/001_postgres_schema.sql", "utf8"));
+  await db.exec(fs.readFileSync("migrations/20261013_core_support.sql", "utf8"));
   await db.exec(
     "INSERT INTO staff_users(username,role,credential_hash) VALUES ('manager','manager','test'),('reception','reception','test'); INSERT INTO restaurant_tables(name,seats,area) VALUES ('Indoor 1',4,'indoor'),('Indoor 2',4,'indoor'),('Outdoor 1',4,'outdoor');",
   );

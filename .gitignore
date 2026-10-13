@@ -62,3 +62,5 @@ security-backups/
 migration-audit/
 .next/
 node_modules/
+# Local test connection files may contain credentials.
+isolated-postgres.local.json

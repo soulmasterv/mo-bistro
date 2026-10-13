@@ -1,79 +1,145 @@
-// Opt-in only. Never accepts the application's Production/database environment variables.
+// Synthetic writes only after explicit approval; never uses an app URL as its target.
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { randomBytes, createHash } from "node:crypto";
-import { load } from "./handler-harness.mjs";
-const approved =
-  process.env.MO_BISTRO_ISOLATED_DB_TEST_ACK ===
-  "I_APPROVE_SYNTHETIC_SCHEMA_WRITES";
-const url = process.env.MO_BISTRO_ISOLATED_TEST_URL;
-test(
-  "isolated PostgreSQL: cross-connection QR/walk-in capacity and duplicate protection",
-  { skip: !approved || !url },
-  async () => {
-    const { default: postgres } = await import("postgres");
-    const schema = "mo_bistro_qa_" + randomBytes(8).toString("hex");
-    assert.match(schema, /^mo_bistro_qa_[a-f0-9]{16}$/);
-    const admin = postgres(url, {
-      max: 1,
-      ssl: "require",
-      connect_timeout: 10,
-    });
-    let sql;
-    try {
-      await admin.unsafe(`CREATE SCHEMA "${schema}"`);
-      sql = postgres(url, {
-        max: 4,
-        ssl: "require",
-        connect_timeout: 10,
-        connection: { search_path: schema },
-      });
-      await sql.unsafe(
-        fs.readFileSync("migrations/001_postgres_schema.sql", "utf8"),
-      );
-      await sql`INSERT INTO restaurant_settings(key,value) VALUES ('queue_capacity','1'),('approval_required','false')`;
-      const { createBookingPostgres } = load("src/lib/booking-creation.ts", {
-        "@/lib/postgres-db": { getPostgres: () => sql },
-        "@/lib/staff-auth": {},
-        "@/lib/staff-auth-postgres": {},
-        "@/lib/guest-tracking": {
-          newTrackingToken: () => randomBytes(32).toString("hex"),
-          hashTrackingToken: (t) =>
-            createHash("sha256").update(t).digest("hex"),
-        },
-        "@/lib/whatsapp/service": { recordBookingConsent: async () => {} },
-      });
-      const guest = {
-        name: "Synthetic Guest",
-        phone: "01012345678",
-        party_size: 2,
-        seating_preference: "any",
-      };
-      const capacity = await Promise.all([
-        createBookingPostgres(guest, { source: "qr" }),
-        createBookingPostgres(
-          { ...guest, phone: "01012345679" },
-          { source: "staff" },
-        ),
-      ]);
-      assert.equal(capacity.filter((r) => "id" in r).length, 1);
-      assert.equal(capacity.filter((r) => r.error === "full").length, 1);
-      await sql`DELETE FROM guests`;
-      await sql`UPDATE restaurant_settings SET value='5' WHERE key='queue_capacity'`;
-      const duplicate = await Promise.all([
-        createBookingPostgres(guest, { source: "qr" }),
-        createBookingPostgres(guest, { source: "staff" }),
-      ]);
-      assert.equal(duplicate.filter((r) => "id" in r).length, 1);
-      assert.equal(duplicate.filter((r) => r.error === "duplicate").length, 1);
-      const [count] = await sql`SELECT COUNT(*)::integer AS count FROM guests`;
-      assert.equal(count.count, 1);
-    } finally {
-      if (sql) await sql.end();
-      // Only our generated temporary schema can be removed. No public schema/table is modified.
-      await admin.unsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
-      await admin.end();
+import { load, harness, request, context } from "./handler-harness.mjs";
+import { ACK, configuredTarget, validateTarget } from "./isolated-postgres-target.mjs";
+
+test("isolated target rejects Preview, missing approval, host mismatch and app URLs before connecting", () => {
+  const c = { url: "postgres://synthetic:synthetic@localhost/mo_bistro_qa_disposable",
+    databaseName: "mo_bistro_qa_disposable", host: "localhost", ack: ACK, ssl: false };
+  assert.equal(validateTarget(c).database,c.databaseName);
+  assert.throws(()=>validateTarget({...c,ack:undefined}));
+  assert.throws(()=>validateTarget({...c,host:"different"}));
+  assert.throws(()=>validateTarget({...c,url:"postgres://localhost/mo_bistro_2",databaseName:"mo_bistro_2"}));
+  assert.throws(()=>validateTarget(c,[c.url]));
+  assert.throws(()=>validateTarget({...c,url:"postgres://remote/mo_bistro_qa_disposable",host:"remote"}));
+});
+const config = configuredTarget();
+test("actual isolated PostgreSQL booking, permits, seating and queue concurrency", {skip:!config}, async t => {
+  const target=validateTarget(config,[process.env.MO_BISTRO_POSTGRES_URL,process.env.DATABASE_URL,process.env.LICENSE_ADMIN_DATABASE_URL]);
+  const {default:postgres}=await import("postgres");
+  const schema="mo_bistro_qa_"+randomBytes(8).toString("hex");
+  assert.match(schema,/^mo_bistro_qa_[a-f0-9]{16}$/);
+  const admin=postgres(target.url,{max:1,ssl:target.ssl,connect_timeout:10});
+  let sql,created=false;
+  try {
+    assert.equal((await admin`SELECT current_database() AS name`)[0].name,target.database);
+    const [inventory]=await admin`SELECT COUNT(*)::integer AS count FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE left(n.nspname,3)<>'pg_' AND n.nspname<>'information_schema' AND c.relkind IN ('r','p','v','m','f')`;
+    assert.equal(inventory.count,0,"Disposable database must have no existing app relations; no writes attempted");
+    await admin.unsafe(`CREATE SCHEMA "${schema}"`); created=true;
+    sql=postgres(target.url,{max:4,ssl:target.ssl,connect_timeout:10,
+      connection:{search_path:schema,statement_timeout:15000,lock_timeout:5000}});
+    assert.equal((await sql`SELECT current_schema() AS name`)[0].name,schema);
+    await sql.unsafe(fs.readFileSync("migrations/001_postgres_schema.sql","utf8"));
+    // Scoped runtime fixtures; never rewrite/apply public-qualified upgrade migrations.
+    // This proves locking/runtime SQL, not fresh-install/upgrade migration compatibility.
+    await sql.unsafe(`ALTER TABLE guests ADD COLUMN seated_at TIMESTAMPTZ;
+      CREATE TABLE qr_registration_permits(id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        token_hash TEXT NOT NULL UNIQUE CHECK(token_hash ~ '^[a-f0-9]{64}$'),qr_code_hash TEXT NOT NULL CHECK(qr_code_hash ~ '^[a-f0-9]{64}$'),
+        qr_expires_at BIGINT NOT NULL,expires_at BIGINT NOT NULL,used_at TIMESTAMPTZ,CHECK(expires_at>=qr_expires_at));
+      CREATE TABLE simple_table_capacity(area TEXT PRIMARY KEY CHECK(area IN ('indoor','outdoor')),
+        total_tables INTEGER NOT NULL CHECK(total_tables BETWEEN 0 AND 500),occupied_tables INTEGER NOT NULL DEFAULT 0,
+        max_party_size INTEGER NOT NULL CHECK(max_party_size BETWEEN 1 AND 30),CHECK(occupied_tables BETWEEN 0 AND total_tables));
+      CREATE TABLE simple_table_events(id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        operation_id TEXT NOT NULL UNIQUE,area TEXT NOT NULL REFERENCES simple_table_capacity(area),
+        kind TEXT NOT NULL CHECK(kind IN ('occupied','released')),actor_id INTEGER NOT NULL REFERENCES staff_users(id),
+        guest_id INTEGER REFERENCES guests(id) ON DELETE SET NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
+    await sql`INSERT INTO staff_users(username,role,credential_hash) VALUES ('synthetic','manager','synthetic')`;
+    await sql`INSERT INTO restaurant_settings(key,value) VALUES ('queue_capacity','50'),('approval_required','false')`;
+    await sql`INSERT INTO seating_settings(key,value) VALUES ('table_view_mode','detailed')`;
+    await sql`INSERT INTO restaurant_tables(name,seats,area) VALUES ('Synthetic 1',4,'indoor'),('Synthetic 2',4,'indoor')`;
+    await sql`INSERT INTO simple_table_capacity(area,total_tables,max_party_size) VALUES ('indoor',1,4),('outdoor',1,4)`;
+    const mocks={"@/lib/postgres-db":{getPostgres:()=>sql},"@/lib/staff-auth":{},"@/lib/staff-auth-postgres":{},
+      "@/lib/guest-tracking":{newTrackingToken:()=>randomBytes(32).toString("hex"),hashTrackingToken:token=>createHash("sha256").update(token).digest("hex")},
+      "@/lib/whatsapp/policy":{whatsappEnabled:()=>false},"@/lib/whatsapp/service":{recordBookingConsent:async()=>{},scheduleReview:async()=>{}}};
+    const {createBookingPostgres:create}=load("src/lib/booking-creation.ts",mocks);
+    const named=load("src/lib/seating-postgres.ts",mocks),simple=load("src/lib/simple-table-postgres.ts",mocks);
+    const h=harness(); h.mocks["@/lib/postgres-db"]=mocks["@/lib/postgres-db"];
+    const queue=h.route("guests/[id]"),management=h.route("management");
+    let serial=0;
+    const guest=()=>({name:"Synthetic Guest",phone:"010"+String(++serial).padStart(8,"0"),party_size:2,seating_preference:"any"});
+    const book=async()=>{const r=await create(guest(),{source:"staff"});assert.ok("id" in r);return r.id;};
+    const successes=results=>{
+      for(const r of results) if(r.status==="rejected") assert.equal(r.reason?.name,"WorkflowError");
+      return results.filter(r=>r.status==="fulfilled").length;
+    };
+    async function reset(mode="detailed",capacity=50) {
+      await sql`DELETE FROM simple_table_events`; await sql`DELETE FROM seating_history`; await sql`DELETE FROM guests`;
+      await sql`DELETE FROM qr_registration_permits`; await sql`UPDATE restaurant_tables SET status='free'`;
+      await sql`UPDATE simple_table_capacity SET occupied_tables=0`;
+      await sql`UPDATE seating_settings SET value=${mode} WHERE key='table_view_mode'`;
+      await sql`UPDATE restaurant_settings SET value=${String(capacity)} WHERE key='queue_capacity'`;
     }
-  },
-);
+    await t.test("uses independent PostgreSQL backends",async()=>{
+      const pids=await Promise.all(Array.from({length:4},()=>sql.begin(async tx=>(await tx`SELECT pg_backend_pid() AS pid,pg_sleep(0.1)`)[0].pid)));
+      assert.ok(new Set(pids).size>=2);
+    });
+    await t.test("mixed QR/staff joins enforce capacity",async()=>{
+      await reset("detailed",2);
+      const rs=await Promise.all(Array.from({length:12},(_,i)=>create(guest(),{source:i%2 ? "qr":"staff"})));
+      assert.equal(rs.filter(r=>"id" in r).length,2);assert.equal(rs.filter(r=>r.error==="full").length,10);
+      assert.equal((await sql`SELECT COUNT(*)::integer AS count FROM guests`)[0].count,2);
+    });
+    await t.test("same phone has one active booking",async()=>{
+      await reset();const input=guest(),rs=await Promise.all(Array.from({length:6},(_,i)=>create(input,{source:i%2 ? "qr":"staff"})));
+      assert.equal(rs.filter(r=>"id" in r).length,1);assert.equal(rs.filter(r=>r.error==="duplicate").length,5);
+    });
+    await t.test("QR permit once-only and rollback after insertion failure",async()=>{
+      await reset();const tokenHash="a".repeat(64),codeHash="b".repeat(64),expiry=Date.now()+60000,permit={tokenHash,codeHash};
+      await sql`INSERT INTO qr_registration_permits(token_hash,qr_code_hash,qr_expires_at,expires_at) VALUES (${tokenHash},${codeHash},${expiry},${expiry})`;
+      await assert.rejects(create({...guest(),name:null},{source:"qr",permit}));
+      assert.equal((await sql`SELECT used_at FROM qr_registration_permits`)[0].used_at,null);
+      const rs=await Promise.all([create(guest(),{source:"qr",permit}),create(guest(),{source:"qr",permit})]);
+      assert.equal(rs.filter(r=>"id" in r).length,1);assert.equal(rs.filter(r=>r.error==="expired").length,1);
+    });
+    await t.test("capacity changes coordinate with creation",async()=>{
+      await reset("detailed",1);
+      const settings={qr_rotation_seconds:"300",qr_required:false,approval_required:false,queue_capacity:2,restaurant_name:"Synthetic Restaurant"};
+      const rs=await Promise.all([create(guest(),{source:"staff"}),management.PATCH(request("PATCH",settings)),create(guest(),{source:"qr"})]);
+      assert.equal(rs[1].status,200);assert.ok((await sql`SELECT COUNT(*)::integer AS count FROM guests`)[0].count<=2);
+    });
+    await t.test("two guests cannot claim one named table",async()=>{
+      await reset();const ids=[await book(),await book()];
+      assert.equal(successes(await Promise.allSettled(ids.map(id=>named.assignTablePostgres(id,1)))),1);
+      assert.equal((await sql`SELECT COUNT(*)::integer AS count FROM guests WHERE status='seated'`)[0].count,1);
+      assert.ok((await sql`SELECT seated_at FROM guests WHERE status='seated'`)[0].seated_at);
+    });
+    await t.test("one guest cannot claim two named tables",async()=>{
+      await reset();const id=await book();
+      assert.equal(successes(await Promise.allSettled([named.assignTablePostgres(id,1),named.assignTablePostgres(id,2)])),1);
+      assert.equal((await sql`SELECT COUNT(*)::integer AS count FROM restaurant_tables WHERE status='occupied'`)[0].count,1);
+    });
+    await t.test("cancel/seat and call/cancel preserve final state",async()=>{
+      await reset();const id=await book();
+      await Promise.allSettled([named.assignTablePostgres(id,1),queue.PATCH(request("PATCH",{action:"cancel"}),context(id))]);
+      const [row]=await sql`SELECT status FROM guests WHERE id=${id}`,[table]=await sql`SELECT status FROM restaurant_tables WHERE id=1`;
+      assert.ok(["seated","cancelled"].includes(row.status));assert.equal(table.status,row.status==="seated" ? "occupied":"free");
+      const other=await book(),rs=await Promise.all([queue.PATCH(request("PATCH",{action:"call"}),context(other)),queue.PATCH(request("PATCH",{action:"cancel"}),context(other))]);
+      assert.ok(rs.every(r=>[200,409].includes(r.status)));assert.equal((await sql`SELECT status FROM guests WHERE id=${other}`)[0].status,"cancelled");
+    });
+    await t.test("duplicate named releases preserve seated_at",async()=>{
+      await reset();const id=await book();await named.assignTablePostgres(id,1);
+      const [before]=await sql`SELECT seated_at FROM guests WHERE id=${id}`;
+      assert.equal(successes(await Promise.allSettled([named.releaseTablePostgres(1),named.releaseTablePostgres(1)])),1);
+      const [after]=await sql`SELECT seated_at,table_id FROM guests WHERE id=${id}`;
+      assert.equal(new Date(after.seated_at).getTime(),new Date(before.seated_at).getTime());assert.equal(after.table_id,null);
+    });
+    await t.test("Simple Mode capacity and retry-safe release",async()=>{
+      await reset("simple");const ids=[await book(),await book()];
+      assert.equal(successes(await Promise.allSettled(ids.map(id=>simple.assignSimpleTable(id,"indoor",1)))),1);
+      const rs=await Promise.all([simple.freeSimpleTable("indoor",1,"synthetic-release"),simple.freeSimpleTable("indoor",1,"synthetic-release")]);
+      assert.equal(rs.filter(r=>r.repeated).length,1);assert.equal((await sql`SELECT occupied_tables FROM simple_table_capacity WHERE area='indoor'`)[0].occupied_tables,0);
+    });
+  } finally {
+    try { if(sql) await sql.end({timeout:5}); }
+    finally {
+      try {
+        // Remove only our exact, validated generated identifier; never public.
+        if(created) await admin.unsafe(`DROP SCHEMA "${schema}" CASCADE`);
+      } finally { await admin.end({timeout:5}); }
+    }
+  }
+});

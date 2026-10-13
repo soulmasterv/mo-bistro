@@ -109,11 +109,13 @@ export async function currentStaff(): Promise<StaffSession | null> {
     return currentStaffPostgres();
   }
 
-  initStaff();
-
   const token = (await cookies()).get(COOKIE_NAME)?.value;
 
   if (!token || !/^[a-f0-9]{64}$/.test(token)) return null;
+
+  // Request-time cookies must be read before SQLite initialization. Builds and
+  // anonymous requests have no session to resolve and must not open a database.
+  initStaff();
 
   const staff = db.prepare(`
     SELECT u.id,u.username,u.role

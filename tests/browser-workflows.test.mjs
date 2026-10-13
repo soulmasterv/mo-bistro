@@ -6,9 +6,13 @@ import os from "node:os";
 import http from "node:http";
 import { createRequire } from "node:module";
 const dependency = createRequire(import.meta.url);
-const tools = process.env.MO_BISTRO_TEST_TOOLS;
-const playwrightPath = process.env.MO_BISTRO_TEST_PLAYWRIGHT;
-const screenshots = process.env.MO_BISTRO_UI_SCREENSHOTS;
+function argument(name) {
+  const index = process.argv.indexOf(name);
+  return index < 0 ? undefined : process.argv[index + 1];
+}
+const tools = argument("--tools") || process.env.MO_BISTRO_TEST_TOOLS;
+const playwrightPath = argument("--playwright") || process.env.MO_BISTRO_TEST_PLAYWRIGHT;
+const screenshots = argument("--screenshots") || process.env.MO_BISTRO_UI_SCREENSHOTS;
 if (screenshots) fs.mkdirSync(screenshots, { recursive: true });
 
 // Actual React components and compiled application CSS, with a local fixture API.
