@@ -3,6 +3,7 @@ import { currentStaff } from "@/lib/staff-auth";
 import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import { getPostgres } from "@/lib/postgres-db";
+import { recordBulkActivity, setActivityActor } from "@/lib/staff-activity";
 
 export const runtime = "nodejs";
 const headers = { "Cache-Control": "no-store" };
@@ -27,6 +28,8 @@ export async function POST(request: Request) {
       // Same locks as seating/mode changes and public/staff registrations.
       await tx`SELECT pg_advisory_xact_lock(741122)`;
       await tx`SELECT pg_advisory_xact_lock(91401283)`;
+      await setActivityActor(tx, staff.id);
+      await recordBulkActivity(tx, staff.id, body.action === "free_tables" ? "free_all_tables" : "cancel_queue");
       if (body.action === "cancel_queue") {
         const cancelled = await tx`UPDATE guests SET status='cancelled',updated_at=CURRENT_TIMESTAMP
           WHERE status IN ('waiting','called') RETURNING id`;

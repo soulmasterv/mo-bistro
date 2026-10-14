@@ -32,7 +32,7 @@ export async function POST(
 
   try {
     const result = process.env.MO_BISTRO_DB === "postgres"
-      ? await releaseTablePostgres(tableId)
+      ? await releaseTablePostgres(tableId, staff.id)
       : releaseTable(tableId);
     return NextResponse.json(result);
   } catch (error) {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { currentStaff } from "@/lib/staff-auth";
 import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { WorkflowError } from "@/lib/workflow-error";
+import { setActivityActor } from "@/lib/staff-activity";
 import {
   freeSimpleTableInTransaction,
   type Area,
@@ -51,6 +52,7 @@ export async function PATCH(
     const result = await sql.begin(async (tx) => {
       // Same lock used by the existing seating/release functions.
       await tx`SELECT pg_advisory_xact_lock(741122)`;
+      await setActivityActor(tx, staff.id);
 
       const [pending] = await tx`
         SELECT id, table_id, NULLIF(to_jsonb(table_ready_requests)->>'area', '') AS area, COALESCE(to_jsonb(table_ready_requests)->>'inventory_mode','detailed') AS inventory_mode, status

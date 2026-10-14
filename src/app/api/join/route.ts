@@ -137,13 +137,15 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             error:
-              result.error === "full"
+              result.error === "paused"
+                ? "The waitlist is temporarily closed. Please speak with reception."
+                : result.error === "full"
                 ? "The waitlist is currently full."
                 : result.error === "expired"
                   ? "Your QR registration has expired. Please scan the current QR code."
                   : "This phone number already has an active registration. Please ask reception for assistance.",
           },
-          { status: result.error === "expired" ? 403 : 409 },
+          { status: result.error === "expired" ? 403 : result.error === "paused" ? 503 : 409 },
         );
       if (whatsappEnabled())
         after(async () => {
@@ -163,6 +165,7 @@ export async function POST(request: Request) {
 
     const approvalRequired = await confirmationRequired();
     const createGuest = db.transaction(() => {
+      if (getSetting("public_waitlist_paused", "false") === "true") return "paused" as const;
       const active = db
         .prepare(
           "SELECT COUNT(*) AS count FROM guests WHERE status IN ('waiting','called')",
@@ -205,6 +208,8 @@ export async function POST(request: Request) {
     });
 
     const id = createGuest();
+    if (id === "paused") return NextResponse.json(
+      { error: "The waitlist is temporarily closed. Please speak with reception." }, { status: 503 });
 
     if (id === "full")
       return NextResponse.json(

@@ -5,6 +5,7 @@ import { getPostgres } from "@/lib/postgres-db";
 import type { TransactionSql } from "postgres";
 import { whatsappEnabled } from "@/lib/whatsapp/policy";
 import { scheduleReview } from "@/lib/whatsapp/service";
+import { setActivityActor } from "@/lib/staff-activity";
 export type Area = "indoor" | "outdoor";
 export type SimpleCapacity = {
   area: Area;
@@ -40,6 +41,7 @@ export async function freeSimpleTableInTransaction(
   actorId: number,
   operationId: string,
 ) {
+  await setActivityActor(tx, actorId);
   await requireSimpleInventory(tx);
   const [existing] =
     await tx`SELECT area,kind,actor_id FROM simple_table_events WHERE operation_id=${operationId}`;
@@ -80,6 +82,7 @@ export async function assignSimpleTable(
 ) {
   return getPostgres().begin(async (tx) => {
     await tx`SELECT pg_advisory_xact_lock(741122)`;
+    await setActivityActor(tx, actorId);
     await requireSimpleInventory(tx);
     const [guest] =
       await tx`SELECT id,status,party_size,seating_preference FROM guests WHERE id=${guestId} FOR UPDATE`;

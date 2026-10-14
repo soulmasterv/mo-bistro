@@ -1,4 +1,6 @@
 import { hasGuestEtaColumn } from "@/lib/guest-eta-support";
+import { currentStaff } from "@/lib/staff-auth";
+import { setActivityActor } from "@/lib/staff-activity";
 import { NextResponse, after } from "next/server";
 import { scheduleAlmostReady, dispatchOutbox } from "@/lib/whatsapp/service";
 import { whatsappEnabled } from "@/lib/whatsapp/policy";
@@ -61,8 +63,10 @@ export async function PATCH(
 
 
     const minutes = parsed.data.minutes;
+    const actor = await currentStaff();
 
     const updated = await sql.begin(async tx => {
+      await setActivityActor(tx, actor?.id);
       const rows = await tx`
       UPDATE guests
       SET eta_at = CASE

@@ -19,7 +19,7 @@ type Options = {
   consent?: BookingConsent;
 };
 export type CreationResult =
-  { id: number; token: string } | { error: "full" | "duplicate" | "expired" };
+  { id: number; token: string } | { error: "full" | "duplicate" | "expired" | "paused" };
 export async function createBookingPostgres(
   guest: Booking,
   options: Options,
@@ -30,11 +30,12 @@ export async function createBookingPostgres(
     // Both entry points and capacity setting updates hold the same lock.
     await tx`SELECT pg_advisory_xact_lock(91401283)`;
     const rows =
-      await tx`SELECT key,value FROM restaurant_settings WHERE key IN ('queue_capacity','approval_required','require_confirmation')`;
+      await tx`SELECT key,value FROM restaurant_settings WHERE key IN ('queue_capacity','approval_required','require_confirmation','public_waitlist_paused')`;
     const settings: Record<string, string> = Object.fromEntries(
       rows.map((row) => [row.key, row.value]),
     );
     const capacity = Number(settings.queue_capacity ?? "50");
+    if (options.source === "qr" && settings.public_waitlist_paused === "true") return { error: "paused" };
     if (!Number.isInteger(capacity) || capacity < 1 || capacity > 500)
       throw Error("Invalid queue capacity configuration");
     const [active] =

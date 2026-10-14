@@ -25,6 +25,17 @@ function isValidFullName(value: string) {
 }
 
 export default function JoinPage() {
+  const [publicPaused, setPublicPaused] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const refresh = () => { void fetch("/api/public/waitlist", {cache:"no-store"})
+      .then(async response => { if (response.ok) { const data = await response.json(); if (active) setPublicPaused(data.paused === true); } })
+      .catch(() => {}); };
+    refresh();
+    const timer = setInterval(refresh, 30000);
+    window.addEventListener("focus", refresh);
+    return () => { active = false; clearInterval(timer); window.removeEventListener("focus", refresh); };
+  }, []);
   const [name, setName] = useState("");
   const [nameTouched, setNameTouched] = useState(false);
   const [phone, setPhone] = useState("");
@@ -124,7 +135,7 @@ export default function JoinPage() {
 
   async function joinWaitlist(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (loading) return;
+    if (loading || publicPaused) return;
 
     setNameTouched(true);
     if (!isValidFullName(name)) {
@@ -305,11 +316,15 @@ export default function JoinPage() {
                 </div>
               )}
 
-              {qrState === "valid" && (
+              {publicPaused && <div role="status" className="rounded-2xl border border-[#E4DCD0] bg-[#FFFDF9] p-6">
+                <h3 className="font-serif text-2xl">Waitlist temporarily closed</h3>
+                <p className="mt-3 text-sm">Please speak with reception. Existing bookings are still active.</p>
+              </div>}
+              {qrState === "valid" && !publicPaused && (
               <RestaurantWaitDisplay />
               )}
 
-              {qrState === "valid" && (
+              {qrState === "valid" && !publicPaused && (
               <form onSubmit={joinWaitlist} className="space-y-5">
                 <div>
                   <label

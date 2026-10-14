@@ -3,6 +3,7 @@ import "server-only";
 import { getPostgres } from "@/lib/postgres-db";
 import { whatsappEnabled } from "@/lib/whatsapp/policy";
 import { scheduleReview } from "@/lib/whatsapp/service";
+import { setActivityActor } from "@/lib/staff-activity";
 
 export async function getAssignableTablesPostgres(guestId: number) {
   const sql = getPostgres();
@@ -23,11 +24,12 @@ export async function getAssignableTablesPostgres(guestId: number) {
   };
 }
 
-export async function assignTablePostgres(guestId: number, tableId: number) {
+export async function assignTablePostgres(guestId: number, tableId: number, actorId?: number) {
   const sql = getPostgres();
   return sql.begin(async tx => {
     // Serialize seating and inventory-mode changes.
     await tx`SELECT pg_advisory_xact_lock(741122)`;
+    await setActivityActor(tx, actorId);
     const [mode] = await tx`SELECT value FROM seating_settings WHERE key='table_view_mode'`;
     if (mode?.value === "simple") throw new WorkflowError("Use anonymous area seating in Simple Mode.");
     const [guest] = await tx`SELECT id,status,party_size,seating_preference,table_id FROM guests WHERE id=${guestId} FOR UPDATE`;
@@ -52,10 +54,11 @@ export async function assignTablePostgres(guestId: number, tableId: number) {
   });
 }
 
-export async function releaseTablePostgres(tableId: number) {
+export async function releaseTablePostgres(tableId: number, actorId?: number) {
   const sql = getPostgres();
   return sql.begin(async tx => {
     await tx`SELECT pg_advisory_xact_lock(741122)`;
+    await setActivityActor(tx, actorId);
     const [mode] = await tx`SELECT value FROM seating_settings WHERE key='table_view_mode'`;
     if (mode?.value === "simple") throw new WorkflowError("Use Table free by area in Simple Mode.");
     const [table] = await tx`SELECT id,status FROM restaurant_tables WHERE id=${tableId} FOR UPDATE`;

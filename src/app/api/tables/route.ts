@@ -1,4 +1,5 @@
 import { getPostgres } from "@/lib/postgres-db";
+import { setActivityActor } from "@/lib/staff-activity";
 import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
@@ -55,6 +56,7 @@ export async function PATCH(request: Request) {
     try {
       const result = await getPostgres().begin(async (tx) => {
         await tx`SELECT pg_advisory_xact_lock(741122)`;
+        await setActivityActor(tx, staff.id);
         const [mode] =
           await tx`SELECT value FROM seating_settings WHERE key='table_view_mode'`;
         if (mode?.value === "simple")

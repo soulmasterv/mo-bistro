@@ -214,6 +214,7 @@ test(
         max_party_size: 4,
       },
     ];
+    let publicPaused=false;
     const server = http.createServer(async (req, res) => {
       if(/^\/menus\/menu-page-\d{2}\.jpg$/.test(req.url)) {
         res.setHeader("content-type","image/jpeg");res.end(fs.readFileSync("public"+req.url));return;
@@ -380,6 +381,15 @@ test(
                 restaurant_name: "Mo Bistro",
               },
             };
+            break;
+          case "/api/public/waitlist":
+            data={paused:publicPaused};
+            break;
+          case "/api/management/operations":
+            if(req.method==="PATCH") { assert.deepEqual(body,{paused:!publicPaused,confirm:true});publicPaused=body.paused; }
+            data={available:true,paused:publicPaused,accuracy:{samples:12,estimated_samples:8,average_wait:"30",average_error:"5",signed_error:"3",within_ten:7},
+              activityAvailable:true,activity:[{id:1,actor:"Synthetic manager",event:"public_waitlist_changed",guest_id:null,created_at:"2026-10-14T12:00:00Z",details:{paused:false}}],
+              whatsapp:{configured:{live:false},blockers:["Automatic sending is simulated."],jobs:[{guest_id:1,kind:"almost_ready",status:"simulated",due_at:"2026-10-14T12:00:00Z",delivery:null,subscribed:true,window_open:true,reason:null}]}};
             break;
           case "/api/management/staff-pin/users":
             data = {
@@ -1426,6 +1436,24 @@ test(
         }
       });
       await testPage.goto(origin+"/management");
+      const controls=testPage.getByRole("region",{name:"Service controls",exact:true});
+      await controls.getByRole("button",{name:"Pause public registrations",exact:true}).click();
+      let pauseDialog=testPage.getByRole("alertdialog",{name:"Pause public waitlist?",exact:true});
+      await pauseDialog.getByRole("button",{name:"Cancel",exact:true}).click();assert.equal(publicPaused,false);
+      await controls.getByRole("button",{name:"Pause public registrations",exact:true}).click();
+      pauseDialog=testPage.getByRole("alertdialog",{name:"Pause public waitlist?",exact:true});
+      await pauseDialog.getByRole("button",{name:"Pause registrations",exact:true}).click();
+      await controls.getByText("Paused — new public registrations are closed",{exact:true}).waitFor();
+      const pausedGuest=await testContext.newPage();await pausedGuest.goto(origin+"/join?code=test-qr");
+      await pausedGuest.getByRole("heading",{name:"Waitlist temporarily closed",exact:true}).waitFor();
+      assert.equal(await pausedGuest.getByRole("button",{name:"Join the waitlist",exact:true}).count(),0);
+      await controls.getByRole("heading",{name:"WhatsApp health",exact:true}).waitFor();
+      await controls.getByText("Delivery: not confirmed",{exact:false}).waitFor();
+      if(screenshots) await controls.screenshot({path:path.join(screenshots,"service-controls-mobile.png")});
+      await controls.getByRole("button",{name:"Reopen public waitlist",exact:true}).click();
+      await testPage.getByRole("alertdialog",{name:"Reopen public waitlist?",exact:true}).getByRole("button",{name:"Reopen waitlist",exact:true}).click();
+      await controls.getByText("Open — guests can join the waitlist",{exact:true}).waitFor();
+      await pausedGuest.reload();await pausedGuest.getByRole("button",{name:"Join the waitlist",exact:true}).waitFor();await pausedGuest.close();
       const sendTest = testPage.getByRole("button",{name:"Send Test WhatsApp",exact:true});
       await testPage.getByText(/Setup check 1 complete/).waitFor();
       await testPage.getByText(/live sending is disabled/).waitFor();

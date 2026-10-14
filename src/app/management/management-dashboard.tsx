@@ -1,6 +1,7 @@
 "use client";
 import WhatsAppPreviewTest from "@/components/whatsapp-preview-test";
 import ManagementDangerZone from "@/components/management-danger-zone";
+import ManagementOperations from "@/components/management-operations";
 import StaffAccountManager from "@/components/staff-account-manager";
 import StaffShiftScheduler from "@/components/staff-shift-scheduler";
 import DemoControls from "@/components/demo-controls";
@@ -138,6 +139,9 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
             </a>
             <a href="#danger-zone">
               <TriangleAlert size={18} /> Danger zone <ArrowUpRight size={14} />
+            </a>
+            <a href="#service-controls">
+              <SlidersHorizontal size={18} /> Service controls <ArrowUpRight size={14} />
             </a>
             <div className="bistro-nav-note">
               <span>Service, your way.</span>
@@ -286,6 +290,7 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
               <SeatingSettings />
               {showDemo && <DemoControls />}
             </section>
+            <ManagementOperations />
             <ManagementDangerZone />
           </div>
         </div>

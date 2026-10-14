@@ -593,6 +593,10 @@ summary {
   color: var(--tone-a34d48, #a34d48);
 }
 #danger-zone { border-color:#b45e54; scroll-margin-top:110px; }
+.operations-scroll { max-height:320px; overflow:auto; overscroll-behavior:contain; overflow-wrap:anywhere; }
+.operations-entry { padding:12px 0; border-bottom:1px solid var(--line); font-size:13px; }
+.operations-entry p { margin-top:5px; }
+#service-controls .bistro-panel-heading { flex-wrap:wrap; gap:12px; }
 #danger-zone .bistro-button-danger { background:transparent; color:#a93636; border:1px solid #b45e54; }
 html[data-theme="dark"] #danger-zone .bistro-button-danger { color:#f3a6a0; border-color:#b45e54; }
 #danger-zone button:disabled { opacity:.5; cursor:wait; }

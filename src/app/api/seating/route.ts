@@ -117,7 +117,7 @@ export async function POST(request: Request) {
       body.area && process.env.MO_BISTRO_DB === "postgres"
         ? await assignSimpleTable(body.guest_id, body.area, staff.id)
         : process.env.MO_BISTRO_DB === "postgres"
-          ? await assignTablePostgres(body.guest_id, body.table_id)
+          ? await assignTablePostgres(body.guest_id, body.table_id, staff.id)
           : assignTable(body.guest_id, body.table_id);
     if (whatsappEnabled()) after(async () => {
       try { await dispatchOutbox(); } catch { console.error("WhatsApp outbox dispatch deferred"); }

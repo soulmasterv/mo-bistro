@@ -1,4 +1,6 @@
 import { getPostgres } from "@/lib/postgres-db";
+import { currentStaff } from "@/lib/staff-auth";
+import { setActivityActor } from "@/lib/staff-activity";
 import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
@@ -73,13 +75,17 @@ export async function PATCH(
       cancel: ["waiting", "called"], confirm: ["waiting", "called"],
     };
     const allowed = permitted[action];
-    const updated = action === "confirm" ? await sql`
+    const actor = await currentStaff();
+    const updated = await sql.begin(async tx => {
+      await setActivityActor(tx, actor?.id);
+      return action === "confirm" ? await tx`
       UPDATE guests SET confirmed = 1, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${guestId} AND status IN ${sql(allowed)} RETURNING id
-    ` : await sql`
+      WHERE id = ${guestId} AND status=ANY(${allowed}::text[]) RETURNING id
+    ` : await tx`
       UPDATE guests SET status = ${statuses[action]}, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${guestId} AND status IN ${sql(allowed)} RETURNING id
+      WHERE id = ${guestId} AND status=ANY(${allowed}::text[]) RETURNING id
     `;
+    });
     if (updated.length) return NextResponse.json({ success: true });
     const existing = await sql`SELECT id FROM guests WHERE id = ${guestId}`;
     return NextResponse.json({ error: existing.length ? "Action not allowed for current status" : "Guest not found" },
