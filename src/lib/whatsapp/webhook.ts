@@ -28,11 +28,14 @@ export async function processMetaWebhook(payload: MetaPayload) {
       const timestamp = Number(message.timestamp);
       if (!Number.isSafeInteger(timestamp) || timestamp <= 0 || timestamp * 1000 > Date.now()+300_000) continue;
       await recordCustomerWindow(sql, phone, timestamp);
-      if (await recordPreviewInbound(message.id, phone, timestamp)) continue;
       const text = message.type === "button" ? message.button?.payload || "" :
         message.type === "text" ? message.text?.body || "" : "";
       const stopped = message.type === "text" && isStop(text);
       const subscription = parseSubscription(text);
+      // An isolated hello opens only the test window. Explicit customer consent
+      // and opt-out commands must still pass the normal ownership/security checks.
+      const previewInbound = await recordPreviewInbound(message.id, phone, timestamp);
+      if (previewInbound && !stopped && !subscription) continue;
       await sql.begin(async tx => {
         // Same phone lock as the sender: STOP and send decisions have a defined order.
         await tx`SELECT pg_advisory_xact_lock(hashtext(${phone}))`;

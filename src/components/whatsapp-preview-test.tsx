@@ -124,7 +124,7 @@ export default function WhatsAppPreviewTest() {
           <p>{automatic.live
             ? "Automatic booking delivery is enabled. Consent, recipient and message-window checks still apply."
             : "Automatic booking messages are not sent to WhatsApp: live sending is disabled. A delivered test message does not enable booking updates."}</p>
-          {automatic.isolatedTestEnabled && <p>Isolated test mode is active. Incoming messages from the test recipient do not subscribe a booking.</p>}
+          {automatic.isolatedTestEnabled && <p>Isolated test mode is active. A test message does not subscribe a booking. Send the booking’s own subscription message to enable its updates; automatic delivery remains disabled.</p>}
           {!automatic.windowTextEnabled && <p>Automatic plain-text messages within the 24-hour window are disabled.</p>}
         </div>
       )}

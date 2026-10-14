@@ -9,9 +9,11 @@ No deployed environment or database was inspected during this change.
 - General delivery requires `WHATSAPP_ENABLED=true`, `MO_BISTRO_DB=postgres`,
   `WHATSAPP_MODE=live`, and `WHATSAPP_ALLOW_LIVE_SEND=true` together. The currently
   requested `test`/`false` controls intentionally prevent real automatic sending.
-- The isolated test requires test mode with general live sending off. Its verified
-  test-recipient inbound messages are intercepted before booking subscription
-  processing. An arbitrary hello or a delivered test never grants booking consent.
+- The isolated test requires test mode with general live sending off. Ordinary
+  test-recipient messages are intercepted before booking subscription processing.
+  Explicit SUBSCRIBE and STOP/UNSUBSCRIBE commands now reach the existing consent
+  checks; the previous blanket interception incorrectly swallowed those commands.
+  An arbitrary hello or a delivered test never grants booking consent.
 - Staff-created walk-ins deliberately start with all customer permissions false.
   Staff cannot grant customer consent. A customer must send the booking-specific
   subscription command themselves for continuing updates.

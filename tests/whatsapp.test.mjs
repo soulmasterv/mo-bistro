@@ -35,6 +35,8 @@ await database.exec(
 await database.exec(
   fs.readFileSync("migrations/20261012_whatsapp_notifications.sql", "utf8"),
 );
+await database.exec(fs.readFileSync("migrations/20261012_whatsapp_preview_test.sql", "utf8"));
+await database.exec(fs.readFileSync("migrations/20261013_whatsapp_customer_windows.sql", "utf8"));
 function sqlAdapter(executor) {
   const sql = async (strings, ...values) => {
     const query = strings.reduce(
@@ -139,7 +141,7 @@ test.after(async () => {
 });
 async function reset() {
   await database.exec(
-    "TRUNCATE whatsapp_delivery_logs,whatsapp_inbound_events,whatsapp_notifications,whatsapp_booking_consents,whatsapp_contact_preferences,seating_history,guests,restaurant_tables RESTART IDENTITY CASCADE",
+    "TRUNCATE whatsapp_preview_inbound,whatsapp_preview_tests,whatsapp_customer_windows,whatsapp_delivery_logs,whatsapp_inbound_events,whatsapp_notifications,whatsapp_booking_consents,whatsapp_contact_preferences,seating_history,guests,restaurant_tables RESTART IDENTITY CASCADE",
   );
   networkCalls = 0;
   afters.length = 0;
@@ -930,6 +932,61 @@ check(
     );
   },
 );
+async function isolatedConsentCase(fn) {
+  const values={VERCEL_ENV:'preview',WHATSAPP_PREVIEW_TEST_ENABLED:'true',WHATSAPP_TEST_RECIPIENT:'201000000000',WHATSAPP_WINDOW_TEXT_ENABLED:'true',WHATSAPP_ALLOW_LIVE_SEND:'false'};
+  const previous=Object.fromEntries(Object.keys(values).map(key=>[key,env[key]]));
+  Object.assign(env,values);
+  try { await fn(); }
+  finally {for(const key of Object.keys(values)) {if(previous[key]===undefined)delete env[key];else env[key]=previous[key];}}
+}
+async function signedPreviewMessage(message,valid=true,business='1234') {
+  const payload=envelope(message);payload.entry[0].changes[0].value.metadata.phone_number_id=business;
+  const raw=JSON.stringify(payload);
+  const signature='sha256='+createHmac('sha256',env.META_APP_SECRET).update(raw).digest('hex');
+  return load('src/app/api/whatsapp/webhook/route.ts').POST(new Request('https://bistro.test/api/whatsapp/webhook',{
+    method:'POST',headers:{'x-hub-signature-256':valid?signature:'sha256='+'0'.repeat(64)},body:raw,
+  }));
+}
+check('isolated Preview records hello without consent, accepts owned signed SUBSCRIBE once and never dispatches',async()=>isolatedConsentCase(async()=>{
+  const b=await booking({whatsapp_confirmation_consent:true});
+  const make=(id,body)=>inbound(b,id,{timestamp:String(Math.floor(Date.now()/1000)-1),text:{body}});
+  assert.equal((await signedPreviewMessage(make('test-hello','Hello'))).status,200);
+  assert.equal((await service.subscriptionState(b.token)).subscribed,false);
+  assert.equal((await database.query('SELECT count(*) AS n FROM whatsapp_inbound_events')).rows[0].n,0);
+  const message=make('test-owned-subscribe',`SUBSCRIBE ${b.id} ${b.code}`);
+  assert.equal((await signedPreviewMessage(message)).status,200);
+  assert.equal((await service.subscriptionState(b.token)).subscribed,true);
+  assert.equal((await signedPreviewMessage(message)).status,200);
+  assert.equal((await database.query('SELECT count(*) AS n FROM whatsapp_inbound_events')).rows[0].n,1);
+  assert.equal((await database.query('SELECT count(*) AS n FROM whatsapp_preview_inbound')).rows[0].n,2);
+  assert.equal((await jobs())[0].status,'pending');assert.equal((await jobs())[0].attempts,0);
+  assert.equal(afters.length,0);assert.equal(networkCalls,0);
+}));
+check('isolated Preview subscription still rejects unsigned, wrong-business, forged-code, wrong-phone and expired commands',async()=>isolatedConsentCase(async()=>{
+  const b=await booking();
+  assert.equal((await signedPreviewMessage(inbound(b),false)).status,401);
+  assert.equal((await signedPreviewMessage(inbound(b),true,'other-business')).status,200);
+  assert.equal((await signedPreviewMessage(inbound(b,randomUUID(),{text:{body:`SUBSCRIBE ${b.id} ${'0'.repeat(64)}`}}))).status,200);
+  assert.equal((await signedPreviewMessage(inbound(b,randomUUID(),{from:'201000000001'}))).status,200);
+  await sql`UPDATE whatsapp_booking_consents SET subscription_expires_at=NOW()-INTERVAL '1 minute' WHERE guest_id=${b.id}`;
+  assert.equal((await signedPreviewMessage(inbound(b))).status,200);
+  assert.equal((await service.subscriptionState(b.token)).subscribed,false);
+  assert.equal((await database.query("SELECT count(*) AS n FROM whatsapp_inbound_events WHERE action='subscribe'")).rows[0].n,0);
+  assert.equal(afters.length,0);assert.equal(networkCalls,0);
+}));
+check('isolated Preview respects mixed-case STOP and UNSUBSCRIBE and invalidates pending notifications',async()=>isolatedConsentCase(async()=>{
+  const b=await booking({whatsapp_confirmation_consent:true,whatsapp_feedback_consent:true});
+  for(const command of ['sToP','UnSuBsCrIbE']) {
+    await sql`UPDATE whatsapp_contact_preferences SET opted_out_at=NULL WHERE phone=${b.phone}`;
+    assert.equal((await signedPreviewMessage(inbound(b))).status,200);
+    assert.equal((await service.subscriptionState(b.token)).subscribed,true);
+    assert.equal((await signedPreviewMessage(inbound(b,randomUUID(),{text:{body:command}}))).status,200);
+    assert.equal((await service.subscriptionState(b.token)).subscribed,false);
+    assert.equal((await service.subscriptionState(b.token)).feedbackConsent,false);
+    assert.equal((await jobs())[0].status,'skipped');
+  }
+  assert.equal(afters.length,0);assert.equal(networkCalls,0);
+}));
 for (const [name, fn] of cases)
   test(name, async () => {
     await reset();

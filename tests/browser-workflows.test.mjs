@@ -1381,7 +1381,7 @@ test(
       const sendTest = testPage.getByRole("button",{name:"Send Test WhatsApp",exact:true});
       await testPage.getByText(/Setup check 1 complete/).waitFor();
       await testPage.getByText(/live sending is disabled/).waitFor();
-      await testPage.getByText(/do not subscribe a booking/).waitFor();
+      await testPage.getByText(/A test message does not subscribe a booking/).waitFor();
       holdSetup = true;
       await testPage.getByRole("button",{name:"Check setup",exact:true}).click();
       await testPage.getByRole("button",{name:"Checking setup…",exact:true}).waitFor();
