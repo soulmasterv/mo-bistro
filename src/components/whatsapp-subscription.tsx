@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { RefreshCw } from "lucide-react";
 type Subscription = {
   available: boolean;
   subscribed?: boolean;
@@ -20,6 +21,8 @@ export default function WhatsappSubscription({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [awaitingReply, setAwaitingReply] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const checkingRef = useRef(false);
   const refresh = useCallback(async () => {
     const response = await fetch(
       `/api/whatsapp/subscription?token=${encodeURIComponent(token)}`,
@@ -78,7 +81,31 @@ export default function WhatsappSubscription({
         </a>
       )}
       {!subscription.subscribed && awaitingReply && <p role="status" className="guest-small-note">Waiting for WhatsApp confirmation. Your subscription activates after we receive your booking-specific reply.</p>}
-      {!subscription.subscribed && <button type="button" className="guest-subscription-refresh" onClick={() => { setError(""); void refresh().catch((err: Error) => setError(err.message)); }}>Check subscription status</button>}
+      {!subscription.subscribed && (
+        <button
+          type="button"
+          className="guest-subscription-refresh"
+          disabled={checking}
+          aria-busy={checking}
+          onClick={async () => {
+            if (checkingRef.current) return;
+            checkingRef.current = true;
+            setChecking(true);
+            setError("");
+            try {
+              await refresh();
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Could not check your subscription.");
+            } finally {
+              checkingRef.current = false;
+              setChecking(false);
+            }
+          }}
+        >
+          <RefreshCw size={15} aria-hidden="true" />
+          {checking ? "Checking subscription…" : "Check subscription status"}
+        </button>
+      )}
       {subscription.subscribed && subscription.feedbackConsent && (
         <p className="guest-review-status">Review requests enabled</p>
       )}
@@ -115,7 +142,7 @@ export default function WhatsappSubscription({
               }}
             />
             <span>
-              Optional: send me one review request 60 minutes after seating.
+              Send me one review request 60 minutes after seating.
             </span>
           </label>
         </details>

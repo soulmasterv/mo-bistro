@@ -302,7 +302,7 @@ export default function Home() {
             </button>
             <button
               type="button"
-              className="bistro-button bistro-button-secondary"
+              className="bistro-button bistro-button-secondary reception-header-tables"
               onClick={() => setShowTables(true)}
             >
               <Armchair size={18} />

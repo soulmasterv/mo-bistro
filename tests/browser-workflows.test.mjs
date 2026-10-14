@@ -652,7 +652,10 @@ test(
           await page.evaluate(()=>window.dispatchEvent(new Event("mo-bistro-tables-changed")));
           await overview.getByText("30m",{exact:true}).waitFor();
         }
-        await page.getByRole("button", { name: "Tables", exact: true }).click();
+        const tablesShortcut = page.getByRole("button", { name: /^(Tables|Active Tables)$/, exact: true });
+        assert.equal(await tablesShortcut.count(), 1, `One visible Tables shortcut at ${width}px`);
+        assert.equal(await tablesShortcut.innerText(), width >= 1100 ? "Active Tables" : "Tables");
+        await tablesShortcut.click();
         await page
           .getByRole("button", { name: "Clear Indoor 1", exact: true })
           .waitFor();
@@ -972,7 +975,7 @@ test(
           });
         await page.keyboard.press("Escape");
         await seat.waitFor({ state: "hidden" });
-        await page.getByRole("button", { name: "Tables", exact: true }).click();
+        await page.getByRole("button", { name: /^(Tables|Active Tables)$/, exact: true }).click();
         await page
           .getByRole("button", { name: "Clear Indoor 1", exact: true })
           .click();
@@ -997,7 +1000,7 @@ test(
         mode = "simple";
         await page.reload();
         await page.waitForFunction(expected => document.querySelectorAll('.reception-service-strip dd')[1]?.textContent === expected, `${2-occupied} / 2 free`);
-        await page.getByRole("button", { name: "Tables", exact: true }).click();
+        await page.getByRole("button", { name: /^(Tables|Active Tables)$/, exact: true }).click();
         await page
           .getByRole("button", { name: "Table free", exact: true })
           .first()
@@ -1301,8 +1304,11 @@ test(
         await guestPage.waitForFunction(() => document.documentElement.dataset.theme === "guest-light");
         if(!subscribed) {
           await guestPage.getByRole("link",{name:"Get WhatsApp updates",exact:true}).waitFor();
-          const review=guestPage.getByRole("checkbox",{name:/Optional: send me one review request/});
+          const review=guestPage.getByRole("checkbox",{name:/Send me one review request/});
           assert.equal(await review.isChecked(),false);
+          const subscriptionCheck = guestPage.getByRole("button", {name:"Check subscription status", exact:true});
+          assert.ok(await subscriptionCheck.locator("svg").count());
+          assert.ok(await subscriptionCheck.evaluate(el => el.getBoundingClientRect().height >= 44));
           await Promise.all([
             guestPage.waitForResponse(response=>response.url().includes('/api/whatsapp/subscription')&&response.request().method()==='GET'),
             review.check(),
