@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 export default function GuestEtaEditor({
   guestId,
   onSaved,
@@ -36,9 +37,9 @@ export default function GuestEtaEditor({
   }
   return (
     <details className="queue-booking-details">
-      <summary>Expected table readiness</summary>
+      <summary>Expected table readiness <ChevronDown className="queue-details-chevron" size={17} aria-hidden="true" /></summary>
       <p className="my-3 text-sm">
-        Set this guest’s expected readiness. Almost Ready uses this time; the
+        Set this guest’s expected readiness. Their status page and Almost Ready use this time; the
         restaurant-wide estimate stays separate.
       </p>
       <form

@@ -103,6 +103,8 @@ export default function Home() {
   const [addError, setAddError] = useState("");
   const [showTables, setShowTables] = useState(false);
   const [queueClock, setQueueClock] = useState(0);
+  const [pendingAction, setPendingAction] = useState<{id:number;action:Exclude<Action,"seat">} | null>(null);
+  const actionInFlight = useRef(false);
   const tablesDialog = useRef<HTMLDivElement>(null);
   useStaffDialog(showTables, tablesDialog, () => setShowTables(false));
   const loadGuests = useCallback(async (force = false) => {
@@ -173,6 +175,7 @@ export default function Home() {
   }, [showQR]);
 
   async function performAction(id: number, action: Action) {
+    if (busy || actionInFlight.current) return;
     if (action === "seat") {
       const guest = guests.find((g) => g.id === id);
       if (guest) {
@@ -180,17 +183,19 @@ export default function Home() {
       }
       return;
     }
-    if (action === "no_show" || action === "cancel") {
-      const guest = guests.find((g) => g.id === id);
-      const message =
-        action === "no_show"
-          ? `Mark ${guest?.name || "this guest"} as no-show? They will leave the active queue.`
-          : `Cancel ${guest?.name || "this guest"}'s booking? They will leave the active queue.`;
-      if (!await confirmAction({ title: action === "no_show" ? "Mark guest as no-show?" : "Cancel booking?", message, confirmLabel: action === "no_show" ? "Mark no-show" : "Cancel booking", destructive: true })) return;
-    }
-    setBusy(true);
-    setError("");
+    actionInFlight.current = true;
     try {
+      if (action === "no_show" || action === "cancel") {
+        const guest = guests.find((g) => g.id === id);
+        const message =
+          action === "no_show"
+            ? `Mark ${guest?.name || "this guest"} as no-show? They will leave the active queue.`
+            : `Cancel ${guest?.name || "this guest"}'s booking? They will leave the active queue.`;
+        if (!await confirmAction({ title: action === "no_show" ? "Mark guest as no-show?" : "Cancel booking?", message, confirmLabel: action === "no_show" ? "Mark no-show" : "Cancel booking", destructive: true })) return;
+      }
+      setBusy(true);
+      setPendingAction({id,action});
+      setError("");
       const response = await fetch(`/api/guests/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -198,11 +203,17 @@ export default function Home() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Action failed");
+      if (action === "cancel" || action === "no_show") {
+        setOpenGuestMenu(current => current === id ? null : current);
+        setGuests(current => current.map(guest => guest.id === id ? {...guest,status:action === "cancel" ? "cancelled" : "no_show"} : guest));
+      }
       await loadGuests(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Action failed");
     } finally {
       setBusy(false);
+      setPendingAction(null);
+      actionInFlight.current = false;
     }
   }
 
@@ -619,6 +630,7 @@ export default function Home() {
           key={selectedGuest.id}
           guest={selectedGuest}
           busy={busy}
+          pendingAction={pendingAction?.id === selectedGuest.id ? pendingAction.action : null}
           error={error}
           onClose={() => setOpenGuestMenu(null)}
           onSeat={() => {

@@ -1,5 +1,6 @@
 "use client";
 import WhatsAppPreviewTest from "@/components/whatsapp-preview-test";
+import ManagementDangerZone from "@/components/management-danger-zone";
 import StaffAccountManager from "@/components/staff-account-manager";
 import StaffShiftScheduler from "@/components/staff-shift-scheduler";
 import DemoControls from "@/components/demo-controls";
@@ -281,6 +282,7 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
               <SeatingSettings />
               {showDemo && <DemoControls />}
             </section>
+            <ManagementDangerZone />
           </div>
         </div>
         <footer className="bistro-page-footer">

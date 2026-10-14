@@ -83,3 +83,35 @@ test('Management GET remains hidden outside Preview',async()=>{
  const h=harness();const endpoint=load('src/app/api/whatsapp/test/route.ts',h.mocks,{process:{env:{VERCEL_ENV:'production'}}});
  assert.deepEqual(await(await endpoint.GET()).json(),{visible:false,enabled:false});
 });
+
+test('setup reports automatic delivery gates without secrets, SQL writes or sending', async()=>{
+  for (const settings of [
+    {WHATSAPP_MODE:'test',WHATSAPP_ALLOW_LIVE_SEND:'false',live:false},
+    {WHATSAPP_MODE:'live',WHATSAPP_ALLOW_LIVE_SEND:'false',live:false},
+    {WHATSAPP_MODE:'test',WHATSAPP_ALLOW_LIVE_SEND:'true',live:false},
+    {WHATSAPP_MODE:'live',WHATSAPP_ALLOW_LIVE_SEND:'true',live:true},
+  ]) {
+    const {h,calls}=setup();
+    h.mocks['@/lib/whatsapp/preview-test'].previewTestState=async()=>({enabled:true,window_open:true});
+    const env={...settings,VERCEL_ENV:'preview',MO_BISTRO_DB:'postgres',WHATSAPP_ENABLED:'true',
+      WHATSAPP_WINDOW_TEXT_ENABLED:'true',WHATSAPP_PREVIEW_TEST_ENABLED:'true',
+      META_WHATSAPP_ACCESS_TOKEN:'synthetic-secret-never-return',META_GRAPH_API_VERSION:'v1.0',META_WHATSAPP_PHONE_NUMBER_ID:'1234'};
+    const endpoint=load('src/app/api/whatsapp/test/route.ts',h.mocks,{process:{env}});
+    const response=await endpoint.GET(); const body=await response.json();
+    assert.equal(body.automaticNotifications.live,settings.live);
+    assert.equal(body.automaticNotifications.windowTextEnabled,true);
+    assert.equal(body.automaticNotifications.isolatedTestEnabled,settings.WHATSAPP_MODE==='test' && settings.WHATSAPP_ALLOW_LIVE_SEND!=='true');
+    assert.equal(JSON.stringify(body).includes(env.META_WHATSAPP_ACCESS_TOKEN),false);
+    assert.equal(calls(),0);assert.equal(h.queries.length,0);
+  }
+});
+
+test('setup diagnostics require manager authorization',async()=>{
+  for(const actor of [null,{role:'reception'},{role:'waiter'}]) {
+    const {h,calls}=setup(actor);
+    const response=await h.route('whatsapp/test').GET();
+    assert.equal(response.status,actor?403:401);
+    assert.equal((await response.json()).automaticNotifications,undefined);
+    assert.equal(calls(),0);assert.equal(h.queries.length,0);
+  }
+});

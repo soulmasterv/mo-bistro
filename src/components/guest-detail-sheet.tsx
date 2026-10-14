@@ -2,7 +2,7 @@
 import GuestEtaEditor from "@/components/guest-eta-editor";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Phone, Users, MessageCircle, Clock } from "lucide-react";
+import { X, Phone, Users, MessageCircle, Clock, ChevronDown, CheckCircle2 } from "lucide-react";
 import { guestDialHref } from "@/lib/guest-phone";
 import { useStaffDialog } from "@/lib/use-staff-dialog";
 
@@ -29,6 +29,7 @@ type WhatsApp = {
 export default function GuestDetailSheet({
   guest,
   busy,
+  pendingAction,
   error,
   onClose,
   onSeat,
@@ -37,6 +38,7 @@ export default function GuestDetailSheet({
 }: {
   guest: Guest;
   busy: boolean;
+  pendingAction?: "call" | "confirm" | "cancel" | "no_show" | null;
   error: string;
   onClose: () => void;
   onRefresh: () => void;
@@ -168,6 +170,8 @@ export default function GuestDetailSheet({
             </div>
           )}
         </dl>
+        {busy && <p role="status" className="queue-sheet-progress">{pendingAction === "cancel" ? "Cancelling booking…" : pendingAction === "no_show" ? "Marking no-show…" : pendingAction === "call" ? "Marking called…" : pendingAction === "confirm" ? "Confirming booking…" : "Updating booking…"} Please wait.</p>}
+        <fieldset disabled={busy} aria-busy={busy} className="queue-sheet-controls">
         <button
           type="button"
           className="bistro-button queue-sheet-seat"
@@ -178,7 +182,7 @@ export default function GuestDetailSheet({
         </button>
         <div className="queue-sheet-contact">
           {dial && (
-            <a className="bistro-button bistro-button-secondary" href={dial}>
+            <a className="bistro-button bistro-button-secondary" href={busy ? undefined : dial} aria-disabled={busy} tabIndex={busy ? -1 : undefined}>
               <Phone size={16} />
               Call guest
             </a>
@@ -186,7 +190,9 @@ export default function GuestDetailSheet({
           {whatsappHref && (
             <a
               className="bistro-button bistro-button-secondary"
-              href={whatsappHref}
+              href={busy ? undefined : whatsappHref}
+              aria-disabled={busy}
+              tabIndex={busy ? -1 : undefined}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -196,7 +202,7 @@ export default function GuestDetailSheet({
           )}
         </div>
         <details className="queue-booking-details">
-          <summary>Booking details</summary>
+          <summary>Booking details <ChevronDown className="queue-details-chevron" size={17} aria-hidden="true" /></summary>
           <p>Seating preference: {guest.seating_preference}</p>
           <p>
             {guest.confirmation_required === false
@@ -234,7 +240,7 @@ export default function GuestDetailSheet({
             className="queue-sheet-text-action"
             onClick={() => onAction("call")}
           >
-            Mark called
+            <CheckCircle2 size={17} aria-hidden="true" /> {pendingAction === "call" ? "Marking called…" : "Mark called"}
           </button>
         )}
         {guest.confirmation_required !== false && guest.confirmed !== 1 && (
@@ -244,7 +250,7 @@ export default function GuestDetailSheet({
             className="queue-sheet-text-action"
             onClick={() => onAction("confirm")}
           >
-            Confirm booking
+            {pendingAction === "confirm" ? "Confirming…" : "Confirm booking"}
           </button>
         )}
         {error && (
@@ -258,16 +264,17 @@ export default function GuestDetailSheet({
             disabled={busy || guest.status === "seated"}
             onClick={() => onAction("no_show")}
           >
-            No-show
+            {pendingAction === "no_show" ? "Marking no-show…" : "No-show"}
           </button>
           <button
             type="button"
             disabled={busy || guest.status === "seated"}
             onClick={() => onAction("cancel")}
           >
-            Cancel booking
+            {pendingAction === "cancel" ? "Cancelling…" : "Cancel booking"}
           </button>
         </div>
+        </fieldset>
       </div>
     </div>,
     document.body,

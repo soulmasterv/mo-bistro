@@ -592,6 +592,10 @@ summary {
 .bistro-danger {
   color: var(--tone-a34d48, #a34d48);
 }
+#danger-zone { border-color:#b45e54; }
+#danger-zone .bistro-button-danger { background:transparent; color:#a93636; border:1px solid #b45e54; }
+html[data-theme="dark"] #danger-zone .bistro-button-danger { color:#f3a6a0; border-color:#b45e54; }
+#danger-zone button:disabled { opacity:.5; cursor:wait; }
 .bistro-panel-footer {
   display: flex;
   justify-content: space-between;
@@ -2389,6 +2393,19 @@ html[data-theme="guest-light"] {
   padding: 14px;
   margin-bottom: 16px;
 }
+.queue-sheet-controls { border:0; padding:0; margin:0; min-width:0; }
+.queue-sheet-progress { border:1px solid var(--line); background:var(--staff-soft); color:var(--ink); border-radius:8px; padding:12px; font-size:13px; margin-bottom:12px; }
+.bistro-dialog-scope .queue-guest-sheet .queue-sheet-controls :is(button:disabled,a[aria-disabled="true"]) { background:#d5d5d5!important; color:#737373!important; border-color:#c4c4c4!important; cursor:wait; opacity:1; transition:none!important; }
+.queue-sheet-controls a[aria-disabled="true"] { pointer-events:none; }
+.queue-sheet-controls input:disabled { opacity:.5; }
+html[data-theme="dark"] .bistro-dialog-scope .queue-guest-sheet .queue-sheet-controls :is(button:disabled,a[aria-disabled="true"]) { background:#343636!important; color:#9d9d9d!important; border-color:#464848!important; }
+.queue-guest-sheet .queue-booking-details summary { justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--staff-soft); list-style:none; }
+.queue-guest-sheet .queue-booking-details summary::-webkit-details-marker { display:none; }
+.queue-details-chevron { flex-shrink:0; transition:transform .15s ease; }
+details[open] > summary > .queue-details-chevron { transform:rotate(180deg); }
+.queue-guest-sheet .queue-booking-details summary:hover { border-color:var(--staff-action); }
+.queue-guest-sheet :is(.queue-booking-details summary,.queue-sheet-text-action):focus-visible { outline:2px solid #b18b4f; outline-offset:3px; }
+.queue-guest-sheet .queue-sheet-text-action { display:flex; align-items:center; justify-content:center; gap:8px; margin:10px 0; border:1px solid var(--line); border-radius:8px; background:var(--staff-soft); }
 @media (max-width: 900px) {
   .bistro-header-inner {
     flex-wrap: nowrap;

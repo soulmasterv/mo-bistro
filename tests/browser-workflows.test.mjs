@@ -111,6 +111,7 @@ test(
     let mode = "detailed",
       occupied = 1;
     let trackingStatus = "waiting";
+    let trackingEta = null;
     let subscriptionSubscribed = true;
     let feedbackEditable = true;
     let staffUsername = "manager";
@@ -277,7 +278,7 @@ test(
             data={areas:[{area:"indoor",available:true,guest:{id:guests[0].id,name:guests[0].name,party_size:guests[0].party_size}},{area:"outdoor",available:true,guest:null}]};
             break;
           case "/api/track":
-            data = {confirmation_required:true, guest:{name:"Omar Hassan",party_size:2,status:trackingStatus,confirmed:true,created_at:new Date().toISOString()}, queue_position:3,guests_ahead:2};
+            data = {confirmation_required:true, guest:{name:"Omar Hassan",party_size:2,status:trackingStatus,confirmed:true,created_at:new Date().toISOString(),eta_at:trackingEta}, queue_position:3,guests_ahead:2};
             break;
           case "/api/join":
             submittedBooking = body;
@@ -675,12 +676,44 @@ test(
         await sheet.getByRole("button", {name:"Cancel booking",exact:true}).click();
         await confirmation.getByRole("button",{name:"Cancel",exact:true}).click();
         assert.equal(guestActions.length, actionCount);
+        let releaseCancellation;
+        const cancellationGate = new Promise(resolve=>{releaseCancellation=resolve;});
+        let heldRequests=0;
+        const cancelUrl = `**/api/guests/${unconfirmed.id}`;
+        await page.route(cancelUrl,async route=>{
+          heldRequests++;
+          await cancellationGate;
+          await route.fulfill({status:503,contentType:"application/json",body:JSON.stringify({error:"Synthetic cancellation failure"})});
+        });
+        await sheet.getByRole("button",{name:"Cancel booking",exact:true}).click();
+        await confirmation.getByRole("button",{name:"Cancel booking",exact:true}).click();
+        const cancelling = sheet.getByRole("button",{name:"Cancelling…",exact:true});
+        await cancelling.waitFor();
+        assert.equal(await cancelling.isDisabled(),true);
+        assert.equal(await sheet.getByRole("button",{name:"No-show",exact:true}).isDisabled(),true);
+        assert.equal(await sheet.getByRole("button",{name:"Seat guest",exact:true}).isDisabled(),true);
+        const disabledSeat = await sheet.getByRole("button",{name:"Seat guest",exact:true}).evaluate(el=>({background:getComputedStyle(el).backgroundColor,color:getComputedStyle(el).color}));
+        assert.equal(disabledSeat.background,"rgb(213, 213, 213)");
+        assert.notEqual(disabledSeat.background,disabledSeat.color);
+        assert.equal(await sheet.getByText("Open WhatsApp",{exact:true}).getAttribute("href"),null);
+        await sheet.getByText("Cancelling booking… Please wait.",{exact:true}).waitFor();
+        await cancelling.evaluate(el=>el.click());
+        assert.equal(heldRequests,1);
+        if(screenshots) await page.screenshot({path:path.join(screenshots,`guest-cancelling-${width}.png`)});
+        releaseCancellation();
+        await sheet.getByText("Synthetic cancellation failure",{exact:true}).waitFor();
+        assert.equal(await sheet.getByRole("button",{name:"Cancel booking",exact:true}).isEnabled(),true);
+        assert.ok(await sheet.isVisible());
+        await page.unroute(cancelUrl);
         await sheet.getByRole("button", {name:"Cancel booking",exact:true}).click();
         await Promise.all([
           page.waitForResponse(response=>/\/api\/guests\/\d+$/.test(new URL(response.url()).pathname)&&response.request().method()==="PATCH"),
           confirmation.getByRole("button",{name:"Cancel booking",exact:true}).click(),
         ]);
         assert.equal(guestActions.length, actionCount + 1);
+        await sheet.waitFor({state:"hidden"});
+        await page.getByRole("button",{name:"More actions for "+unconfirmed.name,exact:true}).click();
+        await sheet.waitFor();
         assert.equal(
           await sheet
             .getByRole("link", { name: "Open WhatsApp", exact: true })
@@ -1217,6 +1250,16 @@ test(
           trackingStatus=status; subscriptionSubscribed=true;
           await guest.goto(origin+"/status?token="+"a".repeat(64));
           await guest.getByText("Omar Hassan",{exact:true}).waitFor();
+          if (status === "waiting") {
+            trackingEta = new Date(Date.now()+30*60_000).toISOString();
+            await guest.getByRole("button",{name:"Refresh status",exact:true}).click();
+            await guest.getByText("Expected table readiness",{exact:true}).waitFor();
+            assert.equal(await guest.getByText("Current estimated wait",{exact:true}).count(),0);
+            trackingEta = null;
+            await guest.getByRole("button",{name:"Refresh status",exact:true}).click();
+            await guest.getByText("Current estimated wait",{exact:true}).waitFor();
+            assert.equal(await guest.getByText("Expected table readiness",{exact:true}).count(),0);
+          }
           assert.ok(await guest.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
           if(status==="seated") {
             await guest.getByRole("heading",{name:"You’re seated!",exact:true}).waitFor();
@@ -1249,15 +1292,65 @@ test(
       const testContext = await browser.newContext({viewport:{width:390,height:844}});
       const testPage = await testContext.newPage();
       let isolatedTestAttempts = 0;
+      let setupReads = 0;
+      let releaseSetup;
+      let holdSetup = false;
       testPage.on("dialog", dialog=>{errors.push("Unexpected native browser dialog");void dialog.dismiss();});
       await testPage.route("**/api/whatsapp/test", async route=>{
         if(route.request().method()==="POST") {
           assert.deepEqual(route.request().postDataJSON(),{confirm:true}); isolatedTestAttempts++;
           await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({state:"sent",providerStatus:200,messageId:"synthetic-only"})});
-        } else await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({visible:true,enabled:true,window_open:true})});
+        } else {
+          setupReads++;
+          if (holdSetup) await new Promise(resolve=>{releaseSetup=resolve;});
+          await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({visible:true,enabled:true,window_open:true,
+            automaticNotifications:{live:false,windowTextEnabled:true,isolatedTestEnabled:true}})});
+        }
       });
       await testPage.goto(origin+"/management");
       const sendTest = testPage.getByRole("button",{name:"Send Test WhatsApp",exact:true});
+      await testPage.getByText(/Setup check 1 complete/).waitFor();
+      await testPage.getByText(/live sending is disabled/).waitFor();
+      await testPage.getByText(/do not subscribe a booking/).waitFor();
+      holdSetup = true;
+      await testPage.getByRole("button",{name:"Check setup",exact:true}).click();
+      await testPage.getByRole("button",{name:"Checking setup…",exact:true}).waitFor();
+      assert.equal(await sendTest.isDisabled(),true);
+      assert.equal(isolatedTestAttempts,0);
+      await testPage.waitForFunction(()=>document.body.textContent.includes("Checking Preview configuration"));
+      while (!releaseSetup) await new Promise(resolve=>setTimeout(resolve,10));
+      holdSetup = false;
+      releaseSetup();
+      await testPage.getByText(/Setup check 2 complete/).waitFor();
+      assert.equal(setupReads,2);
+      assert.equal(isolatedTestAttempts,0);
+      const bulkActions=[];
+      let releaseBulk;
+      await testPage.route("**/api/management/danger-zone", async route=>{
+        bulkActions.push(route.request().postDataJSON());
+        await new Promise(resolve=>{releaseBulk=resolve;});
+        await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({success:true,freed:5,cancelled:3})});
+      });
+      const danger=testPage.getByRole("region",{name:"Danger zone",exact:true});
+      for (const action of ["free_tables","cancel_queue"]) {
+        const free=action==="free_tables";
+        const button=danger.getByRole("button",{name:free?"Free all tables":"Cancel all waiting bookings",exact:true});
+        await button.click();
+        let confirmation=testPage.getByRole("alertdialog",{name:free?"Free all tables?":"Cancel the entire waiting queue?",exact:true});
+        await confirmation.getByRole("button",{name:"Cancel",exact:true}).click();
+        const before=bulkActions.length;
+        await button.click();
+        confirmation=testPage.getByRole("alertdialog",{name:free?"Free all tables?":"Cancel the entire waiting queue?",exact:true});
+        await confirmation.getByRole("button",{name:free?"Free all tables":"Cancel all waiting bookings",exact:true}).click();
+        await danger.getByRole("button",{name:free?"Freeing tables…":"Cancelling bookings…",exact:true}).waitFor();
+        while(!releaseBulk) await new Promise(resolve=>setTimeout(resolve,10));
+        assert.equal(bulkActions.length,before+1);
+        assert.deepEqual(bulkActions.at(-1),{action,confirm:true});
+        assert.equal(await danger.getByRole("button").evaluateAll(buttons=>buttons.every(button=>button.disabled)),true);
+        releaseBulk();releaseBulk=null;
+        await danger.getByText(free?"5 tables freed. Seated bookings were preserved.":"3 waiting/called bookings cancelled. Seated guests were preserved.",{exact:true}).waitFor();
+      }
+      assert.equal(bulkActions.length,2);
       await sendTest.click();
       const testConfirmation = testPage.getByRole("alertdialog",{name:"Send test WhatsApp?",exact:true});
       await testConfirmation.waitFor();

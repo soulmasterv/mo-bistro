@@ -1,6 +1,7 @@
 import { currentStaff } from "@/lib/staff-auth";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import { checkRateLimit } from "@/lib/api-rate-limit";
+import { liveSendingEnabled } from "@/lib/whatsapp/policy";
 import {
   previewTestRecipient,
   previewTestState,
@@ -27,17 +28,26 @@ export async function GET() {
   if (denied) return denied;
   if (process.env.VERCEL_ENV !== "preview")
     return Response.json({ visible: false, enabled: false }, { headers });
+  // Read-only diagnostics. This never enables, queues, drains or sends anything.
+  const automaticNotifications = {
+    live: liveSendingEnabled(),
+    windowTextEnabled: process.env.WHATSAPP_WINDOW_TEXT_ENABLED === "true",
+    isolatedTestEnabled: process.env.WHATSAPP_PREVIEW_TEST_ENABLED === "true" &&
+      process.env.WHATSAPP_MODE === "test" && process.env.WHATSAPP_ALLOW_LIVE_SEND !== "true",
+  };
+  const setupResponse = (body: object) => Response.json(
+    { ...body, automaticNotifications }, { headers },
+  );
   try {
     previewTestRecipient();
   } catch {
-    return Response.json(
+    return setupResponse(
       {
         visible: true,
         enabled: false,
         reason:
           "Configure Preview test mode, enable WHATSAPP_PREVIEW_TEST_ENABLED and set WHATSAPP_TEST_RECIPIENT. General live sending must remain off.",
       },
-      { headers },
     );
   }
   if (
@@ -45,28 +55,25 @@ export async function GET() {
     !/^v\d+\.\d+$/.test(process.env.META_GRAPH_API_VERSION || "") ||
     !/^\d+$/.test(process.env.META_WHATSAPP_PHONE_NUMBER_ID || "")
   )
-    return Response.json(
+    return setupResponse(
       {
         visible: true,
         enabled: false,
         reason: "Meta provider configuration is missing.",
       },
-      { headers },
     );
   try {
-    return Response.json(
+    return setupResponse(
       { visible: true, ...(await previewTestState()) },
-      { headers },
     );
   } catch {
-    return Response.json(
+    return setupResponse(
       {
         visible: true,
         enabled: false,
         reason:
           "Cannot verify the incoming-message window. Check the Preview database and apply 20261012_whatsapp_preview_test.sql if missing.",
       },
-      { headers },
     );
   }
 }

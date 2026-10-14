@@ -286,3 +286,16 @@ test("diagnostic page guards honor Production even when development flag is pres
  const {testEnvironmentAllowed}=load("src/lib/test-environment.ts",{}, {process:{env:{VERCEL_ENV:"production",NODE_ENV:"development"}}});assert.equal(testEnvironmentAllowed(),false);
  for(const page of ["debug","runtime-test"]){const source=fs.readFileSync(`src/app/${page}/page.tsx`,"utf8");assert.ok(source.includes("if(!testEnvironmentAllowed())notFound()"));}
 });
+
+test('tracking exposes only the owning active booking readiness and hides it for terminal states',async()=>{
+  for(const status of ['waiting','called','seated','cancelled','no_show']) {
+    const h=harness({query:q=>q.includes('COUNT(*)')?[{count:0}]:[{id:1,name:'Guest',party_size:2,status,confirmed:1,created_at:'2026-10-14',eta_at:'2026-10-14T16:30:00Z'}]});
+    h.mocks['@/lib/guest-eta-support']={hasGuestEtaColumn:async()=>true};
+    const response=await h.route('track').GET(new Request('https://bistro.test/api/track?token='+'a'.repeat(64)));
+    const body=await response.json();
+    assert.equal(body.guest.eta_at,['waiting','called'].includes(status)?'2026-10-14T16:30:00Z':null);
+    assert.equal(body.guest.phone,undefined);assert.equal(body.guest.tracking_token_hash,undefined);
+    const owned=h.queries.find(q=>q.query.includes('FROM guests WHERE tracking_token_hash'));
+    assert.ok(owned);assert.equal(owned.values.length,1);
+  }
+});

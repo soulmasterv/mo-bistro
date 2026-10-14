@@ -71,7 +71,8 @@ export async function GET(request: Request) {
       confirmation_required: requiresConfirmation,
       guest: { name: guest.name, party_size: guest.party_size,
         status: guest.status, confirmed: Boolean(guest.confirmed),
-        created_at: guest.created_at },
+        created_at: guest.created_at,
+        eta_at: ["waiting", "called"].includes(guest.status) ? guest.eta_at ?? null : null },
       queue_position: ahead === null ? null : ahead + 1,
       guests_ahead: ahead,
     });

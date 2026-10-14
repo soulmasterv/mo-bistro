@@ -9,13 +9,19 @@ export default function WhatsAppPreviewTest() {
   const [attempted, setAttempted] = useState(false);
   const [attemptId, setAttemptId] = useState("");
   const [result, setResult] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [setupChecks, setSetupChecks] = useState(0);
+  const [automatic, setAutomatic] = useState<{ live: boolean; windowTextEnabled: boolean; isolatedTestEnabled: boolean } | null>(null);
   const checkSetup = useCallback(async () => {
+    setChecking(true);
     try {
       const response = await fetch("/api/whatsapp/test", { cache: "no-store" });
-      const v = response.ok ? await response.json() : null;
+      if (!response.ok) throw new Error("Setup unavailable");
+      const v = await response.json();
       setVisible(v?.visible === true);
       setEnabled(v?.enabled === true);
       setWindowOpen(v?.window_open === true);
+      setAutomatic(v?.automaticNotifications ?? null);
       setResult(
         v?.reason ||
           (v?.window_open
@@ -23,7 +29,12 @@ export default function WhatsAppPreviewTest() {
             : "Blocked: send an incoming message to the Meta test number first (within 24 hours)."),
       );
     } catch {
+      setEnabled(false);
+      setWindowOpen(false);
       setResult("Unable to check Preview test setup.");
+    } finally {
+      setChecking(false);
+      setSetupChecks(count => count + 1);
     }
   }, []);
   useEffect(() => {
@@ -90,20 +101,33 @@ export default function WhatsAppPreviewTest() {
         <button
           className="bistro-button bistro-button-secondary"
           type="button"
+          disabled={checking}
           onClick={() => void checkSetup()}
         >
-          Check setup
+          {checking ? "Checking setup…" : "Check setup"}
         </button>
       )}
       <button
         className="bistro-button"
         type="button"
-        disabled={!enabled || !windowOpen || attempted}
+        disabled={checking || !enabled || !windowOpen || attempted}
         onClick={send}
       >
         Send Test WhatsApp
       </button>
       <p role="status">{result}</p>
+      <p role="status" aria-live="polite">
+        {checking ? "Checking Preview configuration…" : setupChecks > 0 ? `Setup check ${setupChecks} complete. No message sent by this check.` : ""}
+      </p>
+      {automatic && (
+        <div aria-label="Automatic WhatsApp notifications" className="space-y-2">
+          <p>{automatic.live
+            ? "Automatic booking delivery is enabled. Consent, recipient and message-window checks still apply."
+            : "Automatic booking messages are not sent to WhatsApp: live sending is disabled. A delivered test message does not enable booking updates."}</p>
+          {automatic.isolatedTestEnabled && <p>Isolated test mode is active. Incoming messages from the test recipient do not subscribe a booking.</p>}
+          {!automatic.windowTextEnabled && <p>Automatic plain-text messages within the 24-hour window are disabled.</p>}
+        </div>
+      )}
     </section>
   );
 }
