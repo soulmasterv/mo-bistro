@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function StaffPinLogin() {
@@ -11,6 +11,7 @@ export default function StaffPinLogin() {
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const submitting = useRef(false);
 
   function addDigit(digit: string) {
     if (loading) return;
@@ -19,8 +20,9 @@ export default function StaffPinLogin() {
   }
 
   async function signIn() {
-    if (!username.trim() || pin.length !== 6 || loading) return;
+    if (!username.trim() || pin.length !== 6 || submitting.current) return;
 
+    submitting.current = true;
     setLoading(true);
     setError("");
 
@@ -55,14 +57,14 @@ export default function StaffPinLogin() {
       setError(
         err instanceof Error ? err.message : "Unable to sign in."
       );
-    } finally {
+      submitting.current = false;
       setLoading(false);
     }
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F6F2E9] px-4 py-8 text-[#293126]">
-      <section className="w-full max-w-sm rounded-3xl border border-[#D8D1C3] bg-[#FFFCF7] p-6 shadow-xl">
+    <main className="staff-login staff-pin-login flex items-center justify-center bg-[#F6F2E9] text-[#293126]">
+      <section aria-busy={loading} className="w-full max-w-sm rounded-3xl border border-[#D8D1C3] bg-[#FFFCF7] p-6 shadow-xl">
         <div className="text-center">
           <h1 className="font-serif text-4xl">Mo Bistro</h1>
           <p className="mt-2 text-sm text-[#727568]">
@@ -73,6 +75,7 @@ export default function StaffPinLogin() {
         <label className="mt-8 block text-sm font-semibold">
           Staff username
           <input
+            disabled={loading}
             value={username}
             onChange={event => setUsername(event.target.value)}
             autoComplete="username"
@@ -151,7 +154,7 @@ export default function StaffPinLogin() {
         </button>
 
         <div className="mt-5 text-center">
-          <Link href="/login" className="text-sm underline">
+          <Link href="/login" aria-disabled={loading} tabIndex={loading ? -1 : undefined} onClick={event => { if (submitting.current) event.preventDefault(); }} className="text-sm underline">
             Use regular login instead
           </Link>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -28,12 +28,14 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const submitting = useRef(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (loading) return;
+    if (submitting.current) return;
 
+    submitting.current = true;
     setLoading(true);
     setError("");
 
@@ -62,15 +64,16 @@ export default function LoginPage() {
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
-    } finally {
+      submitting.current = false;
       setLoading(false);
     }
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#EDECE5] px-4 py-10">
+    <main className="staff-login flex items-center justify-center bg-[#EDECE5]">
       <form
         onSubmit={submit}
+        aria-busy={loading}
         className="w-full max-w-md rounded-3xl bg-[#252525] p-7 text-[#F5F0E7] shadow-2xl sm:p-10"
       >
         <div className="mb-8 flex flex-col items-center text-center">
@@ -95,6 +98,7 @@ export default function LoginPage() {
           Username
           <input
             required
+            disabled={loading}
             value={username}
             onChange={(event) => setUsername(event.target.value)}
             autoComplete="username"
@@ -108,6 +112,7 @@ export default function LoginPage() {
           <div className="relative mt-2">
             <input
               required
+              disabled={loading}
               type={showPassword ? "text" : "password"}
               value={credential}
               onChange={(event) => setCredential(event.target.value)}
@@ -118,6 +123,7 @@ export default function LoginPage() {
 
             <button
               type="button"
+              disabled={loading}
               onClick={() => setShowPassword(!showPassword)}
               aria-label={showPassword ? "Hide password" : "Show password"}
               className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-[#697366]"
@@ -145,7 +151,7 @@ export default function LoginPage() {
           {!loading && <ArrowRight size={19} />}
         </button>
 
-        <Link href="/login/pin" className="mt-4 flex min-h-12 w-full items-center justify-center rounded-xl border border-[#D6B681]/50 px-4 py-3 font-medium text-[#F5F0E7]">
+        <Link href="/login/pin" aria-disabled={loading} tabIndex={loading ? -1 : undefined} onClick={event => { if (submitting.current) event.preventDefault(); }} className="mt-4 flex min-h-12 w-full items-center justify-center rounded-xl border border-[#D6B681]/50 px-4 py-3 font-medium text-[#F5F0E7]">
           Sign in with PIN
         </Link>
 

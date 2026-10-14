@@ -460,13 +460,6 @@ export default function Home() {
                       >
                         {position.toString().padStart(2, "0")}
                       </span>
-                      <div className="bistro-avatar">
-                        {guest.name
-                          .split(" ")
-                          .map((s) => s[0])
-                          .slice(0, 2)
-                          .join("")}
-                      </div>
                       <div className="bistro-guest-copy">
                         <h3>
                           <button

@@ -13,10 +13,13 @@ function formatWait(minutes: number) {
   }`;
 }
 
-export default function RestaurantWaitDisplay() {
+export default function RestaurantWaitDisplay({ etaAt }: { etaAt?: string | null } = {}) {
   const [minutes, setMinutes] = useState<number | null>(null);
+  const timestamp = etaAt ? Date.parse(etaAt) : NaN;
+  const personal = Number.isFinite(timestamp);
 
   useEffect(() => {
+    if (personal) return;
     let active = true;
 
     async function refresh() {
@@ -45,22 +48,22 @@ export default function RestaurantWaitDisplay() {
       active = false;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [personal]);
 
-  if (minutes === null) return null;
+  if (!personal && minutes === null) return null;
 
   return (
     <div className="mb-6 rounded-2xl border border-[#D9C49E]/50 bg-[#F4F0E7] p-5 text-[#302D28]">
       <p className="text-xs font-semibold uppercase tracking-wider text-[#8D724C]">
-        Current estimated wait
+        {personal ? "Expected table readiness" : "Current estimated wait"}
       </p>
 
       <p className="mt-2 font-serif text-3xl">
-        {formatWait(minutes)}
+        {personal ? new Date(timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : formatWait(minutes!)}
       </p>
 
       <p className="mt-2 text-xs text-[#807B71]">
-        Approximate restaurant-wide wait. Actual seating times may vary.
+        {personal ? "An estimate for your booking. Reception will confirm when your table is ready." : "Approximate restaurant-wide wait. Actual seating times may vary."}
       </p>
     </div>
   );

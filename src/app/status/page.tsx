@@ -149,15 +149,7 @@ function StatusContent() {
             </p>
             {active && (
               <div className="guest-estimate">
-                {data?.guest.eta_at && Number.isFinite(Date.parse(data.guest.eta_at)) ? (
-                  <div className="restaurant-wait-display">
-                    <p>Expected table readiness</p>
-                    <p className="text-2xl font-semibold">
-                      {new Date(data.guest.eta_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-                    </p>
-                    <p className="text-sm">An estimate for your booking. Reception will confirm when your table is ready.</p>
-                  </div>
-                ) : <RestaurantWaitDisplay />}
+                <RestaurantWaitDisplay etaAt={data?.guest.eta_at} />
               </div>
             )}
             {loading && !data ? (

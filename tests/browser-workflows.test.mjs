@@ -415,7 +415,7 @@ test(
       res.end(
         "<!doctype html><html><head>" +
           viewport +
-          '<link rel="stylesheet" href="/app.css"></head><body><div id="root"></div><script src="/app.js"></script></body></html>',
+          '<link rel="stylesheet" href="/app.css"></head><body><div id="root" style="display:contents"></div><script src="/app.js"></script></body></html>',
       );
     });
     await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -453,11 +453,38 @@ test(
         await context.addInitScript(() => { if(location.pathname === "/login") localStorage.setItem("mo-bistro-theme", "dark"); });
         await page.goto(origin + "/login");
         await page.waitForFunction(() => document.documentElement.dataset.theme === "guest-light");
+        assert.ok(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+1),"Login should not add page scroll when its contents fit");
+        if(width<=900) {
+          await page.setViewportSize({width,height:650});
+          assert.ok(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+1),"Login should fit a short mobile viewport");
+          await page.setViewportSize({width,height:900});
+        }
         await page.getByLabel("Username", { exact: true }).fill("manager");
         await page.getByLabel("Password", { exact: true }).fill("fixture-only");
         assert.equal(await page.getByLabel("Password", {exact:true}).evaluate(el=>getComputedStyle(el).color), "rgb(41, 49, 38)");
         assert.equal(await page.getByRole("button", {name:"Sign in",exact:true}).evaluate(el=>getComputedStyle(el).color), "rgb(41, 49, 38)");
         if(screenshots) await page.screenshot({path:path.join(screenshots, `login-restored-${width}.png`),fullPage:true});
+        if(width===390) {
+          let finishLogin;
+          let attempts=0;
+          await page.route("**/api/auth/login",async route=>{
+            attempts++;
+            await new Promise(resolve=>{finishLogin=resolve;});
+            await route.fulfill({status:401,contentType:"application/json",body:'{"error":"Synthetic invalid credentials"}'});
+          });
+          await page.getByRole("button",{name:"Sign in",exact:true}).click();
+          const pending=page.getByRole("button",{name:"Signing in...",exact:true});
+          await pending.waitFor();
+          assert.equal(await pending.isDisabled(),true);
+          assert.equal(await pending.evaluate(el=>getComputedStyle(el).backgroundColor),"rgb(191, 192, 191)");
+          await page.locator("form").evaluate(form=>{form.requestSubmit();form.requestSubmit();});
+          assert.equal(attempts,1);
+          if(screenshots)await page.screenshot({path:path.join(screenshots,"login-pending-390.png")});
+          finishLogin();
+          await page.getByText("Synthetic invalid credentials",{exact:true}).waitFor();
+          assert.equal(await page.getByRole("button",{name:"Sign in",exact:true}).isEnabled(),true);
+          await page.unroute("**/api/auth/login");
+        }
 
         if (width <= 1100)
           assert.ok(
@@ -730,6 +757,19 @@ test(
         await sheet.waitFor({ state: "hidden" });
 
         const queue = page.getByRole("region", { name: "Guest queue" });
+        assert.equal(await page.locator(".bistro-avatar").count(),0,"Redundant initials should be removed");
+        if(width<=900) {
+          assert.ok(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+1),"Queue page should fit the viewport");
+          assert.ok(await queue.evaluate(el=>el.clientHeight>=250),"Guest list should retain usable space");
+          assert.ok(await page.locator(".bistro-guest-card").evaluateAll(rows=>rows.every(row=>row.getBoundingClientRect().height>=92)),"Guest rows should not shrink");
+          if(width===390) {
+            await page.setViewportSize({width,height:650});
+            assert.ok(await queue.evaluate(el=>el.clientHeight>=140),"Short mobile viewport still needs a readable list");
+            assert.ok(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+1));
+            if(screenshots)await page.screenshot({path:path.join(screenshots,"queue-mobile-390x650.png")});
+            await page.setViewportSize({width,height:900});
+          }
+        }
         if (width <= 900) assert.ok(await queue.evaluate(el => el.getBoundingClientRect().bottom <= document.querySelector('.queue-bottom-bar').getBoundingClientRect().top + 1), 'Queue must end above fixed tools');
         // Verify the shipped layout, not an artificially constrained test box.
         assert.ok(await queue.evaluate((el) => el.scrollHeight > el.clientHeight));
@@ -1148,6 +1188,32 @@ test(
         await page
           .getByLabel("Staff username", { exact: true })
           .fill(staffUsername);
+        if(width<=900) {
+          await page.setViewportSize({width,height:650});
+          assert.ok(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+1),"PIN login should fit a short mobile viewport");
+          await page.setViewportSize({width,height:900});
+        }
+        if(width===390) {
+          let finishPin;
+          let attempts=0;
+          await page.route("**/api/auth/pin-login",async route=>{
+            attempts++;
+            await new Promise(resolve=>{finishPin=resolve;});
+            await route.fulfill({status:401,contentType:"application/json",body:'{"error":"Synthetic invalid PIN"}'});
+          });
+          for(let digit=0;digit<6;digit++)await page.getByRole("button",{name:"1",exact:true}).click();
+          await page.getByRole("button",{name:"Sign in",exact:true}).click();
+          const pending=page.getByRole("button",{name:"Signing in...",exact:true});
+          await pending.waitFor();
+          assert.equal(await pending.isDisabled(),true);
+          assert.equal(await pending.evaluate(el=>getComputedStyle(el).backgroundColor),"rgb(191, 192, 191)");
+          await pending.evaluate(button=>button.click());
+          assert.equal(attempts,1);
+          finishPin();
+          await page.getByText("Synthetic invalid PIN",{exact:true}).waitFor();
+          assert.equal(await page.getByRole("button",{name:"1",exact:true}).isEnabled(),true);
+          await page.unroute("**/api/auth/pin-login");
+        }
         await assertNoSideScroll("PIN login");
         await context.close();
       }
@@ -1254,6 +1320,10 @@ test(
             trackingEta = new Date(Date.now()+30*60_000).toISOString();
             await guest.getByRole("button",{name:"Refresh status",exact:true}).click();
             await guest.getByText("Expected table readiness",{exact:true}).waitFor();
+            const estimate=guest.locator(".guest-estimate > div");
+            assert.equal(await estimate.evaluate(el=>getComputedStyle(el).borderRadius),"16px");
+            assert.ok(await estimate.evaluate(el=>parseFloat(getComputedStyle(el).marginBottom)>=24));
+            if(screenshots)await guest.screenshot({path:path.join(screenshots,`guest-personal-readiness-${width}.png`),fullPage:true});
             assert.equal(await guest.getByText("Current estimated wait",{exact:true}).count(),0);
             trackingEta = null;
             await guest.getByRole("button",{name:"Refresh status",exact:true}).click();
