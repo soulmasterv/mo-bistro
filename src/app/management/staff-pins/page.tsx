@@ -20,5 +20,5 @@ export default async function StaffPinsPage() {
     );
   }
 
-  return <><WorkspaceHeader role={staff.role} workspace="Management" /><StaffPinsClient /></>;
+  return <><WorkspaceHeader username={staff.username} role={staff.role} workspace="Management" /><StaffPinsClient /></>;
 }

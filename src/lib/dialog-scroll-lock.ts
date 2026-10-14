@@ -1,0 +1,15 @@
+// Overlapping sheets must not restore each other's stale body overflow values.
+let locks = 0;
+let previousOverflow = "";
+export function lockDialogScroll() {
+  if (locks++ === 0) {
+    previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+  }
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    if (--locks === 0) document.body.style.overflow = previousOverflow;
+  };
+}

@@ -2739,6 +2739,37 @@ html[data-theme="light"] .bistro-qr-overlay { background:#faf7f1!important; }
 .guest-menu-page>header { flex-shrink:0; margin-bottom:18px; }
 .guest-menu-heading { flex-shrink:0; margin-bottom:16px; }
 .guest-menu-pages { flex:1; min-height:0; width:100%; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; padding:0 8px; }
+
+/* Review fixes: header tools flow with the account menu instead of viewport offsets. */
+.bistro-header-inner { max-width:none; width:100%; flex-wrap:nowrap; }
+.workspace-header-actions { display:flex; align-items:center; justify-content:flex-end; gap:10px; min-width:0; margin-left:auto; }
+.workspace-account { display:flex; flex-direction:column; text-align:left; line-height:1.3; }
+.workspace-account b { font-size:13px; max-width:140px; overflow:hidden; text-overflow:ellipsis; }
+.workspace-account small { font-size:11px; color:var(--muted); }
+#reception-header-tools .bistro-toolbar { position:static; display:flex; flex-wrap:nowrap; margin:0; }
+#reception-header-tools .bistro-live { display:none; }
+#reception-header-tools .bistro-button:not(.bistro-button-secondary) { background:#dfbd84; border-color:#dfbd84; color:#222; }
+.reception-reference .bistro-count { display:inline-flex; align-items:center; justify-content:center; min-width:42px; min-height:36px; margin-left:8px; padding:4px 10px; border-radius:10px; background:var(--staff-action); color:var(--staff-inverse); font-size:20px; font-weight:750; }
+.reception-reference .bistro-guest-list { min-height:0; max-height:clamp(180px,calc(100dvh - 330px),650px); overflow-y:auto; overscroll-behavior-y:auto; touch-action:pan-y; }
+.reception-reference .bistro-guest-card.is-next-guest { background:var(--staff-soft); box-shadow:inset 4px 0 #be934e; }
+.queue-next-badge { display:inline-block; margin:4px 0 0 8px; padding:3px 7px; border:1px solid #b38b48; border-radius:6px; font-size:10px; line-height:1.4; font-weight:650; color:var(--ink); }
+.bistro-app.reception-reference { height:calc(100dvh - 72px); min-height:0; overflow-y:auto; scroll-padding-bottom:100px; }
+.reception-reference .bistro-container { display:flex; flex-direction:column; height:100%; min-height:0; padding-bottom:16px; align-self:stretch; }
+.reception-reference .bistro-container > :not(.bistro-reception-grid) { flex-shrink:0; }
+.reception-reference .bistro-reception-grid { flex:1; min-height:420px; }
+.reception-reference .bistro-queue { display:flex; flex-direction:column; height:100%; min-height:0; }
+.reception-reference .bistro-queue > :not(.bistro-guest-list) { flex-shrink:0; }
+.reception-reference .bistro-guest-list { flex:1; max-height:none; min-height:160px; }
+.reception-reference .bistro-page-footer { display:none; }
+@media(max-width:900px) {
+ #reception-header-tools { display:none; }
+ .workspace-account b { max-width:90px; }
+ .bistro-header-inner { gap:8px; }
+ .reception-reference .bistro-count { min-height:32px; min-width:38px; font-size:18px; }
+ .reception-reference .bistro-container { padding-bottom:calc(80px + env(safe-area-inset-bottom)); }
+ .reception-reference .bistro-guest-list { max-height:none; }
+ .queue-next-badge { display:block; width:max-content; margin:4px 0 0; }
+}
 .guest-menu-page footer { flex-shrink:0; margin-top:12px; }
 .next-guest-panel { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px; }
 .next-guest-panel article { flex:1; min-width:min(240px,100%); border:1px solid var(--line); background:var(--staff-surface); padding:14px 18px; border-radius:10px; font-size:13px; }

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, type RefObject } from "react";
+import { lockDialogScroll } from "@/lib/dialog-scroll-lock";
 
 export function useStaffDialog(
   open: boolean,
@@ -17,13 +18,12 @@ export function useStaffDialog(
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockDialogScroll();
     dialog
       ?.querySelector<HTMLElement>(
         "button:not(:disabled),input:not(:disabled),select:not(:disabled)",
       )
-      ?.focus();
+      ?.focus({ preventScroll: true });
     function keydown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -50,8 +50,8 @@ export function useStaffDialog(
     }
     document.addEventListener("keydown", keydown);
     return () => {
-      document.body.style.overflow = overflow;
-      previous?.focus();
+      unlock();
+      previous?.focus({ preventScroll: true });
       document.removeEventListener("keydown", keydown);
     };
   }, [open, ref]);

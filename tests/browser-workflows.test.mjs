@@ -175,6 +175,10 @@ test(
         created_at: "2026-10-12",
       },
     );
+    guests.push(...Array.from({length:20}, (_, index) => ({
+      id:100 + index, name:`Synthetic Queue Guest ${index + 1}`, phone:`010${String(index + 50).padStart(8,"0")}`,
+      party_size:2, seating_preference:"any", status:"waiting", confirmed:1, created_at:"2026-10-12",
+    })));
     tables.push(
       { id: 3, name: "Indoor 2", area: "indoor", status: "free", seats: 4 },
       { id: 4, name: "Indoor 3", area: "indoor", status: "occupied", seats: 6 },
@@ -648,6 +652,16 @@ test(
         await sheet.waitFor({ state: "hidden" });
 
         const queue = page.getByRole("region", { name: "Guest queue" });
+        if (width <= 900) assert.ok(await queue.evaluate(el => el.getBoundingClientRect().bottom <= document.querySelector('.queue-bottom-bar').getBoundingClientRect().top + 1), 'Queue must end above fixed tools');
+        // Verify the shipped layout, not an artificially constrained test box.
+        assert.ok(await queue.evaluate((el) => el.scrollHeight > el.clientHeight));
+        await queue.hover();
+        await page.mouse.wheel(0, 450);
+        await page.waitForFunction(() => document.querySelector('[aria-label="Guest queue"]').scrollTop > 0);
+        await queue.evaluate((el) => { el.scrollTop = 0; });
+        assert.notEqual(await page.evaluate(() => document.body.style.overflow), "hidden");
+        assert.ok(await page.locator(".queue-next-badge").count() > 0);
+        assert.equal(await page.getByRole("button", { name: "Settings", exact: true }).count(), 0);
         await queue.evaluate((el) => {
           el.style.maxHeight = "200px";
         });
@@ -1110,6 +1124,10 @@ test(
         subscriptionSubscribed=false; await guestPage.reload();
         await guestPage.getByRole("link",{name:"Subscribe to WhatsApp updates"}).waitFor();
         assert.equal(await guestPage.getByRole("checkbox").count(),0);
+        subscriptionSubscribed=true;
+        await guestPage.getByRole("button",{name:"Check subscription status",exact:true}).click();
+        await guestPage.getByText("WhatsApp updates enabled",{exact:true}).waitFor();
+        assert.equal(await guestPage.getByRole("link",{name:"Subscribe to WhatsApp updates"}).count(),0);
         subscriptionSubscribed=true; feedbackEditable=true;
         assert.equal(submittedBooking.whatsapp_confirmation_consent, consent);
         assert.equal(submittedBooking.whatsapp_feedback_consent, consent);

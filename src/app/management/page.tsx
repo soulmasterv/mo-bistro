@@ -5,5 +5,5 @@ import { requireStaffPage } from "@/lib/require-staff-page";
 
 export default async function Page() {
   const staff = await requireStaffPage(["manager"]);
-  return <><WorkspaceHeader role={staff.role} workspace="Management" /><ManagementDashboard showDemo={testEnvironmentAllowed()} /></>;
+  return <><WorkspaceHeader username={staff.username} role={staff.role} workspace="Management" /><ManagementDashboard showDemo={testEnvironmentAllowed()} /></>;
 }

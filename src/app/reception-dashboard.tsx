@@ -80,6 +80,13 @@ export default function Home() {
   useStaffDialog(showAdd, addDialog, () => setShowAdd(false));
   const qrDialog = useRef<HTMLDivElement>(null);
   const [showQR, setShowQR] = useState(false);
+  useStaffDialog(showQR, qrDialog, () => setShowQR(false));
+  const [headerTools, setHeaderTools] = useState<HTMLElement | null>(null);
+  const [nextGuestIds, setNextGuestIds] = useState<number[]>([]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setHeaderTools(document.getElementById("reception-header-tools")), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
   const [registrationUrl, setRegistrationUrl] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -158,57 +165,6 @@ export default function Home() {
     if (!showQR) return;
     const timer = window.setInterval(refreshQR, 15000);
     return () => window.clearInterval(timer);
-  }, [showQR]);
-
-  useEffect(() => {
-    if (!showQR) return;
-
-    const previousFocus =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-    const dialog = qrDialog.current;
-    dialog?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setShowQR(false);
-      if (event.key === "Tab" && dialog) {
-        const controls = [
-          ...dialog.querySelectorAll<HTMLElement>(
-            'button:not(:disabled), a[href], input, select, [tabindex="0"]',
-          ),
-        ];
-        const first = controls[0],
-          last = controls[controls.length - 1];
-        if (!first) {
-          event.preventDefault();
-          dialog.focus();
-        } else if (
-          event.shiftKey &&
-          (document.activeElement === first ||
-            document.activeElement === dialog)
-        ) {
-          event.preventDefault();
-          last.focus();
-        } else if (
-          !event.shiftKey &&
-          (document.activeElement === last || document.activeElement === dialog)
-        ) {
-          event.preventDefault();
-          first.focus();
-        }
-      }
-    };
-
-    document.addEventListener("keydown", closeOnEscape);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      previousFocus?.focus();
-      document.removeEventListener("keydown", closeOnEscape);
-    };
   }, [showQR]);
 
   async function performAction(id: number, action: Action) {
@@ -301,20 +257,6 @@ export default function Home() {
         <button type="button" onClick={() => setShowTables(true)}>
           <Armchair size={20} /> Active Tables
         </button>
-        <button
-          type="button"
-          onClick={() => {
-            const menu = document.querySelector<HTMLDetailsElement>(
-              ".bistro-workspace-header details",
-            );
-            if (menu) {
-              menu.open = true;
-              menu.querySelector<HTMLElement>("summary")?.focus();
-            }
-          }}
-        >
-          Settings
-        </button>
       </nav>
       <div className="bistro-container">
         <section
@@ -330,7 +272,7 @@ export default function Home() {
             <h1>Reception</h1>
             <p>Manage the queue and seat guests.</p>
           </div>
-          <div className="bistro-toolbar">
+          {headerTools ? createPortal(<div className="bistro-toolbar">
             <span className="bistro-live">
               <i /> Live service
             </span>
@@ -367,7 +309,7 @@ export default function Home() {
             >
               <Plus size={18} /> Add guest
             </button>
-          </div>
+          </div>, headerTools) : null}
         </header>
         <section className="bistro-stat-grid" aria-label="Service statistics">
           {[
@@ -419,7 +361,7 @@ export default function Home() {
             <button onClick={() => setError("")}>Dismiss</button>
           </div>
         )}
-        <NextGuestPanel />
+        <NextGuestPanel onRecommendations={setNextGuestIds} />
         <div className="bistro-reception-grid">
           <section id="reception-queue" className="bistro-panel bistro-queue">
             <div className="bistro-panel-heading">
@@ -492,7 +434,7 @@ export default function Home() {
                 return (
                   <article
                     key={guest.id}
-                    className={`bistro-guest-card ${guest.status === "called" ? "is-called" : ""}`}
+                    className={`bistro-guest-card ${guest.status === "called" ? "is-called" : ""} ${nextGuestIds.includes(guest.id) && ["waiting", "called"].includes(guest.status) ? "is-next-guest" : ""}`}
                   >
                     <div className="bistro-guest-main">
                       <span
@@ -518,6 +460,7 @@ export default function Home() {
                           >
                             {guest.name}
                           </button>
+                          {nextGuestIds.includes(guest.id) && ["waiting", "called"].includes(guest.status) && <span className="queue-next-badge">Next guest</span>}
                         </h3>
                         <p>
                           <Users size={13} /> {guest.party_size} guests{" "}

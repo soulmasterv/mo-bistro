@@ -1,7 +1,7 @@
 "use client";
 import {useEffect,useState} from "react";
 type Suggestion={area:string;available:boolean;guest:{id:number;name:string;party_size:number}|null};
-export default function NextGuestPanel() {
+export default function NextGuestPanel({onRecommendations}:{onRecommendations?:(ids:number[])=>void}) {
  const [items,setItems]=useState<Suggestion[]>([]);
  const [error,setError]=useState("");
  useEffect(()=>{
@@ -12,14 +12,14 @@ export default function NextGuestPanel() {
     const response=await fetch("/api/reception/next-guest?areas=all",{cache:"no-store",signal:current.signal});
     if(!response.ok)throw Error("Next guest recommendations unavailable.");
     const results=(await response.json()).areas;
-    if(!current.signal.aborted){setItems(results);setError("");}
-   }catch{if(!current.signal.aborted){setItems([]);setError("Next guest recommendations unavailable.");}}
+    if(!current.signal.aborted){setItems(results);setError("");onRecommendations?.(results.filter((item:Suggestion)=>item.available && item.guest).map((item:Suggestion)=>item.guest!.id));}
+   }catch{if(!current.signal.aborted){setItems([]);onRecommendations?.([]);setError("Next guest recommendations unavailable.");}}
   }
   const initial=setTimeout(()=>void refresh(),0);
   const timer=setInterval(()=>{if(document.visibilityState==="visible")void refresh();},5000);
   const changed=()=>void refresh();window.addEventListener("mo-bistro-tables-changed",changed);
   return()=>{controller?.abort();clearTimeout(initial);clearInterval(timer);window.removeEventListener("mo-bistro-tables-changed",changed);};
- },[]);
+ },[onRecommendations]);
  return <section className="next-guest-panel" aria-label="Next guests for free tables">
  {error&&<p role="status">{error}</p>}
  {items.filter(item=>item.available).map(item=><article key={item.area}><strong>{item.area==="indoor"?"Indoor":"Outdoor"} · Table available</strong><p>{item.guest?<>Next guest is <b>{item.guest.name}</b> · {item.guest.party_size} guests</>:"No suitable guests waiting."}</p></article>)}

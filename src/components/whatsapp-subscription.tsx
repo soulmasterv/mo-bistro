@@ -19,6 +19,7 @@ export default function WhatsappSubscription({
   });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [awaitingReply, setAwaitingReply] = useState(false);
   const refresh = useCallback(async () => {
     const response = await fetch(
       `/api/whatsapp/subscription?token=${encodeURIComponent(token)}`,
@@ -34,9 +35,14 @@ export default function WhatsappSubscription({
       () => void refresh().catch(() => {}),
       10000,
     );
+    const focused = () => { if (document.visibilityState === "visible") void refresh().catch(() => {}); };
+    window.addEventListener("focus", focused);
+    document.addEventListener("visibilitychange", focused);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(timer);
+      window.removeEventListener("focus", focused);
+      document.removeEventListener("visibilitychange", focused);
     };
   }, [refresh]);
   if (!subscription.available || (!subscription.subscribed && !allowSubscribe))
@@ -65,11 +71,14 @@ export default function WhatsappSubscription({
           href={subscription.url}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => setAwaitingReply(true)}
           className="block rounded-xl bg-[#242424] px-4 py-3 text-center font-medium text-white"
         >
           Subscribe to WhatsApp updates
         </a>
       )}
+      {!subscription.subscribed && awaitingReply && <p role="status" className="guest-small-note">Waiting for WhatsApp confirmation. Your subscription activates after we receive your booking-specific reply.</p>}
+      {!subscription.subscribed && <button type="button" className="guest-subscription-refresh" onClick={() => { setError(""); void refresh().catch((err: Error) => setError(err.message)); }}>Check subscription status</button>}
       {subscription.subscribed && subscription.feedbackConsent && (
         <p className="guest-review-status">Review requests enabled</p>
       )}

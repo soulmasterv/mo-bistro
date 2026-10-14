@@ -4,5 +4,5 @@ import { requireStaffPage } from "@/lib/require-staff-page";
 
 export default async function Page() {
   const staff = await requireStaffPage(["manager", "waiter"]);
-  return <><WorkspaceHeader role={staff.role} workspace="Waiter" /><WaiterDashboard /></>;
+  return <><WorkspaceHeader username={staff.username} role={staff.role} workspace="Waiter" /><WaiterDashboard /></>;
 }

@@ -48,23 +48,32 @@ export default function GuestDetailSheet({
   const [whatsapp, setWhatsapp] = useState<WhatsApp | null>(null);
   const [whatsappError, setWhatsappError] = useState("");
   useEffect(() => {
-    const controller = new AbortController();
-    fetch(`/api/whatsapp/guests/${guest.id}`, {
+    let controller: AbortController | null = null;
+    async function refresh() {
+    controller?.abort();
+    const current = new AbortController();
+    controller = current;
+    await fetch(`/api/whatsapp/guests/${guest.id}`, {
       cache: "no-store",
-      signal: controller.signal,
+      signal: current.signal,
     })
       .then(async (response) => {
         if (!response.ok) throw Error("WhatsApp status unavailable");
         return response.json();
       })
       .then((data) => {
-        if (!controller.signal.aborted) setWhatsapp(data);
+        if (!current.signal.aborted) { setWhatsapp(data); setWhatsappError(""); }
       })
       .catch(() => {
-        if (!controller.signal.aborted)
+        if (!current.signal.aborted)
           setWhatsappError("WhatsApp status unavailable");
       });
-    return () => controller.abort();
+    }
+    const initial = window.setTimeout(() => void refresh(), 0);
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void refresh(); }, 5000);
+    const focused = () => { if (document.visibilityState === "visible") void refresh(); };
+    window.addEventListener("focus", focused);
+    return () => { controller?.abort(); window.clearTimeout(initial); window.clearInterval(timer); window.removeEventListener("focus", focused); };
   }, [guest.id]);
   const dial = guestDialHref(guest.phone);
   const egypt = /^01[0125]\d{8}$/.test(guest.phone)

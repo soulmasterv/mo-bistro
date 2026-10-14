@@ -15,9 +15,11 @@ const workspaces = [
 export default function WorkspaceHeader({
   role,
   workspace,
+  username,
 }: {
   role: StaffRole;
   workspace: string;
+  username?: string;
 }) {
   const selector = useRef<HTMLDetailsElement>(null);
   const [busy, setBusy] = useState(false);
@@ -81,7 +83,8 @@ export default function WorkspaceHeader({
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="workspace-header-actions">
+          {workspace === "Reception" && <div id="reception-header-tools" />}
           {workspace === "Reception" && pendingCount > 0 && (
             <button
               type="button"
@@ -110,6 +113,7 @@ export default function WorkspaceHeader({
               aria-label="Open menu"
             >
               <Menu size={22} />
+              <span className="workspace-account"><b>{username || "Staff"}</b><small>{role === "reception" ? "Receptionist" : role === "manager" ? "Manager" : "Waiter"}</small></span>
               <span className="sr-only">
                 {role === "manager" ? "Switch Workspace" : "Menu"}
               </span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useStaffDialog } from "@/lib/use-staff-dialog";
 import { X, Armchair } from "lucide-react";
 
@@ -46,25 +46,39 @@ export default function SeatGuestModal({
   const dialog = useRef<HTMLDivElement>(null);
   useStaffDialog(true, dialog, onClose);
 
-  useEffect(() => {
-    fetch(`/api/seating?guest_id=${guest.id}`, { cache: "no-store" })
+  const load = useCallback(async (signal?: AbortSignal) => {
+    await fetch(`/api/seating?guest_id=${guest.id}`, { cache: "no-store", signal })
       .then(async (r) => {
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || "Unable to load tables");
         return data;
       })
       .then((data) => {
+        if (signal?.aborted) return;
         setMode(data.mode === "simple" ? "simple" : "detailed");
         setTables(data.tables ?? []);
         setAreas(data.areas ?? []);
       })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-    // Loading is distinct from an actual empty inventory response.
+      .finally(() => { if (!signal?.aborted) setLoading(false); });
   }, [guest.id]);
+  useEffect(() => {
+    let controller: AbortController | null = null;
+    const refresh = () => {
+      controller?.abort();
+      const current = new AbortController(); controller = current;
+      void load(current.signal).catch((e) => { if (!current.signal.aborted) setError(e.message); });
+    };
+    const initial = window.setTimeout(refresh, 0);
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 5000);
+    window.addEventListener("mo-bistro-tables-changed", refresh);
+    return () => { controller?.abort(); window.clearTimeout(initial); window.clearInterval(timer); window.removeEventListener("mo-bistro-tables-changed", refresh); };
+  }, [load]);
+  const validSelection = mode === "simple"
+    ? areas.some((area) => area.area === selectedArea && area.free_tables > 0 && area.max_party_size >= guest.party_size)
+    : tables.some((table) => table.id === selected);
 
   async function confirm() {
-    if (busy || (mode === "simple" ? selectedArea === null : selected === null))
+    if (busy || loading || !validSelection)
       return;
     setBusy(true);
     setError("");
@@ -89,6 +103,7 @@ export default function SeatGuestModal({
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Assignment failed");
+      await load().catch(() => {});
     } finally {
       setBusy(false);
     }
@@ -180,7 +195,7 @@ export default function SeatGuestModal({
           !error &&
           !loading && (
             <p className="mt-5 text-sm text-slate-400">
-              No suitable free tables currently available.
+              {mode === "simple" ? "No suitable free tables in Simple Mode. Check the area's configured capacity in Management, or wait for a table to be released." : "No suitable free tables currently available."}
             </p>
           )}
 
@@ -194,7 +209,7 @@ export default function SeatGuestModal({
           onClick={() => void confirm()}
           disabled={
             busy ||
-            (mode === "simple" ? selectedArea === null : selected === null)
+            loading || !validSelection
           }
           className="mt-6 w-full rounded-xl bg-[#C5A77B] px-5 py-3 font-semibold text-[#101820] disabled:opacity-40"
         >

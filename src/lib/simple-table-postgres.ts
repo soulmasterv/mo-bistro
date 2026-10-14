@@ -88,7 +88,7 @@ export async function assignSimpleTable(
     const [pool] =
       await tx`SELECT total_tables,occupied_tables,max_party_size FROM simple_table_capacity WHERE area=${area} FOR UPDATE`;
     if (!pool || pool.occupied_tables >= pool.total_tables)
-      throw new WorkflowError("No anonymous table is available in this area.");
+      throw new WorkflowError("No free table is available in this area. Availability may have changed; refresh and try another area, or check Simple Mode capacity in Management.");
     if (guest.party_size > pool.max_party_size)
       throw new WorkflowError(
         "This party exceeds the area's anonymous table capacity.",
