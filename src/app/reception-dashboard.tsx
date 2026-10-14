@@ -380,28 +380,12 @@ export default function Home() {
         <NextGuestPanel onRecommendations={setNextGuestIds} />
         <div className="bistro-reception-grid">
           <section id="reception-queue" className="bistro-panel bistro-queue">
-            <ReceptionServiceStrip />
-            <div className="bistro-panel-heading">
+            <div className="bistro-panel-heading reception-queue-heading">
               <div>
-                <p className="bistro-eyebrow">THE NEXT GREAT EXPERIENCE</p>
                 <h2>
                   Waiting queue{" "}
                   <span className="bistro-count">{active.length}</span>
                 </h2>
-              </div>
-              <span className="bistro-muted">
-                Manage the waiting queue and seating.
-              </span>
-            </div>
-            <div className="bistro-queue-controls">
-              <div className="bistro-search">
-                <Search size={18} />
-                <input
-                  aria-label="Search guests"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search a guest or phone number"
-                />
               </div>
               <div className="bistro-tabs" aria-label="Queue status">
                 {(
@@ -429,6 +413,18 @@ export default function Home() {
                   </button>
                 ))}
               </div>
+            </div>
+            <div className="bistro-queue-controls reception-queue-toolbar">
+              <div className="bistro-search">
+                <Search size={18} />
+                <input
+                  aria-label="Search guests"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search a guest or phone number"
+                />
+              </div>
+              <ReceptionServiceStrip />
             </div>
             <div className="reception-table-head" aria-hidden="true">
               <span># · Guest</span>

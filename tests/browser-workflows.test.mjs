@@ -624,6 +624,18 @@ test(
         const overview = page.getByLabel("Service overview", { exact: true });
         await overview.getByText("30m", { exact: true }).waitFor();
         assert.equal(await overview.locator("dt").allTextContents().then(labels=>labels.join(",")), "Current ETA,Indoor,Outdoor");
+        assert.ok(await overview.locator("dd").evaluateAll((values,min)=>values.every(value=>parseFloat(getComputedStyle(value).fontSize)>=min),width<=900?16:21),"Service figures should be prominent");
+        assert.equal(await page.locator(".reception-queue-heading .bistro-tabs button").count(),4);
+        if(width>900) {
+          assert.ok(await page.locator(".reception-queue-heading").evaluate(el=>{
+            const title=el.querySelector('h2').getBoundingClientRect(),filters=el.querySelector('.bistro-tabs').getBoundingClientRect();
+            return Math.abs((title.top+title.height/2)-(filters.top+filters.height/2))<=2;
+          }),"Desktop filters should sit beside the title");
+          assert.ok(await page.locator(".reception-queue-toolbar").evaluate(el=>{
+            const search=el.querySelector('.bistro-search').getBoundingClientRect(),stats=el.querySelector('.reception-service-strip').getBoundingClientRect();
+            return search.right<=stats.left && Math.abs((search.top+search.height/2)-(stats.top+stats.height/2))<=2;
+          }),"Search and service figures should share a desktop row");
+        }
         for (const [index, area] of ["indoor","outdoor"].entries()) {
           const expected = `${tables.filter(table=>table.area===area&&table.status==="free").length} / ${tables.filter(table=>table.area===area).length} free`;
           await page.waitForFunction(({index,expected}) => document.querySelectorAll('.reception-service-strip dd')[index+1]?.textContent === expected, {index,expected});
