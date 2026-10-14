@@ -1311,8 +1311,9 @@ test(
           assert.ok(await subscriptionCheck.evaluate(el => el.getBoundingClientRect().height >= 44));
           await Promise.all([
             guestPage.waitForResponse(response=>response.url().includes('/api/whatsapp/subscription')&&response.request().method()==='GET'),
-            review.check(),
+            review.click(), // Controlled value is refreshed only after the preference PATCH succeeds.
           ]);
+          await guestPage.waitForFunction(() => document.querySelector('.guest-whatsapp-card input[type="checkbox"]')?.checked === true);
           assert.equal(feedbackConsent,true);assert.equal(subscriptionSubscribed,false);
           assert.equal(await guestPage.getByRole("link",{name:"Get WhatsApp updates",exact:true}).count(),1);
           subscriptionSubscribed=true;
@@ -1442,6 +1443,29 @@ test(
       assert.equal(setupReads,2);
       assert.equal(isolatedTestAttempts,0);
       const bulkActions=[];
+      let cleanupEnabled=false;
+      await testPage.route("**/api/management/cleanup", async route=>{
+        if (route.request().method()==="PATCH") {
+          const body=route.request().postDataJSON();
+          assert.deepEqual(body,{enabled:!cleanupEnabled,confirm:true});
+          cleanupEnabled=body.enabled;
+          return route.fulfill({json:{enabled:cleanupEnabled}});
+        }
+        return route.fulfill({json:{available:true,enabled:cleanupEnabled,schedulerConfigured:true,lastResult:null}});
+      });
+      await testPage.reload();
+      await testPage.getByRole("link",{name:"Danger zone",exact:true}).click();
+      assert.equal(new URL(testPage.url()).hash,"#danger-zone");
+      const cleanup=testPage.getByLabel("Automatic database cleanup",{exact:true});
+      await cleanup.getByRole("button",{name:"Enable automatic cleanup",exact:true}).click();
+      let cleanupConfirmation=testPage.getByRole("alertdialog",{name:"Enable automatic cleanup?",exact:true});
+      await cleanupConfirmation.getByRole("button",{name:"Cancel",exact:true}).click();
+      assert.equal(cleanupEnabled,false);
+      await cleanup.getByRole("button",{name:"Enable automatic cleanup",exact:true}).click();
+      cleanupConfirmation=testPage.getByRole("alertdialog",{name:"Enable automatic cleanup?",exact:true});
+      await cleanupConfirmation.getByRole("button",{name:"Enable cleanup",exact:true}).click();
+      await cleanup.getByText("Enabled — waiting for scheduled runs",{exact:true}).waitFor();
+      assert.equal(cleanupEnabled,true);
       let releaseBulk;
       await testPage.route("**/api/management/danger-zone", async route=>{
         bulkActions.push(route.request().postDataJSON());

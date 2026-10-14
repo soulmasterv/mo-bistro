@@ -16,6 +16,7 @@ import {
   SlidersHorizontal,
   Armchair,
   ArrowUpRight,
+  TriangleAlert,
 } from "lucide-react";
 
 type Settings = {
@@ -134,6 +135,9 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
             </a>
             <a href="#floor-settings">
               <Armchair size={18} /> Floor & seating <ArrowUpRight size={14} />
+            </a>
+            <a href="#danger-zone">
+              <TriangleAlert size={18} /> Danger zone <ArrowUpRight size={14} />
             </a>
             <div className="bistro-nav-note">
               <span>Service, your way.</span>

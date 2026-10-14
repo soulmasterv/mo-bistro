@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { useConfirmation } from "@/components/confirmation-provider";
+import ManagementCleanup from "@/components/management-cleanup";
 
 type Action = "free_tables" | "cancel_queue";
 export default function ManagementDangerZone() {
@@ -43,5 +44,6 @@ export default function ManagementDangerZone() {
       <button type="button" className="bistro-button bistro-button-danger" disabled={busy !== null} onClick={() => void run("cancel_queue")}>{busy === "cancel_queue" ? "Cancelling bookings…" : "Cancel all waiting bookings"}</button>
     </div>
     <p role="status">{message}</p>
+    <ManagementCleanup blocked={busy !== null} />
   </section>;
 }
