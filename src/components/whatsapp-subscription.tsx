@@ -63,7 +63,7 @@ export default function WhatsappSubscription({
         </p>
       ) : (
         <p className="guest-small-note">
-          Keep up with your booking while you enjoy your time.
+          Open WhatsApp and send your booking message to turn on updates.
         </p>
       )}
       {!subscription.subscribed && allowSubscribe && subscription.url && (
@@ -74,7 +74,7 @@ export default function WhatsappSubscription({
           onClick={() => setAwaitingReply(true)}
           className="block rounded-xl bg-[#242424] px-4 py-3 text-center font-medium text-white"
         >
-          Subscribe to WhatsApp updates
+          Get WhatsApp updates
         </a>
       )}
       {!subscription.subscribed && awaitingReply && <p role="status" className="guest-small-note">Waiting for WhatsApp confirmation. Your subscription activates after we receive your booking-specific reply.</p>}
@@ -123,7 +123,7 @@ export default function WhatsappSubscription({
       <p className="text-xs text-[#77716A]">
         {!subscription.subscribed && (
           <>
-            Tap subscribe, then send the message in WhatsApp to enable
+            Open WhatsApp, then send the message to enable
             updates.{" "}
           </>
         )}

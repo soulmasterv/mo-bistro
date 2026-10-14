@@ -114,6 +114,7 @@ test(
     let trackingEta = null;
     let subscriptionSubscribed = true;
     let feedbackEditable = true;
+    let feedbackConsent = true;
     let staffUsername = "manager";
     let sessionStatus = 200;
     const guestActions = [];
@@ -272,7 +273,8 @@ test(
             data = { valid: true, expiresAt: null };
             break;
           case "/api/whatsapp/subscription":
-            data = {available:true,subscribed:subscriptionSubscribed,feedbackConsent:true,feedbackEditable,url:"https://wa.me/201000000000?text=SUBSCRIBE"};
+            if(req.method==='PATCH') { feedbackConsent=body.feedbackConsent; data={saved:true}; }
+            else data = {available:true,subscribed:subscriptionSubscribed,feedbackConsent,feedbackEditable,url:"https://wa.me/201000000000?text=SUBSCRIBE"};
             break;
           case "/api/reception/next-guest":
             data={areas:[{area:"indoor",available:true,guest:{id:guests[0].id,name:guests[0].name,party_size:guests[0].party_size}},{area:"outdoor",available:true,guest:null}]};
@@ -787,7 +789,15 @@ test(
             await page.setViewportSize({width,height:900});
           }
         }
-        if(width>=1100) assert.ok(await page.locator(".bistro-guest-card").first().evaluate(row=>row.getBoundingClientRect().height<=76),"A short desktop guest row should stay compact");
+        if(width>=1100) {
+          assert.ok(await page.locator(".bistro-guest-card").first().evaluate(row=>row.getBoundingClientRect().height<=76),"A short desktop guest row should stay compact");
+          const columns=await page.evaluate(()=>{
+            const headers=[...document.querySelectorAll('.reception-table-head > span')].slice(1,5);
+            const facts=[...document.querySelector('.bistro-guest-card .reception-row-facts').children];
+            return headers.map((header,index)=>({label:header.textContent,offset:Math.abs(header.getBoundingClientRect().left-facts[index].getBoundingClientRect().left)}));
+          });
+          assert.ok(columns.every(column=>column.offset<=1.5),"Queue column headings should align with row values: "+JSON.stringify(columns));
+        }
         if (width <= 900) assert.ok(await queue.evaluate(el => el.getBoundingClientRect().bottom <= document.querySelector('.queue-bottom-bar').getBoundingClientRect().top + 1), 'Queue must end above fixed tools');
         // Verify the shipped layout, not an artificially constrained test box.
         assert.ok(await queue.evaluate((el) => el.scrollHeight > el.clientHeight));
@@ -1256,7 +1266,8 @@ test(
         );
         await context.close();
       }
-      for (const consent of [false, true]) {
+      for (const subscribed of [false, true]) {
+        subscriptionSubscribed=subscribed;feedbackEditable=true;feedbackConsent=false;
         const guestContext = await browser.newContext({
           viewport: { width: 390, height: 844 },
           colorScheme: "dark",
@@ -1266,8 +1277,8 @@ test(
           localStorage.setItem("mo-bistro-theme", "dark"),
         );
         await guestPage.goto(origin + "/join");
-        await guestPage.getByRole("checkbox").waitFor();
-        assert.equal(await guestPage.getByRole("checkbox").count(), 1);
+        await guestPage.getByRole("button",{name:"Join the waitlist",exact:true}).waitFor();
+        assert.equal(await guestPage.getByRole("checkbox").count(), 0);
         await guestPage.waitForFunction(
           () => document.documentElement.dataset.theme === "guest-light",
         );
@@ -1277,10 +1288,9 @@ test(
         await guestPage
           .getByPlaceholder("01XXXXXXXXX", { exact: true })
           .fill("01012345678");
-        if (consent) await guestPage.getByRole("checkbox").check();
-        if (screenshots && consent)
+        if (screenshots && !subscribed)
           await guestPage.screenshot({
-            path: path.join(screenshots, "join-combined-consent.png"),
+            path: path.join(screenshots, "join-without-whatsapp-checkbox.png"),
             fullPage: true,
           });
         await guestPage
@@ -1289,8 +1299,21 @@ test(
         await guestPage.waitForURL("**/status?token=*");
         await guestPage.getByText("Omar Hassan", {exact:true}).waitFor();
         await guestPage.waitForFunction(() => document.documentElement.dataset.theme === "guest-light");
+        if(!subscribed) {
+          await guestPage.getByRole("link",{name:"Get WhatsApp updates",exact:true}).waitFor();
+          const review=guestPage.getByRole("checkbox",{name:/Optional: send me one review request/});
+          assert.equal(await review.isChecked(),false);
+          await Promise.all([
+            guestPage.waitForResponse(response=>response.url().includes('/api/whatsapp/subscription')&&response.request().method()==='GET'),
+            review.check(),
+          ]);
+          assert.equal(feedbackConsent,true);assert.equal(subscriptionSubscribed,false);
+          assert.equal(await guestPage.getByRole("link",{name:"Get WhatsApp updates",exact:true}).count(),1);
+          subscriptionSubscribed=true;
+          await guestPage.getByRole("button",{name:"Check subscription status",exact:true}).click();
+        }
         await guestPage.getByText("WhatsApp updates enabled",{exact:true}).waitFor();
-        assert.equal(await guestPage.getByRole("link",{name:"Subscribe to WhatsApp updates"}).count(),0);
+        assert.equal(await guestPage.getByRole("link",{name:"Get WhatsApp updates"}).count(),0);
         assert.equal(await guestPage.getByRole("checkbox").count(),0); // Review preference is collapsed for subscribers.
         await guestPage.getByText("To unsubscribe at any time, reply UNSUBSCRIBE or STOP on WhatsApp.",{exact:true}).waitFor();
         feedbackEditable=false; await guestPage.reload();
@@ -1298,15 +1321,15 @@ test(
         assert.equal(await guestPage.getByRole("checkbox").count(),0);
         if(screenshots) await guestPage.screenshot({path:path.join(screenshots,"whatsapp-updates-enabled.png"),fullPage:true});
         subscriptionSubscribed=false; await guestPage.reload();
-        await guestPage.getByRole("link",{name:"Subscribe to WhatsApp updates"}).waitFor();
+        await guestPage.getByRole("link",{name:"Get WhatsApp updates"}).waitFor();
         assert.equal(await guestPage.getByRole("checkbox").count(),0);
         subscriptionSubscribed=true;
         await guestPage.getByRole("button",{name:"Check subscription status",exact:true}).click();
         await guestPage.getByText("WhatsApp updates enabled",{exact:true}).waitFor();
-        assert.equal(await guestPage.getByRole("link",{name:"Subscribe to WhatsApp updates"}).count(),0);
+        assert.equal(await guestPage.getByRole("link",{name:"Get WhatsApp updates"}).count(),0);
         subscriptionSubscribed=true; feedbackEditable=true;
-        assert.equal(submittedBooking.whatsapp_confirmation_consent, consent);
-        assert.equal(submittedBooking.whatsapp_feedback_consent, consent);
+        assert.equal(submittedBooking.whatsapp_confirmation_consent, false);
+        assert.equal(submittedBooking.whatsapp_feedback_consent, false);
         await guestContext.close();
       }
       const seatedStaff=await browser.newPage();
@@ -1354,13 +1377,13 @@ test(
             assert.equal(await guest.getByText("Queue position",{exact:true}).count(),0);
             assert.equal(await guest.getByText("Parties ahead",{exact:true}).count(),0);
             assert.equal(await guest.getByRole("button",{name:"Refresh status"}).count(),0);
-            assert.equal(await guest.getByRole("link",{name:"Subscribe to WhatsApp updates"}).count(),0);
+            assert.equal(await guest.getByRole("link",{name:"Get WhatsApp updates"}).count(),0);
           }
           if(screenshots) await guest.screenshot({path:path.join(screenshots,`guest-${status}-${width}.png`),fullPage:true});
         }
         subscriptionSubscribed=false;trackingStatus="seated";await guest.reload();
         await guest.getByRole("heading",{name:"You’re seated!",exact:true}).waitFor();
-        assert.equal(await guest.getByRole("link",{name:"Subscribe to WhatsApp updates"}).count(),0);
+        assert.equal(await guest.getByRole("link",{name:"Get WhatsApp updates"}).count(),0);
         await guest.goto(origin+"/menu");
         await guest.getByRole("heading",{name:"Something delicious awaits."}).waitFor();
         assert.equal(await guest.getByRole("link",{name:"Open menu",exact:true}).getAttribute("href"),"/menus/mo-bistro-menu.pdf");

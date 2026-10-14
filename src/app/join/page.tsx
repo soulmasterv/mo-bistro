@@ -32,15 +32,6 @@ export default function JoinPage() {
   const [seatingPreference, setSeatingPreference] = useState<Seating>("any");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [whatsappAvailable, setWhatsappAvailable] = useState(false);
-  const [whatsappConfirmation, setWhatsappConfirmation] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    void fetch("/api/whatsapp/config", { cache: "no-store" }).then(r => r.json())
-      .then(data => { if (active) setWhatsappAvailable(data.available === true); }).catch(() => {});
-    return () => { active = false; };
-  }, []);
 
   const [qrCode, setQrCode] = useState("");
   const [qrState, setQrState] = useState<"checking" | "valid" | "invalid">("checking");
@@ -154,8 +145,8 @@ export default function JoinPage() {
           party_size: partySize,
           seating_preference: seatingPreference,
           qr_code: qrCode,
-          whatsapp_confirmation_consent: whatsappAvailable && whatsappConfirmation,
-          whatsapp_feedback_consent: whatsappAvailable && whatsappConfirmation,
+          whatsapp_confirmation_consent: false,
+          whatsapp_feedback_consent: false,
         }),
       });
 
@@ -430,15 +421,6 @@ export default function JoinPage() {
                     queue. Seating preferences depend on availability.
                   </p>
                 </div>
-
-                {whatsappAvailable && <fieldset className="space-y-3 rounded-xl border border-[#E4DCD0] p-4 text-[13px]">
-                  <legend className="px-1 font-semibold">Optional WhatsApp messages</legend>
-                  <label className="flex items-start gap-3">
-                    <input type="checkbox" checked={whatsappConfirmation} onChange={e => setWhatsappConfirmation(e.target.checked)} />
-                    <span>Send me one WhatsApp booking confirmation. If I reply to subscribe, send me queue updates and one review request 60 minutes after seating.</span>
-                  </label>
-                  <p className="text-xs text-[#777367]">Booking is available without these options. To unsubscribe at any time, reply UNSUBSCRIBE or STOP on WhatsApp.</p>
-                </fieldset>}
 
                 {error && (
                   <div

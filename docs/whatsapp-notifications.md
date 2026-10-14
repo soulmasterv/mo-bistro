@@ -6,10 +6,14 @@ is required; the SQLite fallback continues without WhatsApp.
 
 ## Customer permission
 
-Both booking checkboxes start unchecked and do not block a booking:
-
-* One-time booking confirmation permits **only** one confirmation template.
-* Feedback permission permits one review request **only after** subscription.
+The guest join page records neither confirmation nor feedback permission. After
+booking, the status page offers **Get WhatsApp updates**. The guest must send the
+booking-specific message themselves; opening WhatsApp does not subscribe them.
+Review permission is an independent, initially unchecked preference on that page
+and permits one review request **only after** subscription. Existing recorded
+permissions are preserved. The legacy confirmation event/API remains supported for
+bookings with explicit confirmation consent; the simplified join UI does not
+request that permission or queue that initial confirmation.
 
 The approved confirmation template must have a quick-reply button named exactly
 **Subscribe to Updates**. Its per-booking payload is a 30-day, secret-derived

@@ -2885,12 +2885,18 @@ html[data-theme="dark"] .confirmation-actions button:not(.confirmation-primary):
 html[data-theme="dark"] .reception-reference .bistro-guest-copy h3 .queue-next-badge { color:#eac483; }
 @media(min-width:1100px) {
  .reception-reference .bistro-guest-card { min-height:64px; }
+ .reception-reference .reception-table-head { overflow-y:hidden; scrollbar-gutter:stable; }
+ .reception-reference .bistro-guest-list { scrollbar-gutter:stable; padding-top:8px; }
  .reception-reference .bistro-guest-main { padding:0; }
  .reception-reference .bistro-guest-copy { display:flex; align-items:center; flex-wrap:wrap; gap:4px 10px; }
  .reception-reference .bistro-phone { margin:0; }
 }
 @media(max-width:1099px) {
  .reception-reference .bistro-guest-main { padding:6px 0; }
+}
+@media(min-width:1100px) and (pointer:fine) {
+ .reception-reference .bistro-guest-actions .bistro-button { min-height:36px; padding:7px 10px; }
+ .reception-reference .bistro-guest-actions .bistro-icon-button { width:36px; min-width:36px; min-height:36px; height:36px; }
 }
 @media(max-width:900px) {
  .reception-reference .bistro-guest-card { min-height:76px; padding:2px 8px; }
