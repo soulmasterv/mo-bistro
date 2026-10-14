@@ -587,6 +587,23 @@ test(
           .getByRole("link", { name: "Reception", exact: true })
           .click();
         await page.waitForURL(origin + "/");
+        const overview = page.getByLabel("Service overview", { exact: true });
+        await overview.getByText("30m", { exact: true }).waitFor();
+        assert.equal(await overview.locator("dt").allTextContents().then(labels=>labels.join(",")), "Current ETA,Indoor,Outdoor");
+        for (const [index, area] of ["indoor","outdoor"].entries()) {
+          const expected = `${tables.filter(table=>table.area===area&&table.status==="free").length} / ${tables.filter(table=>table.area===area).length} free`;
+          await page.waitForFunction(({index,expected}) => document.querySelectorAll('.reception-service-strip dd')[index+1]?.textContent === expected, {index,expected});
+        }
+        if (width === 390) {
+          await page.route("**/api/wait-estimate", route=>route.fulfill({status:503,contentType:"application/json",body:'{"error":"Synthetic failure"}'}));
+          await page.evaluate(()=>window.dispatchEvent(new Event("mo-bistro-tables-changed")));
+          await overview.getByTitle("Wait estimate unavailable", {exact:true}).waitFor();
+          assert.equal(await overview.locator("dd").first().textContent(), "—");
+          assert.notEqual(await overview.locator("dd").nth(1).textContent(), "—");
+          await page.unroute("**/api/wait-estimate");
+          await page.evaluate(()=>window.dispatchEvent(new Event("mo-bistro-tables-changed")));
+          await overview.getByText("30m",{exact:true}).waitFor();
+        }
         await page.getByRole("button", { name: "Tables", exact: true }).click();
         await page
           .getByRole("button", { name: "Clear Indoor 1", exact: true })
@@ -837,6 +854,7 @@ test(
           });
         mode = "simple";
         await page.reload();
+        await page.waitForFunction(expected => document.querySelectorAll('.reception-service-strip dd')[1]?.textContent === expected, `${2-occupied} / 2 free`);
         await page.getByRole("button", { name: "Tables", exact: true }).click();
         await page
           .getByRole("button", { name: "Table free", exact: true })

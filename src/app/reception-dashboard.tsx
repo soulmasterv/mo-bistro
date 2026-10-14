@@ -1,6 +1,7 @@
 "use client";
 import TrackingHandoff from "@/components/tracking-handoff";
 import NextGuestPanel from "@/components/next-guest-panel";
+import ReceptionServiceStrip from "@/components/reception-service-strip";
 import ReceptionTableRequests from "@/components/reception-table-requests";
 import TableReadyNotifications from "@/components/table-ready-notifications";
 
@@ -364,6 +365,7 @@ export default function Home() {
         <NextGuestPanel onRecommendations={setNextGuestIds} />
         <div className="bistro-reception-grid">
           <section id="reception-queue" className="bistro-panel bistro-queue">
+            <ReceptionServiceStrip />
             <div className="bistro-panel-heading">
               <div>
                 <p className="bistro-eyebrow">THE NEXT GREAT EXPERIENCE</p>
