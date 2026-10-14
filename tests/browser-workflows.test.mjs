@@ -773,7 +773,12 @@ test(
         if(width<=900) {
           assert.ok(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+1),"Queue page should fit the viewport");
           assert.ok(await queue.evaluate(el=>el.clientHeight>=250),"Guest list should retain usable space");
-          assert.ok(await page.locator(".bistro-guest-card").evaluateAll(rows=>rows.every(row=>row.getBoundingClientRect().height>=92)),"Guest rows should not shrink");
+          assert.ok(await page.locator(".bistro-guest-card").evaluateAll(rows=>rows.every(row=>row.getBoundingClientRect().height>=76)),"Compact guest rows should retain a readable minimum height");
+          const compactRow=page.locator(".bistro-guest-card").first();
+          if(screenshots)await compactRow.screenshot({path:path.join(screenshots,`compact-row-${width}.png`)});
+          const rowLayout=await compactRow.evaluate(row=>[row,...row.querySelectorAll('.bistro-guest-main,.bistro-guest-copy,h3,p,.queue-next-badge')].map(el=>({name:el.className||el.tagName,height:el.getBoundingClientRect().height,width:el.getBoundingClientRect().width,padding:getComputedStyle(el).padding})));
+          assert.ok(rowLayout[0].height<=96,"A short mobile guest row should stay compact: "+JSON.stringify(rowLayout));
+          assert.ok(await page.locator(".bistro-guest-card").first().locator(".bistro-guest-actions button").evaluateAll(buttons=>buttons.every(button=>button.getBoundingClientRect().height>=44)),"Mobile action targets must remain easy to tap");
           if(width===390) {
             await page.setViewportSize({width,height:650});
             assert.ok(await queue.evaluate(el=>el.clientHeight>=140),"Short mobile viewport still needs a readable list");
@@ -782,6 +787,7 @@ test(
             await page.setViewportSize({width,height:900});
           }
         }
+        if(width>=1100) assert.ok(await page.locator(".bistro-guest-card").first().evaluate(row=>row.getBoundingClientRect().height<=76),"A short desktop guest row should stay compact");
         if (width <= 900) assert.ok(await queue.evaluate(el => el.getBoundingClientRect().bottom <= document.querySelector('.queue-bottom-bar').getBoundingClientRect().top + 1), 'Queue must end above fixed tools');
         // Verify the shipped layout, not an artificially constrained test box.
         assert.ok(await queue.evaluate((el) => el.scrollHeight > el.clientHeight));

@@ -466,7 +466,7 @@ export default function Home() {
                           >
                             {guest.name}
                           </button>
-                          {nextGuestIds.includes(guest.id) && ["waiting", "called"].includes(guest.status) && <span className="queue-next-badge">Next guest</span>}
+                          {nextGuestIds.includes(guest.id) && ["waiting", "called"].includes(guest.status) && <span className="queue-next-badge" aria-label="Next guest">Next</span>}
                         </h3>
                         <p>
                           <Users size={13} /> {guest.party_size} guests{" "}
