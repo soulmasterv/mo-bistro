@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmation } from "@/components/confirmation-provider";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { UserPlus } from "lucide-react";
@@ -14,6 +15,7 @@ type Employee = {
 };
 
 export default function StaffAccountManager() {
+  const confirmAction = useConfirmation();
   const [username, setUsername] = useState("");
   const [credential, setCredential] = useState("");
   const [role, setRole] = useState<Role>("waiter");
@@ -56,7 +58,7 @@ export default function StaffAccountManager() {
     const next = employee.active === 1 ? 0 : 1;
     const action = next === 1 ? "reactivate" : "disable";
 
-    if (!window.confirm(`${action === "disable" ? "Disable" : "Reactivate"} ${employee.username}?`)) {
+    if (!await confirmAction({ title: next === 1 ? "Reactivate staff account?" : "Disable staff account?", message: `${action === "disable" ? "Disable" : "Reactivate"} ${employee.username}?`, confirmLabel: next === 1 ? "Reactivate account" : "Disable account", destructive: next === 0 })) {
       return;
     }
 

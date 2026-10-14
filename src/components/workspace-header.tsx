@@ -26,6 +26,23 @@ export default function WorkspaceHeader({
   const [error, setError] = useState("");
   const [pendingCount, setPendingCount] = useState(0);
   useEffect(() => {
+    let controller: AbortController | null = null;
+    async function checkSession() {
+      if (controller) return;
+      const current = new AbortController(); controller = current;
+      try {
+        const response = await fetch("/api/auth/me", { cache: "no-store", credentials: "same-origin", signal: current.signal });
+        if (!current.signal.aborted && response.status === 401) window.location.replace("/login?reason=session-expired");
+      } catch { /* A network failure must not sign staff out. */ }
+      finally { if (controller === current) controller = null; }
+    }
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void checkSession(); }, 60000);
+    const focused = () => { if (document.visibilityState === "visible") void checkSession(); };
+    window.addEventListener("focus", focused);
+    document.addEventListener("visibilitychange", focused);
+    return () => { controller?.abort(); window.clearInterval(timer); window.removeEventListener("focus", focused); document.removeEventListener("visibilitychange", focused); };
+  }, []);
+  useEffect(() => {
     function dismiss(event: PointerEvent | FocusEvent) {
       if (
         selector.current &&

@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmation } from "@/components/confirmation-provider";
 import RestaurantWaitDisplay from "@/components/restaurant-wait-display";
 import WhatsappSubscription from "@/components/whatsapp-subscription";
 
@@ -30,6 +31,7 @@ type Tracking = {
 };
 
 function StatusContent() {
+  const confirmAction = useConfirmation();
   const router = useRouter();
   const params = useSearchParams();
   const token = params.get("token");
@@ -83,7 +85,7 @@ function StatusContent() {
   async function cancel() {
     if (!token || busy) return;
 
-    if (!window.confirm("Leave the restaurant waitlist?")) {
+    if (!await confirmAction({ title: "Leave the waitlist?", message: "Your booking will be cancelled and your place in the queue will be released.", confirmLabel: "Leave waitlist", destructive: true })) {
       return;
     }
 

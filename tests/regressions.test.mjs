@@ -683,7 +683,7 @@ test("Reception queue badges and QR dialog contain accessible Mo Bistro copy", (
     useEffect() {},
     useCallback: (fn) => fn,
   };
-  const mocks = { react, "react-dom": { createPortal: (value) => value } };
+  const mocks = { react, "react-dom": { createPortal: (value) => value }, "@/components/confirmation-provider": {useConfirmation:()=>async()=>false} };
   for (const component of [
     "reception-table-requests",
     "table-ready-notifications",

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 type Preference = "system" | "light" | "dark";
 const KEY = "mo-bistro-theme";
-let volatilePreference: Preference = "light";
+let volatilePreference: Preference = "dark";
 const CHANGE = "mo-bistro-theme-change";
 function preference(): Preference {
   try {
@@ -38,7 +38,7 @@ function subscribe(callback: () => void) {
   };
 }
 function useTheme() {
-  return useSyncExternalStore(subscribe, snapshot, () => "light:light");
+  return useSyncExternalStore(subscribe, snapshot, () => "dark:dark");
 }
 export function ThemePreference() {
   const current = useTheme();

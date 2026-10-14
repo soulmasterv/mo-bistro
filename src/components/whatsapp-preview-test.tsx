@@ -1,6 +1,8 @@
 "use client";
+import { useConfirmation } from "@/components/confirmation-provider";
 import { useCallback, useEffect, useState } from "react";
 export default function WhatsAppPreviewTest() {
+  const confirmAction = useConfirmation();
   const [enabled, setEnabled] = useState(false);
   const [visible, setVisible] = useState(false);
   const [windowOpen, setWindowOpen] = useState(false);
@@ -49,9 +51,7 @@ export default function WhatsAppPreviewTest() {
       !enabled ||
       !windowOpen ||
       attempted ||
-      !window.confirm(
-        "Send one real plain-text test message to the configured verified test recipient?",
-      )
+      !await confirmAction({ title: "Send test WhatsApp?", message: "Send one real plain-text test message to the configured verified test recipient? No automatic retries.", confirmLabel: "Send test message" })
     )
       return;
     setAttempted(true);

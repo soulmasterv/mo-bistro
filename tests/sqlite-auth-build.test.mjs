@@ -47,3 +47,22 @@ test("PostgreSQL authentication delegation is unchanged", async () => {
   assert.equal(await h.module.currentStaff(), null);
   assert.deepEqual(h.calls, ["postgres"]);
 });
+
+test("SQLite and PostgreSQL logins both use fixed twelve-hour expiry", async () => {
+  const now = 1_800_000_000_000;
+  class Clock extends Date { static now() { return now; } }
+  const globals = {Date:Clock,process:{env:{STAFF_SESSION_SECRET:"synthetic-session-secret-at-least-32-characters"}}};
+  let sqliteExpiry, postgresExpiry;
+  const sqlite = load("src/lib/staff-auth.ts", {
+    "@/lib/db": {__esModule:true,default:{exec(){},prepare(query){return {run(...values){if(query.includes("INSERT INTO staff_sessions")) sqliteExpiry=values[2];}};}}},
+    "@/lib/staff-auth-utils":{}, "@/lib/staff-auth-postgres":{}, "next/headers":{},
+  }, globals);
+  const postgres = load("src/lib/staff-auth-postgres.ts", {
+    "@/lib/postgres-db":{getPostgres:()=>async (strings,...values)=>{assert.match(strings.join("?"),/INSERT INTO staff_sessions/);postgresExpiry=values[2];return [];}},
+    "next/headers":{},
+  },globals);
+  assert.equal(sqlite.createSession(7).expiresAt,now+43_200_000);
+  assert.equal((await postgres.createSessionPostgres(7)).expiresAt,now+43_200_000);
+  assert.equal(sqliteExpiry,now+43_200_000);
+  assert.equal(postgresExpiry,now+43_200_000);
+});

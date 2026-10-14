@@ -25,6 +25,9 @@ export function useStaffDialog(
       )
       ?.focus({ preventScroll: true });
     function keydown(event: KeyboardEvent) {
+      // Only the top dialog handles keys when confirmation overlays a guest sheet.
+      const dialogs = document.querySelectorAll('[aria-modal="true"]');
+      if (dialogs[dialogs.length - 1] !== dialog) return;
       if (event.key === "Escape") {
         event.preventDefault();
         closeRef.current();

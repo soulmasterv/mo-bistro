@@ -55,12 +55,13 @@ test(
       "import {ThemePreference} from " +
       component("src/components/theme-preference.tsx") +
       ";" +
+      "import {ConfirmationProvider} from " + component("src/components/confirmation-provider.tsx") + ";" +
       "import Header from " +
       component("src/components/workspace-header.tsx") +
       ";" +
       'const p=location.pathname;const role=document.cookie.match(/fixture_role=(manager|reception|waiter)/)?.[1] ?? "manager";' +
       'const title=p==="/waiter"?"Waiter":p.startsWith("/management")||p==="/manager"?"Management":"Reception";' +
-      'createRoot(document.getElementById("root")).render(p==="/join"?<><ThemePreference/><Join/></>:p==="/menu"?<><ThemePreference/><Menu/></>:p==="/status"?<><ThemePreference/><Status/></>:p==="/login"?<><ThemePreference/><Login/></>:p==="/login/pin"?<><ThemePreference/><PinLogin/></>:<><ThemePreference/><Header role={role} workspace={p==="/workspace-fixture"?"Workspaces":title}/>{title==="Waiter"?<Waiter/>:title==="Management"?(p==="/management/staff-pins"?<StaffPins/>:<Management/>):<Reception/>}</>);';
+      'createRoot(document.getElementById("root")).render(<ConfirmationProvider>{p==="/join"?<><ThemePreference/><Join/></>:p==="/menu"?<><ThemePreference/><Menu/></>:p==="/status"?<><ThemePreference/><Status/></>:p==="/login"?<><ThemePreference/><Login/></>:p==="/login/pin"?<><ThemePreference/><PinLogin/></>:<><ThemePreference/><Header role={role} workspace={p==="/workspace-fixture"?"Workspaces":title}/>{title==="Waiter"?<Waiter/>:title==="Management"?(p==="/management/staff-pins"?<StaffPins/>:<Management/>):<Reception/>}</>}</ConfirmationProvider>);';
     await esbuild.build({
       stdin: { contents: source, loader: "tsx", resolveDir: root },
       bundle: true,
@@ -113,6 +114,8 @@ test(
     let subscriptionSubscribed = true;
     let feedbackEditable = true;
     let staffUsername = "manager";
+    let sessionStatus = 200;
+    const guestActions = [];
     const errors = [];
     const readyRequests = [];
     let submittedBooking;
@@ -236,6 +239,7 @@ test(
               /fixture_role=(manager|reception|waiter)/,
             )?.[1] ?? "manager";
         let data = {};
+        if (/^\/api\/guests\/\d+$/.test(url.pathname) && req.method === "PATCH") guestActions.push(body.action);
         if (url.pathname.startsWith("/api/whatsapp/guests/")) {
           res.setHeader("content-type", "application/json");
           res.end(
@@ -290,6 +294,7 @@ test(
             data = { success: true };
             break;
           case "/api/auth/me":
+            res.statusCode = sessionStatus;
             data = { id: 1, role, username: role };
             break;
           case "/api/guests/4/eta":
@@ -443,6 +448,7 @@ test(
         });
         const page = await context.newPage();
         page.on("pageerror", (error) => errors.push(error.message));
+        page.on("dialog", dialog => { errors.push("Unexpected native browser dialog"); void dialog.dismiss(); });
         await context.addInitScript(() => { if(location.pathname === "/login") localStorage.setItem("mo-bistro-theme", "dark"); });
         await page.goto(origin + "/login");
         await page.waitForFunction(() => document.documentElement.dataset.theme === "guest-light");
@@ -653,6 +659,28 @@ test(
           exact: true,
         });
         assert.ok(await sheet.isVisible());
+        const actionCount = guestActions.length;
+        await sheet.getByRole("button", {name:"Cancel booking",exact:true}).click();
+        const confirmation = page.getByRole("alertdialog", {name:"Cancel booking?",exact:true});
+        await confirmation.waitFor();
+        assert.equal(await page.locator(".confirmation-overlay").evaluate(el=>getComputedStyle(el).backgroundColor), "rgba(0, 0, 0, 0.65)");
+        assert.equal(guestActions.length, actionCount);
+        assert.ok(await confirmation.getByRole("button",{name:"Cancel",exact:true}).evaluate(el=>el===document.activeElement));
+        if(screenshots) await page.screenshot({path:path.join(screenshots,`custom-confirmation-${width}.png`)});
+        await page.keyboard.press("Escape");
+        await confirmation.waitFor({state:"hidden"});
+        assert.ok(await sheet.isVisible());
+        assert.equal(guestActions.length, actionCount);
+        assert.equal(await page.evaluate(()=>document.body.style.overflow), "hidden");
+        await sheet.getByRole("button", {name:"Cancel booking",exact:true}).click();
+        await confirmation.getByRole("button",{name:"Cancel",exact:true}).click();
+        assert.equal(guestActions.length, actionCount);
+        await sheet.getByRole("button", {name:"Cancel booking",exact:true}).click();
+        await Promise.all([
+          page.waitForResponse(response=>/\/api\/guests\/\d+$/.test(new URL(response.url()).pathname)&&response.request().method()==="PATCH"),
+          confirmation.getByRole("button",{name:"Cancel booking",exact:true}).click(),
+        ]);
+        assert.equal(guestActions.length, actionCount + 1);
         assert.equal(
           await sheet
             .getByRole("link", { name: "Open WhatsApp", exact: true })
@@ -697,6 +725,13 @@ test(
         await page.waitForFunction(
           () => document.documentElement.dataset.theme === "dark",
         );
+        if(width===390) {
+          await page.getByRole("button",{name:"More actions for "+unconfirmed.name,exact:true}).click();
+          await page.getByRole("dialog",{name:unconfirmed.name,exact:true}).getByRole("button",{name:"Cancel booking",exact:true}).click();
+          await page.getByRole("alertdialog",{name:"Cancel booking?",exact:true}).waitFor();
+          if(screenshots) await page.screenshot({path:path.join(screenshots,"custom-confirmation-dark.png")});
+          await page.keyboard.press("Escape"); await page.keyboard.press("Escape");
+        }
         await page.waitForFunction(() => {
           const button = document.querySelector(
             '[aria-label="Seat Omar Hassan"]',
@@ -759,6 +794,12 @@ test(
           .getByRole("button", { name: "Copy link", exact: true })
           .waitFor({ state: "visible" });
         await dialog.locator("svg").waitFor();
+        if(width===390) {
+          await page.evaluate(()=>Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText:async()=>{throw Error("Synthetic clipboard rejection");}}}));
+          await dialog.getByRole("button",{name:"Copy link",exact:true}).click();
+          await dialog.getByText("Automatic copying is unavailable. Select and copy the registration link above.",{exact:true}).waitFor();
+          assert.equal(await dialog.getByLabel("Registration link",{exact:true}).inputValue(),"http://localhost/join?code=test-qr");
+        }
         if (screenshots)
           await page.screenshot({
             path: path.join(screenshots, `qr-${width}.png`),
@@ -1205,6 +1246,46 @@ test(
         if(screenshots) await guest.screenshot({path:path.join(screenshots,`menu-${width}.png`)});
         await guestContext.close();
       }
+      const testContext = await browser.newContext({viewport:{width:390,height:844}});
+      const testPage = await testContext.newPage();
+      let isolatedTestAttempts = 0;
+      testPage.on("dialog", dialog=>{errors.push("Unexpected native browser dialog");void dialog.dismiss();});
+      await testPage.route("**/api/whatsapp/test", async route=>{
+        if(route.request().method()==="POST") {
+          assert.deepEqual(route.request().postDataJSON(),{confirm:true}); isolatedTestAttempts++;
+          await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({state:"sent",providerStatus:200,messageId:"synthetic-only"})});
+        } else await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({visible:true,enabled:true,window_open:true})});
+      });
+      await testPage.goto(origin+"/management");
+      const sendTest = testPage.getByRole("button",{name:"Send Test WhatsApp",exact:true});
+      await sendTest.click();
+      const testConfirmation = testPage.getByRole("alertdialog",{name:"Send test WhatsApp?",exact:true});
+      await testConfirmation.waitFor();
+      assert.equal(isolatedTestAttempts,0);
+      await testConfirmation.getByRole("button",{name:"Cancel",exact:true}).click();
+      assert.equal(isolatedTestAttempts,0);
+      await sendTest.click();
+      await testConfirmation.getByRole("button",{name:"Send test message",exact:true}).click();
+      await testPage.getByText(/Meta HTTP 200: sent/).waitFor();
+      assert.equal(isolatedTestAttempts,1);
+      assert.equal(await sendTest.isDisabled(),true);
+      await testContext.close();
+      const expiryContext = await browser.newContext();
+      const expiryPage = await expiryContext.newPage();
+      await expiryPage.goto(origin + "/");
+      await expiryPage.getByLabel("Service overview",{exact:true}).waitFor();
+      await expiryPage.waitForFunction(()=>document.documentElement.dataset.theme==="dark");
+      sessionStatus=503;
+      await Promise.all([
+        expiryPage.waitForResponse(response=>response.url().endsWith("/api/auth/me")),
+        expiryPage.evaluate(()=>window.dispatchEvent(new Event("focus"))),
+      ]);
+      assert.equal(new URL(expiryPage.url()).pathname,"/");
+      sessionStatus=401;
+      await expiryPage.evaluate(()=>window.dispatchEvent(new Event("focus")));
+      await expiryPage.waitForURL("**/login?reason=session-expired");
+      sessionStatus=200;
+      await expiryContext.close();
       assert.deepEqual(errors, []);
       console.log("Browser evidence directory: " + temp);
     } finally {

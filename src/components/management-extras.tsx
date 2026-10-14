@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmation } from "@/components/confirmation-provider";
 
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2, Armchair } from "lucide-react";
@@ -12,6 +13,7 @@ type Table = {
 };
 
 export default function ManagementExtras() {
+  const confirmAction = useConfirmation();
   const [tables, setTables] = useState<Table[]>([]);
   const [tableName, setTableName] = useState("");
   const [seats, setSeats] = useState(4);
@@ -141,8 +143,8 @@ export default function ManagementExtras() {
               <button
                 type="button"
                 disabled={busy || table.status !== "free"}
-                onClick={() => {
-                  if (window.confirm(`Remove ${table.name}?`)) {
+                onClick={async () => {
+                  if (await confirmAction({ title: "Remove table?", message: `Remove ${table.name}? This removes it from the floor inventory.`, confirmLabel: "Remove table", destructive: true })) {
                     void send("/api/management/tables", "DELETE", {
                       id: table.id,
                     });

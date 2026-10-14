@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmation } from "@/components/confirmation-provider";
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -12,6 +13,7 @@ type StaffUser = {
 };
 
 export default function StaffPinsPage() {
+  const confirmAction = useConfirmation();
   const [pinSupported, setPinSupported] = useState(true);
   const [warning, setWarning] = useState("");
   const [users, setUsers] = useState<StaffUser[]>([]);
@@ -86,9 +88,7 @@ export default function StaffPinsPage() {
     }
 
     if (
-      !window.confirm(
-        `${selected.has_pin ? "Replace" : "Set"} the PIN for ${selected.username}?`
-      )
+      !await confirmAction({ title: selected.has_pin ? "Replace staff PIN?" : "Set staff PIN?", message: `${selected.has_pin ? "Replace" : "Set"} the PIN for ${selected.username}?`, confirmLabel: selected.has_pin ? "Replace PIN" : "Set PIN" })
     ) {
       return;
     }

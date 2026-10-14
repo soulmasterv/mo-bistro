@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmation } from "@/components/confirmation-provider";
 import TrackingHandoff from "@/components/tracking-handoff";
 import NextGuestPanel from "@/components/next-guest-panel";
 import ReceptionServiceStrip from "@/components/reception-service-strip";
@@ -67,6 +68,7 @@ const labels: Record<GuestStatus, string> = {
 };
 
 export default function Home() {
+  const confirmAction = useConfirmation();
   const guestsController = useRef<AbortController | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [seatingGuest, setSeatingGuest] = useState<Guest | null>(null);
@@ -89,6 +91,7 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, []);
   const [registrationUrl, setRegistrationUrl] = useState("");
+  const [copyMessage, setCopyMessage] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [party, setParty] = useState(2);
@@ -157,6 +160,7 @@ export default function Home() {
   }
 
   async function openQR() {
+    setCopyMessage("");
     setRegistrationUrl("");
     setShowQR(true);
     await refreshQR();
@@ -182,7 +186,7 @@ export default function Home() {
         action === "no_show"
           ? `Mark ${guest?.name || "this guest"} as no-show? They will leave the active queue.`
           : `Cancel ${guest?.name || "this guest"}'s booking? They will leave the active queue.`;
-      if (!window.confirm(message)) return;
+      if (!await confirmAction({ title: action === "no_show" ? "Mark guest as no-show?" : "Cancel booking?", message, confirmLabel: action === "no_show" ? "Mark no-show" : "Cancel booking", destructive: true })) return;
     }
     setBusy(true);
     setError("");
@@ -699,17 +703,19 @@ export default function Home() {
                 )}
               </div>
 
-              <p className="break-all text-xs text-slate-400">
-                {registrationUrl}
-              </p>
+              <label className="block text-xs text-slate-400">Registration link
+                <input aria-label="Registration link" readOnly value={registrationUrl} onFocus={event => event.currentTarget.select()} className="mt-2 w-full rounded-lg border border-white/20 bg-transparent p-3" />
+              </label>
+              {copyMessage && <p role="status" className="mt-2 text-xs">{copyMessage}</p>}
 
               <div className="mt-6 flex gap-3">
                 <button
                   onClick={async () => {
                     try {
                       await navigator.clipboard.writeText(registrationUrl);
+                      setCopyMessage("Registration link copied.");
                     } catch {
-                      window.prompt("Copy registration link:", registrationUrl);
+                      setCopyMessage("Automatic copying is unavailable. Select and copy the registration link above.");
                     }
                   }}
                   disabled={!registrationUrl}
