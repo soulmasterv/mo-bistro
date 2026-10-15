@@ -3,16 +3,22 @@ import { Receiver } from "@upstash/qstash";
 import { callbackUrl, liveSendingEnabled, type NotificationKind } from "@/lib/whatsapp/policy";
 
 export function templatePayload(job: { id: string; kind: NotificationKind; guest_id: number },
-  booking: { phone: string; name: string }, code: string) {
+  booking: { phone: string; name: string; eta_at?: Date | null }, code: string) {
   const keys: Record<NotificationKind, string> = {
     confirmation: "WHATSAPP_CONFIRMATION_TEMPLATE", almost_ready: "WHATSAPP_ALMOST_READY_TEMPLATE",
     review: "WHATSAPP_REVIEW_TEMPLATE",
+    eta_update: "WHATSAPP_ETA_UPDATE_TEMPLATE",
   };
   const name = process.env[keys[job.kind]];
   if (!name || !/^[a-z0-9_]+$/.test(name)) throw new Error("WhatsApp approved template is not configured");
-  const components: object[] = [{ type: "body", parameters: [
+  const parameters = [
     { type: "text", text: booking.name }, { type: "text", text: String(job.guest_id) },
-  ] }];
+  ];
+  if (job.kind === "eta_update") {
+    if (!booking.eta_at) throw Error("Expected readiness time missing");
+    parameters.push({type:"text",text:new Intl.DateTimeFormat("en-GB", {timeZone:"Africa/Cairo",hour:"numeric",minute:"2-digit",hour12:true}).format(new Date(booking.eta_at))});
+  }
+  const components: object[] = [{ type: "body", parameters }];
   if (job.kind === "confirmation") components.push({
     type: "button", sub_type: "quick_reply", index: "0",
     parameters: [{ type: "payload", payload: `subscribe:${job.guest_id}:${code}` }],

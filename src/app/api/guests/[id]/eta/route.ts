@@ -1,9 +1,10 @@
 import { hasGuestEtaColumn } from "@/lib/guest-eta-support";
+import { randomUUID } from "node:crypto";
 import { currentStaff } from "@/lib/staff-auth";
 import { setActivityActor } from "@/lib/staff-activity";
 import { NextResponse, after } from "next/server";
-import { scheduleAlmostReady, dispatchOutbox } from "@/lib/whatsapp/service";
-import { whatsappEnabled } from "@/lib/whatsapp/policy";
+import { scheduleEtaUpdate, scheduleAlmostReady, dispatchOutbox } from "@/lib/whatsapp/service";
+import { liveSendingEnabled, whatsappEnabled } from "@/lib/whatsapp/policy";
 import { z } from "zod";
 import { getPostgres } from "@/lib/postgres-db";
 import { requireActiveLicense } from "@/lib/licensing/enforce";
@@ -13,6 +14,7 @@ export const runtime = "nodejs";
 
 const EtaSchema = z.object({
   minutes: z.number().int().min(1).max(240).nullable(),
+  requestId: z.uuid().optional(),
 });
 
 export async function PATCH(
@@ -64,9 +66,22 @@ export async function PATCH(
 
     const minutes = parsed.data.minutes;
     const actor = await currentStaff();
+    const requestId = parsed.data.requestId ?? randomUUID();
+    const [schema] = await sql`SELECT to_regclass('public.guest_eta_changes') IS NOT NULL AS eta_updates`;
+    const etaUpdates = schema?.eta_updates === true;
 
     const updated = await sql.begin(async tx => {
       await setActivityActor(tx, actor?.id);
+      // Serialize duplicate requests and seating against the same authoritative guest row.
+      await tx`SELECT id FROM guests WHERE id=${guestId} FOR UPDATE`;
+      if (etaUpdates) {
+        const previous = await tx`SELECT guest_id,minutes,eta_at FROM public.guest_eta_changes WHERE request_id=${requestId}`;
+        if (previous.length) {
+          if (previous[0].guest_id !== guestId || previous[0].minutes !== minutes)
+            throw new Error("ETA request ID already used");
+          return [{ id:guestId,eta_at:previous[0].eta_at,replayed:true }];
+        }
+      }
       const rows = await tx`
       UPDATE guests
       SET eta_at = CASE
@@ -78,18 +93,25 @@ export async function PATCH(
         AND status IN ('waiting', 'called')
       RETURNING id, eta_at
     `;
-      if (rows.length && whatsappEnabled()) await scheduleAlmostReady(tx,guestId,
-        rows[0].eta_at ? new Date(rows[0].eta_at) : null);
-      return rows;
+      if (rows.length && etaUpdates) await tx`INSERT INTO public.guest_eta_changes(request_id,guest_id,minutes,eta_at)
+        VALUES (${requestId},${guestId},${minutes},${rows[0].eta_at})`;
+      if (rows.length && whatsappEnabled()) {
+        const eta = rows[0].eta_at ? new Date(rows[0].eta_at) : null;
+        if (etaUpdates) await scheduleEtaUpdate(tx,guestId,eta,requestId);
+        // <=10 minutes: the immediate ETA update covers the imminent alert too.
+        await scheduleAlmostReady(tx,guestId,etaUpdates && eta && eta.getTime()-Date.now()<=10*60_000 ? null : eta);
+      }
+      return rows.map(row=>({id:row.id,eta_at:row.eta_at,replayed:false}));
     });
 
     if (updated.length) {
-      if (whatsappEnabled()) after(async () => {
+      if (whatsappEnabled() && !updated[0].replayed) after(async () => {
         try { await dispatchOutbox(); } catch { console.error("WhatsApp outbox dispatch deferred"); }
       });
       return NextResponse.json({
         success: true,
         eta_at: updated[0].eta_at,
+        whatsapp: !etaUpdates ? "migration_required" : !whatsappEnabled() ? "disabled" : liveSendingEnabled() ? "queued_if_subscribed" : "simulated_if_subscribed",
       });
     }
 

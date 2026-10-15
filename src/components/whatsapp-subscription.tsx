@@ -19,7 +19,6 @@ export default function WhatsappSubscription({
     available: false,
   });
   const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
   const [awaitingReply, setAwaitingReply] = useState(false);
   const [checking, setChecking] = useState(false);
   const checkingRef = useRef(false);
@@ -53,7 +52,7 @@ export default function WhatsappSubscription({
   return (
     <section
       className="guest-whatsapp-card space-y-3 rounded-xl border border-[#DDD5C9] p-4 text-sm"
-      aria-label="Optional WhatsApp updates"
+      aria-label="WhatsApp updates"
     >
       <p>
         {subscription.subscribed
@@ -66,7 +65,7 @@ export default function WhatsappSubscription({
         </p>
       ) : (
         <p className="guest-small-note">
-          Open WhatsApp and send your booking message to turn on updates.
+          Subscribe for booking updates and one review request 60 minutes after seating. Open WhatsApp and send your booking message to enable both.
         </p>
       )}
       {!subscription.subscribed && allowSubscribe && subscription.url && (
@@ -108,44 +107,6 @@ export default function WhatsappSubscription({
       )}
       {subscription.subscribed && subscription.feedbackConsent && (
         <p className="guest-review-status">Review requests enabled</p>
-      )}
-      {subscription.feedbackEditable && (
-        <details open={!subscription.subscribed}>
-          <summary>Review preference</summary>
-          <label className="flex items-start gap-3">
-            <input
-              type="checkbox"
-              checked={!!subscription.feedbackConsent}
-              disabled={saving}
-              onChange={async (e) => {
-                const value = e.target.checked;
-                setSaving(true);
-                setError("");
-                try {
-                  const response = await fetch("/api/whatsapp/subscription", {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ token, feedbackConsent: value }),
-                  });
-                  if (!response.ok)
-                    throw new Error("Could not save your review preference.");
-                  await refresh();
-                } catch (err) {
-                  setError(
-                    err instanceof Error
-                      ? err.message
-                      : "Could not save preference.",
-                  );
-                } finally {
-                  setSaving(false);
-                }
-              }}
-            />
-            <span>
-              Send me one review request 60 minutes after seating.
-            </span>
-          </label>
-        </details>
       )}
       <p className="text-xs text-[#77716A]">
         {!subscription.subscribed && (

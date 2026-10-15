@@ -1014,3 +1014,68 @@ test("review preference is relevant before review dispatch or deadline",async()=
   await sql`UPDATE whatsapp_notifications SET kind='review',status='sent' WHERE guest_id=${b.id}`;
   assert.equal((await service.subscriptionState(b.token)).feedbackEditable,false);
 });
+
+test("bundled review consent requires the received REVIEWS command; legacy choices are preserved",async()=>{
+  await reset(); const b=await booking();
+  const before=await service.subscriptionState(b.token);
+  assert.equal(before.feedbackConsent,false);
+  assert.match(decodeURIComponent(before.url),/ REVIEWS$/);
+  await webhook.processMetaWebhook(envelope(inbound(b,'forged-bundled-review',{from:'201111111111',text:{body:`SUBSCRIBE ${b.id} ${b.code} REVIEWS`}})));
+  assert.equal((await service.subscriptionState(b.token)).feedbackConsent,false);
+  await webhook.processMetaWebhook(envelope(inbound(b,'bundled-review',{text:{body:`SUBSCRIBE ${b.id} ${b.code} REVIEWS`}})));
+  assert.equal((await service.subscriptionState(b.token)).feedbackConsent,true);
+  await sql`UPDATE guests SET status='seated',seated_at=NOW() WHERE id=${b.id}`;
+  await sql.begin(tx=>service.scheduleReview(tx,b.id,new Date()));
+  const [review]=await sql`SELECT due_at FROM whatsapp_notifications WHERE guest_id=${b.id} AND kind='review'`;
+  assert.ok(Math.abs(new Date(review.due_at).getTime()-Date.now()-3600000)<5000);
+  const legacy=await booking({},'01000000001');
+  await webhook.processMetaWebhook(envelope(inbound(legacy,'legacy-review-choice')));
+  assert.equal((await service.subscriptionState(legacy.token)).feedbackConsent,false);
+  assert.equal(networkCalls,0);
+});
+
+test("new ETA migration queues immutable time updates, reschedules alerts, deduplicates retries and cancels obsolete jobs",async()=>{
+  await reset();
+  await database.exec(fs.readFileSync('migrations/20261015_whatsapp_eta_updates.sql','utf8'));
+  const b=await booking();
+  await webhook.processMetaWebhook(envelope(inbound(b,'eta-subscriber')));
+  const route=load('src/app/api/guests/[id]/eta/route.ts');
+  const context={params:Promise.resolve({id:String(b.id)})};
+  const save=(minutes,requestId=randomUUID())=>route.PATCH(new Request('https://bistro.test/api/eta',{
+    method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({minutes,requestId})
+  }),context);
+  const firstId=randomUUID();let response=await save(30,firstId);assert.equal(response.status,200);
+  const first=await response.json();assert.equal(first.whatsapp,'simulated_if_subscribed');
+  let jobs=await sql`SELECT id,kind,status,due_at FROM whatsapp_notifications WHERE status='pending' ORDER BY kind`;
+  assert.deepEqual(jobs.map(j=>j.kind),['almost_ready','eta_update']);
+  const originalAlert=jobs.find(j=>j.kind==='almost_ready');
+  assert.ok(Math.abs(new Date(originalAlert.due_at).getTime()-Date.now()-20*60000)<5000);
+  const callbackCount=afters.length;
+  response=await save(30,firstId);assert.equal(response.status,200);
+  assert.equal((await response.json()).eta_at,first.eta_at);assert.equal(afters.length,callbackCount);
+  assert.equal((await sql`SELECT id FROM whatsapp_notifications`).length,2);
+  await save(45);
+  assert.equal((await sql`SELECT status FROM whatsapp_notifications WHERE id=${originalAlert.id}`)[0].status,'skipped');
+  assert.equal((await sql`SELECT id FROM whatsapp_notifications WHERE status='pending'`).length,2);
+  await save(5);
+  jobs=await sql`SELECT id,kind FROM whatsapp_notifications WHERE status='pending'`;
+  assert.deepEqual(jobs.map(j=>j.kind),['eta_update']); // One immediate message for a short ETA.
+  await service.dispatchOutbox();
+  assert.equal((await sql`SELECT status FROM whatsapp_notifications WHERE id=${jobs[0].id}`)[0].status,'simulated');
+  // A later manual change is a new event, even after an earlier update was delivered/simulated.
+  await save(40);
+  assert.equal((await sql`SELECT id FROM whatsapp_notifications WHERE status='pending'`).length,2);
+  await save(null);
+  assert.equal((await sql`SELECT id FROM whatsapp_notifications WHERE status IN ('pending','scheduled')`).length,0);
+  const optedOut=await booking({},'01000000002');
+  await sql.begin(tx=>service.scheduleEtaUpdate(tx,optedOut.id,new Date(Date.now()+1800000),randomUUID()));
+  assert.equal((await sql`SELECT id FROM whatsapp_notifications WHERE guest_id=${optedOut.id}`).length,0);
+  const legacyNotifications=await booking({whatsapp_confirmation_consent:true,whatsapp_feedback_consent:true},'01000000003');
+  await sql`UPDATE whatsapp_booking_consents SET subscribed_at=NOW() WHERE guest_id=${legacyNotifications.id}`;
+  await sql`UPDATE guests SET status='seated',seated_at=NOW() WHERE id=${legacyNotifications.id}`;
+  await sql.begin(tx=>service.scheduleReview(tx,legacyNotifications.id,new Date()));
+  assert.deepEqual((await sql`SELECT kind FROM whatsapp_notifications WHERE guest_id=${legacyNotifications.id} ORDER BY kind`).map(j=>j.kind),['confirmation','review']);
+  await sql`DELETE FROM guests WHERE id=${b.id}`;
+  assert.equal((await sql`SELECT request_id FROM guest_eta_changes WHERE guest_id=${b.id}`).length,0);
+  assert.equal(networkCalls,0);
+});

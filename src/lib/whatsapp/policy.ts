@@ -1,6 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
-export type NotificationKind = "confirmation" | "almost_ready" | "review";
+export type NotificationKind = "confirmation" | "almost_ready" | "review" | "eta_update";
 export const CONSENT_VERSION = "whatsapp-v2-2026-10-12";
 export function whatsappEnabled() {
   return process.env.WHATSAPP_ENABLED === "true" && process.env.MO_BISTRO_DB === "postgres";
@@ -33,9 +33,9 @@ export function verifyMetaSignature(raw: string, signature: string | null) {
   return safeEqual(signature, `sha256=${createHmac("sha256", secret).update(raw).digest("hex")}`);
 }
 export function parseSubscription(message: string) {
-  const match = /^(?:subscribe:|SUBSCRIBE\s+)(\d+)(?::|\s+)([a-f0-9]{64})$/i.exec(message.trim());
+  const match = /^(?:subscribe:|SUBSCRIBE\s+)(\d+)(?::|\s+)([a-f0-9]{64})(?:\s+(REVIEWS))?$/i.exec(message.trim());
   if (!match || !Number.isSafeInteger(Number(match[1])) || Number(match[1]) < 1) return null;
-  return { guestId: Number(match[1]), code: match[2].toLowerCase() };
+  return { guestId: Number(match[1]), code: match[2].toLowerCase(), reviews: !!match[3] };
 }
 export function isStop(text: string) {
   return /^(stop|unsubscribe|cancel updates|إلغاء|الغاء)$/iu.test(text.trim());

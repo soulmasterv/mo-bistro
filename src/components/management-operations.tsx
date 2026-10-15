@@ -72,7 +72,7 @@ export default function ManagementOperations() {
         <p><strong>{data.whatsapp.configured.live?"Live sending permitted by configuration":"Automatic sending is disabled or simulated"}</strong></p>
         <p className="bistro-muted">Notifications: {data.whatsapp.configured.enabled?"enabled":"disabled"} · Live mode: {data.whatsapp.configured.modeLive?"on":"off"} · Live-send permission: {data.whatsapp.configured.livePermission?"on":"off"}</p>
         {data.whatsapp.blockers.map(reason=><p key={reason} className="bistro-muted">{reason}</p>)}
-        <p className="bistro-muted">Almost Ready: personal ETA minus 10 minutes. Reviews: 60 minutes after seating with review consent. Subscribing and marking called do not send an immediate update.</p>
+        <p className="bistro-muted">ETA changes: an immediate time update, then Almost Ready 10 minutes before. Under 10 minutes, one immediate update covers both. Reviews: 60 minutes after seating for customers who subscribed with review permission. Subscribing and marking called do not send an immediate update.</p>
         <div className="operations-scroll" aria-label="Recent WhatsApp notifications" tabIndex={0}>
           {data.whatsapp.jobs.length===0 ? <p>No notification jobs to display. Check subscription and a personal booking ETA first.</p> : data.whatsapp.jobs.map((job,i)=><div className="operations-entry" key={`${job.guest_id}-${job.kind}-${i}`}>
             <strong>Booking #{job.guest_id} · {job.kind.replaceAll("_"," ")}</strong>

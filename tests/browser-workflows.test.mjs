@@ -1295,6 +1295,14 @@ test(
         await guestPage.waitForFunction(
           () => document.documentElement.dataset.theme === "guest-light",
         );
+        for (const preference of ["light", "dark", "system"]) {
+          await guestPage.evaluate(value => {
+            localStorage.setItem("mo-bistro-theme", value);
+            window.dispatchEvent(new Event("storage"));
+          }, preference);
+          assert.equal(await guestPage.locator("main section").first().evaluate(el => getComputedStyle(el).backgroundColor), "rgb(52, 56, 46)");
+          assert.equal(await guestPage.getByRole("button", {name:"Join the waitlist",exact:true}).evaluate(el => getComputedStyle(el).backgroundColor), "rgb(52, 56, 46)");
+        }
         await guestPage
           .getByPlaceholder("Full name", { exact: true })
           .fill("Omar Hassan");
@@ -1314,18 +1322,8 @@ test(
         await guestPage.waitForFunction(() => document.documentElement.dataset.theme === "guest-light");
         if(!subscribed) {
           await guestPage.getByRole("link",{name:"Get WhatsApp updates",exact:true}).waitFor();
-          const review=guestPage.getByRole("checkbox",{name:/Send me one review request/});
-          assert.equal(await review.isChecked(),false);
-          const subscriptionCheck = guestPage.getByRole("button", {name:"Check subscription status", exact:true});
-          assert.ok(await subscriptionCheck.locator("svg").count());
-          assert.ok(await subscriptionCheck.evaluate(el => el.getBoundingClientRect().height >= 44));
-          await Promise.all([
-            guestPage.waitForResponse(response=>response.url().includes('/api/whatsapp/subscription')&&response.request().method()==='GET'),
-            review.click(), // Controlled value is refreshed only after the preference PATCH succeeds.
-          ]);
-          await guestPage.waitForFunction(() => document.querySelector('.guest-whatsapp-card input[type="checkbox"]')?.checked === true);
-          assert.equal(feedbackConsent,true);assert.equal(subscriptionSubscribed,false);
-          assert.equal(await guestPage.getByRole("link",{name:"Get WhatsApp updates",exact:true}).count(),1);
+          assert.equal(await guestPage.getByRole("checkbox").count(),0);
+          await guestPage.getByText(/one review request 60 minutes after seating/).waitFor();
           subscriptionSubscribed=true;
           await guestPage.getByRole("button",{name:"Check subscription status",exact:true}).click();
         }

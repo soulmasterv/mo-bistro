@@ -29,11 +29,9 @@ export async function recordCustomerWindow(
 export async function sendWindowNotification(
   sql: TransactionSql,
   job: { id: string; kind: NotificationKind; guest_id: number },
-  booking: { phone: string; name: string },
+  booking: { phone: string; name: string; eta_at?: Date | null },
   code: string,
 ): Promise<SendResult> {
-  if (!customerWindowEnabled())
-    return sendTemplate(templatePayload(job, booking, code));
   if (!liveSendingEnabled()) return { state: "simulated" };
   if (process.env.VERCEL_ENV === "preview") {
     try {
@@ -46,6 +44,8 @@ export async function sendWindowNotification(
       return { state: "skipped", error: "preview_recipient_not_configured" };
     }
   }
+  if (!customerWindowEnabled())
+    return sendTemplate(templatePayload(job, booking, code));
   const business = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
   if (!business)
     return { state: "skipped", error: "business_number_not_configured" };
@@ -62,16 +62,19 @@ export async function sendWindowNotification(
     confirmation: "WHATSAPP_CONFIRMATION",
     almost_ready: "WHATSAPP_ALMOST_READY",
     review: "WHATSAPP_REVIEW",
+    eta_update: "WHATSAPP_ETA_UPDATE",
   }[job.kind];
-  const text = process.env[prefix + "_TEXT"];
+  const text = process.env[prefix + "_TEXT"] ?? (job.kind === "eta_update"
+    ? "Mo Bistro update: your table is expected to be ready at {eta_time}. This is an estimate; reception will confirm when your table is ready." : undefined);
   if (open && text) {
     let body = text
       .replaceAll("{name}", booking.name)
       .replaceAll("{booking_id}", String(job.guest_id))
+      .replaceAll("{eta_time}", booking.eta_at ? new Intl.DateTimeFormat("en-GB", { timeZone:"Africa/Cairo",hour:"numeric",minute:"2-digit",hour12:true }).format(new Date(booking.eta_at)) : "")
       .replaceAll("{subscribe_command}", `SUBSCRIBE ${job.guest_id} ${code}`);
     if (
       body.length > 4096 ||
-      /\{(?:name|booking_id|subscribe_command)\}/.test(body)
+      /\{(?:name|booking_id|subscribe_command|eta_time)\}/.test(body)
     )
       return { state: "skipped", error: "notification_text_invalid" };
     // Confirmation must preserve the explicit reply path when the guest is not yet subscribed.

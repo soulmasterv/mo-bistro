@@ -211,7 +211,7 @@ export default function JoinPage() {
         <div className="grid min-h-screen w-full overflow-hidden bg-[#FFFCF7] shadow-[0_16px_65px_rgba(42,35,25,0.08)] lg:min-h-[750px] lg:grid-cols-[0.9fr_1.1fr] lg:rounded-[28px]">
 
           {/* Restaurant introduction */}
-          <section className="relative flex min-h-[260px] flex-col justify-between overflow-hidden bg-[#252525] px-7 py-7 text-[#F9F4E9] sm:px-10 lg:min-h-full lg:px-12 lg:py-12">
+          <section className="relative flex min-h-[260px] flex-col justify-between overflow-hidden bg-[#34382E] px-7 py-7 text-[#F9F4E9] sm:px-10 lg:min-h-full lg:px-12 lg:py-12">
             <div
               aria-hidden="true"
               className="pointer-events-none absolute -right-32 -top-24 h-80 w-80 rounded-full border border-[#D7C49E]/15"
@@ -449,7 +449,7 @@ export default function JoinPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="group flex w-full items-center justify-center gap-3 rounded-xl bg-[#252525] px-5 py-4 text-[14px] font-semibold text-[#FFF9EC] transition hover:bg-[#393735] disabled:cursor-wait disabled:opacity-60"
+                  className="group flex w-full items-center justify-center gap-3 rounded-xl bg-[#34382E] px-5 py-4 text-[14px] font-semibold text-[#FFF9EC] transition hover:bg-[#424938] disabled:cursor-wait disabled:opacity-60"
                 >
                   {loading ? "Joining the waitlist..." : "Join the waitlist"}
                   {!loading && (

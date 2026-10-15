@@ -70,6 +70,10 @@ export async function processMetaWebhook(payload: MetaPayload) {
           ON CONFLICT (phone) DO UPDATE SET opted_out_at=NULL`;
         await tx`UPDATE whatsapp_booking_consents SET subscribed_at=COALESCE(subscribed_at,NOW()),
           unsubscribed_at=NULL,subscribed_message_id=${message.id} WHERE guest_id=${booking.guest_id}`;
+        // New displayed opt-in includes one review. Legacy commands retain their saved choice.
+        if (message.type === "text" && subscription.reviews) await tx`UPDATE whatsapp_booking_consents
+          SET feedback_consent=TRUE,consent_recorded_at=NOW(),consent_version='whatsapp-bundled-review-v1-2026-10-15'
+          WHERE guest_id=${booking.guest_id}`;
         await tx`UPDATE whatsapp_inbound_events SET guest_id=${booking.guest_id},action='subscribe' WHERE message_id=${message.id}`;
         await scheduleAlmostReady(tx,booking.guest_id,booking.eta_at ? new Date(booking.eta_at) : null);
         if (booking.seated_at) await scheduleReview(tx,booking.guest_id,new Date(booking.seated_at));

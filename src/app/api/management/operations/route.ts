@@ -33,6 +33,7 @@ const safeReason = (value: unknown) => {
     customer_window_closed_template_unconfigured: "24-hour window closed and no applicable approved template",
     notification_content_unconfigured: "No valid notification text or applicable template is configured",
     confirmation_subscription_copy_missing: "Confirmation is missing the required subscription instructions",
+    eta_superseded: "A newer readiness time replaced this unsent alert",
   };
   return typeof value === "string" && value ? known[value] ?? "Provider, eligibility or configuration issue — inspect safe delivery status" : null;
 };
@@ -49,6 +50,7 @@ export async function GET() {
       to_regclass('public.whatsapp_booking_consents') IS NOT NULL AS consents,
       to_regclass('public.whatsapp_contact_preferences') IS NOT NULL AS preferences,
       to_regclass('public.whatsapp_customer_windows') IS NOT NULL AS windows`;
+    const [etaSchema] = await sql`SELECT to_regclass('public.guest_eta_changes') IS NOT NULL AS eta_updates`;
     const [setting] = await sql`SELECT value FROM restaurant_settings WHERE key='public_waitlist_paused'`;
     const accuracy = schema.accuracy ? (await sql`SELECT COUNT(*)::integer AS samples,
       COUNT(eta_error_minutes)::integer AS estimated_samples,
@@ -78,6 +80,7 @@ export async function GET() {
     if (!configured.scheduler) blockers.push("Automatic scheduling configuration is incomplete.");
     if (!configured.meta || !configured.association) blockers.push("Meta or booking-association configuration is incomplete.");
     if (!configured.windowText) blockers.push("24-hour plain-text notifications are disabled; only applicable configured templates can be used.");
+    if (!etaSchema?.eta_updates) blockers.push("Immediate ETA-change messages require the ETA-update migration. Existing Almost Ready remains available.");
     if (previewTestEnabled()) blockers.push("The isolated Preview test is enabled. A manual test proves only its own delivery; it does not activate automatic booking updates.");
     const jobs = schema.notifications && schema.delivery && schema.consents && schema.preferences && schema.windows
       ? await sql`SELECT n.guest_id,n.kind,n.status,n.due_at,n.last_error,

@@ -7,7 +7,7 @@ import { CONSENT_VERSION, whatsappEnabled, normalizePhone, subscriptionCode, has
 import { sendWindowNotification } from "@/lib/whatsapp/customer-window";
 import { publishJob } from "@/lib/whatsapp/transport";
 type DeliveryBooking = Eligibility & { id: string; guest_id: number; name: string; phone: string;
-  revision: number; attempts: number; tracking_token_hash: string; subscription_expires_at: Date };
+  revision: number; attempts: number; tracking_token_hash: string; subscription_expires_at: Date; eta_snapshot_at?: string | null };
 
 export type BookingConsent = { whatsapp_confirmation_consent?: boolean; whatsapp_feedback_consent?: boolean };
 export async function recordBookingConsent(tx: TransactionSql, guestId: number, phone: string,
@@ -23,14 +23,46 @@ export async function recordBookingConsent(tx: TransactionSql, guestId: number, 
 export async function queueNotification(tx: TransactionSql, guestId: number, kind: NotificationKind, due: Date) {
   await tx`INSERT INTO whatsapp_notifications (id,guest_id,kind,due_at)
     VALUES (${randomUUID()},${guestId},${kind},${due})
-    ON CONFLICT (guest_id,kind) DO UPDATE SET due_at=EXCLUDED.due_at,
+    ON CONFLICT (guest_id,kind) WHERE kind NOT IN ('eta_update','almost_ready') DO UPDATE SET due_at=EXCLUDED.due_at,
       revision=whatsapp_notifications.revision+1,status='pending',qstash_message_id=NULL,
       publish_lease_until=NULL,updated_at=NOW()
     WHERE whatsapp_notifications.status IN ('pending','scheduled','skipped')`;
 }
+export async function scheduleEtaUpdate(tx: TransactionSql, guestId: number, eta: Date | null, requestId: string) {
+  if (!whatsappEnabled()) return;
+  // Supersede only jobs which have not started. Unknown or in-flight sends are never rearmed.
+  await tx`UPDATE whatsapp_notifications SET status='skipped',revision=revision+1,last_error='eta_superseded',updated_at=NOW()
+    WHERE guest_id=${guestId} AND kind='eta_update' AND status IN ('pending','scheduled')`;
+  if (!eta) return;
+  const [consent] = await tx`SELECT subscribed_at,unsubscribed_at FROM whatsapp_booking_consents WHERE guest_id=${guestId}`;
+  if (!consent?.subscribed_at || consent.unsubscribed_at) return;
+  await tx`INSERT INTO whatsapp_notifications(id,guest_id,kind,due_at,event_key,eta_snapshot_at)
+    VALUES (${randomUUID()},${guestId},'eta_update',NOW(),${requestId},${eta})
+    ON CONFLICT(event_key) WHERE event_key IS NOT NULL DO NOTHING`;
+}
 export async function scheduleAlmostReady(tx: TransactionSql, guestId: number, eta: Date | null) {
   if (!whatsappEnabled()) return;
   const [consent] = await tx`SELECT subscribed_at,unsubscribed_at FROM whatsapp_booking_consents WHERE guest_id=${guestId}`;
+  const [schema] = await tx`SELECT to_regclass('public.guest_eta_changes') IS NOT NULL AS eta_updates`;
+  if (schema?.eta_updates) {
+    if (!eta || !consent?.subscribed_at || consent.unsubscribed_at) {
+      await tx`UPDATE whatsapp_notifications SET status='skipped',revision=revision+1,updated_at=NOW()
+        WHERE guest_id=${guestId} AND kind='almost_ready' AND status IN ('pending','scheduled')`;
+      return;
+    }
+    const digest = hashCode(`almost-ready:${guestId}:${eta.toISOString()}`);
+    const eventKey = `${digest.slice(0,8)}-${digest.slice(8,12)}-4${digest.slice(13,16)}-8${digest.slice(17,20)}-${digest.slice(20,32)}`;
+    await tx`UPDATE whatsapp_notifications SET status='skipped',revision=revision+1,last_error='eta_superseded',updated_at=NOW()
+      WHERE guest_id=${guestId} AND kind='almost_ready' AND event_key IS DISTINCT FROM ${eventKey}::uuid
+        AND status IN ('pending','scheduled')`;
+    await tx`INSERT INTO whatsapp_notifications(id,guest_id,kind,due_at,event_key,eta_snapshot_at)
+      VALUES (${randomUUID()},${guestId},'almost_ready',${dueTime('almost_ready',eta)},${eventKey},${eta})
+      ON CONFLICT(event_key) WHERE event_key IS NOT NULL DO UPDATE SET
+        due_at=EXCLUDED.due_at,status='pending',revision=whatsapp_notifications.revision+1,
+        qstash_message_id=NULL,publish_lease_until=NULL,updated_at=NOW()
+      WHERE whatsapp_notifications.status IN ('pending','scheduled','skipped')`;
+    return;
+  }
   if (eta && consent?.subscribed_at && !consent?.unsubscribed_at) {
     await queueNotification(tx, guestId, "almost_ready", dueTime("almost_ready", eta));
   } else await tx`UPDATE whatsapp_notifications SET status='skipped',revision=revision+1,updated_at=NOW()
@@ -103,7 +135,7 @@ export async function deliverNotification(id: string, revision: number): Promise
     const [booking] = await tx<DeliveryBooking[]>`SELECT n.id,n.kind,n.guest_id,n.revision,n.attempts,
       c.phone,c.confirmation_consent,c.feedback_consent,c.subscribed_at,c.unsubscribed_at,
       c.subscription_token_hash,c.subscription_expires_at,g.name,g.status AS guest_status,
-      g.eta_at,g.seated_at,g.tracking_token_hash,p.opted_out_at
+      g.eta_at,g.seated_at,g.tracking_token_hash,p.opted_out_at,to_jsonb(n)->>'eta_snapshot_at' AS eta_snapshot_at
       FROM whatsapp_notifications n JOIN whatsapp_booking_consents c ON c.guest_id=n.guest_id
       JOIN guests g ON g.id=n.guest_id LEFT JOIN whatsapp_contact_preferences p ON p.phone=c.phone
       WHERE n.id=${id} AND n.revision=${revision} AND n.status='sending' FOR UPDATE OF n,c`;
@@ -112,6 +144,11 @@ export async function deliverNotification(id: string, revision: number): Promise
       return "done";
     }
     const kind = booking.kind as NotificationKind;
+    if ((kind === "eta_update" || (kind === "almost_ready" && booking.eta_snapshot_at)) &&
+        (!booking.eta_snapshot_at || !booking.eta_at || new Date(booking.eta_snapshot_at).getTime() !== new Date(booking.eta_at).getTime())) {
+      await tx`UPDATE whatsapp_notifications SET status='skipped',last_error='eta_superseded',updated_at=NOW() WHERE id=${id}`;
+      return "done";
+    }
     const currentDue = kind === "review" && booking.seated_at ? dueTime(kind,new Date(booking.seated_at)) :
       kind === "almost_ready" && booking.eta_at ? dueTime(kind,new Date(booking.eta_at)) : null;
     if (eligible({ ...booking, kind }) && currentDue && currentDue.getTime() > Date.now()) {
@@ -120,7 +157,7 @@ export async function deliverNotification(id: string, revision: number): Promise
       return "done";
     }
     if (!eligible({ ...booking, kind }) ||
-        (kind === "almost_ready" && (!booking.eta_at || new Date(booking.eta_at).getTime() < Date.now())) ||
+        (["almost_ready","eta_update"].includes(kind) && (!booking.eta_at || new Date(booking.eta_at).getTime() < Date.now())) ||
         (kind === "confirmation" && new Date(booking.subscription_expires_at).getTime() < Date.now())) {
       await tx`UPDATE whatsapp_notifications SET status='skipped',last_error='consent_or_booking_ineligible',updated_at=NOW() WHERE id=${id}`;
       return "done";
@@ -158,5 +195,5 @@ export async function subscriptionState(trackingToken: string) {
   const feedbackEditable = available && !booking.review_dispatched &&
     (!booking.seated_at || new Date(booking.seated_at).getTime() + 60*60_000 > Date.now());
   return { available,subscribed,feedbackConsent: booking.feedback_consent,feedbackEditable,
-    url: available && !subscribed ? `https://wa.me/${number}?text=${encodeURIComponent(`SUBSCRIBE ${booking.guest_id} ${code}`)}` : null };
+    url: available && !subscribed ? `https://wa.me/${number}?text=${encodeURIComponent(`SUBSCRIBE ${booking.guest_id} ${code} REVIEWS`)}` : null };
 }
