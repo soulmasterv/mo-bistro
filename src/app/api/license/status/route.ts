@@ -3,15 +3,14 @@ import { currentStaff } from "@/lib/staff-auth";
 import {
   authorizedOwner,
   licenseStatus,
+  licenseVersion,
 } from "@/lib/licensing/core";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const staff = await currentStaff();
-
-  if (!staff && !authorizedOwner(request)) {
+  if (!authorizedOwner(request) && !await currentStaff()) {
     return NextResponse.json(
       { error: "Unauthorized" },
       { status: 401 }
@@ -23,7 +22,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(license, {
       status: license.licensed ? 200 : 403,
-      headers: { "Cache-Control": "no-store" },
+      headers: { "Cache-Control": "no-store", ETag:licenseVersion(license) },
     });
   } catch {
     return NextResponse.json(

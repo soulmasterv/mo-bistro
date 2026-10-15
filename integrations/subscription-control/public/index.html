@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Subscription Control | Labbing</title><link rel="stylesheet" href="/panel.css"><script src="/panel.js" defer></script></head>
+<body><header><div class="brand">Labbing / Subscription Control</div><p>Private administration · Mo Bistro Preview</p></header>
+<main><div class="heading"><div><h1>Overview</h1><p>Manage Mo Bistro’s Preview license.</p></div><button id="refresh" type="button">Check connection</button></div>
+<p id="message" role="status" aria-live="polite">Checking the license connection…</p>
+<div class="grid"><article class="card"><p class="label">Restaurant · <span id="plan">—</span></p><h2>Mo Bistro</h2><span class="badge">Preview only</span></article><article class="card"><p class="label">Subscription</p><h2 id="status">Checking…</h2></article><article class="card"><p class="label">Expiry · Cairo time</p><h2 id="expiry">—</h2></article></div>
+<section class="card actions"><h2>Management</h2>
+<div class="action"><div><strong>Activate subscription</strong><p>Start a new monthly license when none exists.</p></div><button type="button" data-action="activate" id="activate" disabled>Activate</button></div>
+<div class="action"><div><strong>Extend subscription</strong><p>Add one month to the later of today or the current expiry.</p></div><button type="button" data-action="renew" id="renew" disabled>Renew one month</button></div>
+<div class="action"><div><strong>Suspend / reactivate</strong><p>Suspension blocks protected restaurant actions. Reactivation preserves the current expiry.</p></div><div class="button-row"><button type="button" class="danger" data-action="suspend" id="suspend" disabled>Suspend</button><button type="button" data-action="activate" id="reactivate" disabled>Reactivate</button></div></div>
+<div class="action"><div><strong>Send staff announcement</strong><p>Not configured. No messages will be sent by this panel.</p></div><span class="muted">Coming soon</span></div>
+<div class="action"><div><strong>Audit history</strong><p>Read the latest license changes.</p></div><button type="button" id="audit" disabled>View history</button></div>
+</section><section class="card" id="audit-section" hidden><h2>Audit history</h2><div id="audit-list" class="audit-list" tabindex="0"></div></section>
+<p class="muted">Actions require owner authentication and a current license snapshot. No action retries automatically.</p></main>
+<div class="overlay" id="confirmation" hidden><section class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-description" tabindex="-1"><h2 id="confirm-title"></h2><p id="confirm-description"></p><div class="button-row"><button id="cancel" type="button">Cancel</button><button id="confirm" type="button">Confirm</button></div></section></div>
+</body></html>
