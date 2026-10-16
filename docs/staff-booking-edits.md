@@ -36,3 +36,15 @@ Broader WhatsApp formatting is on today's checklist after this feature. User con
 Audit records snapshot the authenticated staff username so later account renaming does not rewrite history. Full offline suite: 182 passed, four opt-in tests skipped. Six focused staff-booking tests passed again after adding the username snapshot. TypeScript, changed-file lint and Webpack build are checked before release. Real multi-session concurrency and deployed mutation testing remain unverified; no staff-booking migration has been applied remotely.
 
 Read-only Preview preflight confirmed `mo_bistro_2`, public schema, inspected role `neondb_owner`, CREATE privilege, both new relations absent and integer IDs on guests/staff_users. Prior ETA approval is not treated as permission to apply this migration.
+
+## Activation status
+
+The user explicitly authorized the necessary database changes and requested no backup. Applied the reviewed transaction to the verified shared Preview/Development database with a database/schema identity guard. COMMIT succeeded; no PostgreSQL errors were reported. Both tables exist and inspected-role notes SELECT/INSERT/UPDATE and audit SELECT/INSERT permissions passed. No backup, environment change or Production change was made.
+
+Both `24e8d16` deployments were Ready: feature `EZJpjeCXtpVdbuzdQ3oZL9Au8EgC`, Development `JBHmjiahXBEV2qFJDqthim6DiKXq`. The live test saved synthetic booking 90's name, party size, preference and note successfully.
+
+## PostgreSQL driver audit correction
+
+The live test exposed string-valued JSONB audit snapshots: Postgres.js infers JSONB from a direct `::jsonb` parameter cast and serializes the already-stringified JSON again. The writer now binds JSON text using `::text::jsonb`, keeping PostgreSQL's parameter type text before parsing it into an object. This inference was not modeled by the embedded test adapter.
+
+Apply the follow-up `migrations/20261016_staff_booking_audit_json.sql` after the corrected deployment is Ready. It converts string snapshots to objects without deleting history and adds a check requiring object snapshots. Malformed JSON or unexpected non-object values abort the transaction. The user has authorized necessary Preview/Development fixes without backups; Production remains excluded. Seven focused tests passed, including snapshot normalization/rejection; TypeScript and changed-file lint passed. Repeat the live audit display and stale-save test after this correction.

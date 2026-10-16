@@ -91,7 +91,7 @@ export async function PATCH(request: Request, context: Context) {
         VALUES (${auth.id},${after.notes},1) ON CONFLICT(guest_id) DO UPDATE
         SET notes=EXCLUDED.notes,revision=guest_staff_details.revision+1 RETURNING revision`;
       await tx`INSERT INTO public.guest_booking_changes(guest_id,actor_id,actor_label,before_values,after_values)
-        VALUES (${auth.id},${auth.actor.id},${auth.actor.username},${JSON.stringify(before)}::jsonb,${JSON.stringify(after)}::jsonb)`;
+        VALUES (${auth.id},${auth.actor.id},${auth.actor.username},${JSON.stringify(before)}::text::jsonb,${JSON.stringify(after)}::text::jsonb)`;
       return { success: true, revision: saved.revision };
     });
     return NextResponse.json(result, { status: "error" in result ? result.status : 200 });

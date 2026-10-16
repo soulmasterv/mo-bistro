@@ -16,7 +16,10 @@ async function setup({migrate=true}={}) {
   const db=new PGlite();
   await db.exec(fs.readFileSync('migrations/001_postgres_schema.sql','utf8'));
   await db.exec("INSERT INTO staff_users(username,role,credential_hash) VALUES ('manager','manager','test'),('reception','reception','test'); INSERT INTO guests(name,phone,party_size,seating_preference,tracking_token_hash) VALUES ('Guest One','01000000000',2,'any','private-tracking');");
-  if(migrate) await db.exec(fs.readFileSync('migrations/20261016_staff_booking_edits.sql','utf8'));
+  if(migrate) {
+    await db.exec(fs.readFileSync('migrations/20261016_staff_booking_edits.sql','utf8'));
+    await db.exec(fs.readFileSync('migrations/20261016_staff_booking_audit_json.sql','utf8'));
+  }
   const h=harness();h.mocks['@/lib/postgres-db']={getPostgres:()=>adapter(db)};
   const route=h.route('guests/[id]/staff-details');
   const patch=body=>route.PATCH(request('PATCH',body),context(1));
@@ -105,5 +108,18 @@ test('audit failure rolls back both booking changes and staff notes',async()=>{
     assert.equal((await t.patch({...t.values,name:'Must roll back',notes:'Must roll back'})).status,503);
     assert.equal((await t.db.query('SELECT name FROM guests WHERE id=1')).rows[0].name,'Guest One');
     assert.equal((await t.db.query('SELECT * FROM guest_staff_details')).rows.length,0);
+  }finally{await t.db.close();}
+});
+
+test('audit repair normalizes serialized snapshots and rejects future non-object snapshots',async()=>{
+  const t=await setup();try{
+    await t.db.exec('ALTER TABLE guest_booking_changes DROP CONSTRAINT guest_booking_changes_snapshot_objects');
+    const snapshot={name:'Synthetic historical name',party_size:2,seating_preference:'any',notes:'Synthetic note'};
+    await t.db.query('INSERT INTO guest_booking_changes(guest_id,actor_id,actor_label,before_values,after_values) VALUES(1,1,$1,$2::jsonb,$2::jsonb)',
+      ['manager',JSON.stringify(JSON.stringify(snapshot))]);
+    await t.db.exec(fs.readFileSync('migrations/20261016_staff_booking_audit_json.sql','utf8'));
+    const row=(await t.db.query('SELECT before_values,after_values FROM guest_booking_changes')).rows[0];
+    assert.deepEqual(row.before_values,snapshot);assert.deepEqual(row.after_values,snapshot);
+    await assert.rejects(t.db.query("UPDATE guest_booking_changes SET before_values='\"not an object\"'::jsonb"),e=>e.code==='23514');
   }finally{await t.db.close();}
 });
