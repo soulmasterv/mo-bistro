@@ -71,6 +71,8 @@ export async function sendWindowNotification(
     ? "Mo Bistro update: your table is expected to be ready at {eta_time}. This is an estimate; reception will confirm when your table is ready."
     : job.kind === "almost_ready"
     ? "Hi {name}, your table for Mo Bistro booking #{booking_id} is expected to be ready in about 10 minutes. Please stay nearby; reception will confirm when your table is ready."
+    : job.kind === "review"
+    ? "Thank you for joining us at Mo Bistro, {name}! We hope you're enjoying your visit. Our review page is coming soon."
     : undefined);
   if (open && text) {
     let body = text
@@ -94,6 +96,18 @@ export async function sendWindowNotification(
     if (!body.includes(optOut)) body += "\n\n" + optOut;
     if (body.length > 4096)
       return { state: "skipped", error: "notification_text_invalid" };
+    if (job.kind === "review") {
+      if (body.length > 1024)
+        return { state: "skipped", error: "notification_text_invalid" };
+      // Temporary reply button: no URL, review submission or subscription action.
+      return requestMetaTemplate({
+        messaging_product: "whatsapp", to: booking.phone, type: "interactive",
+        biz_opaque_callback_data: job.id,
+        interactive: { type: "button", body: { text: body }, action: { buttons: [
+          { type: "reply", reply: { id: "review_placeholder", title: "Leave a review" } },
+        ] } },
+      });
+    }
     return requestMetaTemplate({
       messaging_product: "whatsapp",
       to: booking.phone,

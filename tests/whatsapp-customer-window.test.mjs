@@ -61,6 +61,36 @@ test("subscribed confirmation sends a thank-you once without asking the guest to
  assert.ok(!h.calls[0].text.body.includes('SUBSCRIBE 1'));
  assert.ok(!h.calls[0].text.body.includes('{'));
 });
+test("review due after seating sends one placeholder reply button, with no URL",async()=>{
+ const booking={kind:'review',guest_status:'seated',seated_at:new Date(Date.now()-3600001)};
+ const h=setup({booking});
+ await h.service.deliverNotification('notification-id',1);
+ await h.service.deliverNotification('notification-id',1);
+ assert.equal(h.calls.length,1);
+ const payload=h.calls[0];
+ assert.equal(payload.type,'interactive');
+ assert.equal(payload.biz_opaque_callback_data,'notification-id');
+ assert.equal(payload.interactive.type,'button');
+ assert.match(payload.interactive.body.text,/review page is coming soon/);
+ assert.match(payload.interactive.body.text,/UNSUBSCRIBE or STOP/);
+ assert.equal(payload.interactive.action.buttons.length,1);
+ assert.equal(payload.interactive.action.buttons[0].type,'reply');
+ assert.equal(payload.interactive.action.buttons[0].reply.id,'review_placeholder');
+ assert.equal(payload.interactive.action.buttons[0].reply.title,'Leave a review');
+ assert.ok(!JSON.stringify(payload).includes('https://'));
+ const early=setup({booking:{...booking,seated_at:new Date()}});
+ await early.service.deliverNotification('notification-id',1);
+ assert.equal(early.calls.length,0);
+ const closed=setup({booking,open:false});
+ await closed.service.deliverNotification('notification-id',1);
+ assert.equal(closed.calls.length,0);
+ assert.equal(closed.state.status,'skipped');
+ const long=setup({booking,env:{WHATSAPP_REVIEW_TEXT:'x'.repeat(1024)}});
+ await long.service.deliverNotification('notification-id',1);
+ assert.equal(long.calls.length,0);
+ assert.equal(long.state.status,'skipped');
+});
+
 test("missing consent, STOP and unsubscribe block open-window sends",async()=>{
  for(const booking of [{subscribed_at:null},{opted_out_at:new Date()},{unsubscribed_at:new Date()},{kind:"confirmation",confirmation_consent:false},{kind:"review",guest_status:"seated",seated_at:new Date(Date.now()-3600000),feedback_consent:false}]) {
  const h=setup({booking});await h.service.deliverNotification("notification-id",1);assert.equal(h.calls.length,0);

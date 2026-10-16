@@ -74,7 +74,10 @@ export async function sendTemplate(payload: ReturnType<typeof templatePayload>):
 
 // Internal transport shared by the normal policy-gated sender and isolated Preview test.
 export type MetaTextPayload = { messaging_product: "whatsapp"; to: string; type: "text"; text: { body: string }; biz_opaque_callback_data: string };
-export async function requestMetaTemplate(payload: ReturnType<typeof templatePayload> | MetaTextPayload): Promise<SendResult> {
+export type MetaReplyButtonPayload = { messaging_product: "whatsapp"; to: string; type: "interactive";
+  biz_opaque_callback_data: string; interactive: { type: "button"; body: { text: string };
+    action: { buttons: { type: "reply"; reply: { id: string; title: string } }[] } } };
+export async function requestMetaTemplate(payload: ReturnType<typeof templatePayload> | MetaTextPayload | MetaReplyButtonPayload): Promise<SendResult> {
   const access = process.env.META_WHATSAPP_ACCESS_TOKEN, phoneId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
   const version = process.env.META_GRAPH_API_VERSION;
   if (!access || !phoneId || !/^\d+$/.test(phoneId) || !/^v\d+\.\d+$/.test(version || "")) {

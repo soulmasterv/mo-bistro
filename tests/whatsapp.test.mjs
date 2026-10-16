@@ -1094,6 +1094,22 @@ test("bundled review consent requires a received subscription command; legacy ch
   assert.equal(networkCalls,0);
 });
 
+test("review placeholder button replies do not change consent, submit reviews or queue notifications",async()=>{
+  await reset(); const b=await booking();
+  await webhook.processMetaWebhook(envelope(inbound(b,'review-placeholder-subscribe')));
+  const beforeConsent=await sql`SELECT subscribed_at,unsubscribed_at,feedback_consent FROM whatsapp_booking_consents WHERE guest_id=${b.id}`;
+  const beforeJobs=await sql`SELECT id,kind,status,revision FROM whatsapp_notifications WHERE guest_id=${b.id} ORDER BY id`;
+  const reply=inbound(b,'review-placeholder-tap',{type:'interactive',interactive:{
+    type:'button_reply',button_reply:{id:'review_placeholder',title:'Leave a review'}
+  }});
+  await webhook.processMetaWebhook(envelope(reply));
+  await webhook.processMetaWebhook(envelope(reply));
+  assert.deepEqual(await sql`SELECT subscribed_at,unsubscribed_at,feedback_consent FROM whatsapp_booking_consents WHERE guest_id=${b.id}`,beforeConsent);
+  assert.deepEqual(await sql`SELECT id,kind,status,revision FROM whatsapp_notifications WHERE guest_id=${b.id} ORDER BY id`,beforeJobs);
+  assert.equal((await sql`SELECT action FROM whatsapp_inbound_events WHERE message_id='review-placeholder-tap'`)[0].action,'ignored');
+  assert.equal(networkCalls,0);
+});
+
 test("new ETA migration queues immutable time updates, reschedules alerts, deduplicates retries and cancels obsolete jobs",async()=>{
   await reset();
   await database.exec(fs.readFileSync('migrations/20261015_whatsapp_eta_updates.sql','utf8'));
