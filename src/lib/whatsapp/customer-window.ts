@@ -68,7 +68,10 @@ export async function sendWindowNotification(
   const text = subscribedConfirmation
     ? "Thanks for booking with Mo Bistro, {name}! Your booking #{booking_id} is on our waitlist. You're subscribed to WhatsApp updates. We'll let you know when your table is nearly ready."
     : process.env[prefix + "_TEXT"] ?? (job.kind === "eta_update"
-    ? "Mo Bistro update: your table is expected to be ready at {eta_time}. This is an estimate; reception will confirm when your table is ready." : undefined);
+    ? "Mo Bistro update: your table is expected to be ready at {eta_time}. This is an estimate; reception will confirm when your table is ready."
+    : job.kind === "almost_ready"
+    ? "Hi {name}, your table for Mo Bistro booking #{booking_id} is expected to be ready in about 10 minutes. Please stay nearby; reception will confirm when your table is ready."
+    : undefined);
   if (open && text) {
     let body = text
       .replaceAll("{name}", booking.name)

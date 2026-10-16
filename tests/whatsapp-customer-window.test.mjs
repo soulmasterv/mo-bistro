@@ -31,6 +31,23 @@ test("expired window falls back only to configured applicable template",async()=
  const skip=setup({open:false});await skip.service.deliverNotification("notification-id",1);assert.equal(skip.calls.length,0);assert.equal(skip.state.status,"skipped");assert.ok(skip.queries.some(q=>q.values.includes("customer_window_closed_template_unconfigured")));
 });
 
+test("almost-ready has default window text without a configured template or text override",async()=>{
+ const h=setup({env:{WHATSAPP_ALMOST_READY_TEXT:undefined}});
+ await h.service.deliverNotification('notification-id',1);
+ await h.service.deliverNotification('notification-id',1);
+ assert.equal(h.calls.length,1);
+ assert.equal(h.calls[0].type,'text');
+ assert.match(h.calls[0].text.body,/Hi Guest/);
+ assert.match(h.calls[0].text.body,/booking #1/);
+ assert.match(h.calls[0].text.body,/reception will confirm/);
+ assert.match(h.calls[0].text.body,/UNSUBSCRIBE or STOP/);
+ assert.equal(h.state.status,'sent');
+ const closed=setup({open:false,env:{WHATSAPP_ALMOST_READY_TEXT:undefined}});
+ await closed.service.deliverNotification('notification-id',1);
+ assert.equal(closed.calls.length,0);
+ assert.equal(closed.state.status,'skipped');
+});
+
 test("subscribed confirmation sends a thank-you once without asking the guest to subscribe again",async()=>{
  const h=setup({booking:{kind:'confirmation'}});
  await h.service.deliverNotification('notification-id',1);
