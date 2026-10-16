@@ -2,7 +2,7 @@ import "server-only";
 import { Receiver } from '@upstash/qstash';
 import { getPostgres } from '@/lib/postgres-db';
 import { liveSendingEnabled, normalizePhone, whatsappEnabled } from '@/lib/whatsapp/policy';
-import { requestMetaTemplate } from '@/lib/whatsapp/transport';
+import { requestMetaTemplate as sendMetaMessage } from '@/lib/whatsapp/transport';
 import { PILOT_ORIGIN, PILOT_JOB_PATH } from './config';
 import { finalizePendingExits } from '@/lib/pilot/store';
 
@@ -66,10 +66,14 @@ export async function deliverPilotCall(id:string) {
    if(stop?.opted_out_at && new Date(stop.opted_out_at)>=new Date(party.whatsapp_consent_at))error='guest_unsubscribed';
    else if(process.env.VERCEL_ENV!=='production'&&(!process.env.WHATSAPP_TEST_RECIPIENT||phone!==safeTestPhone()))error='preview_recipient_not_allowed';
    else {
-    const template=process.env.WHATSAPP_READY_TEMPLATE;
-    const result=template&&/^[a-z0-9_]+$/.test(template)?await requestMetaTemplate({messaging_product:'whatsapp',to:phone,type:'template',biz_opaque_callback_data:id,
-       template:{name:template,language:{code:process.env.WHATSAPP_TEMPLATE_LANGUAGE||'en'},components:[{type:'body',parameters:[{type:'text',text:party.name},{type:'text',text:String(party.id)}]}]}})
-     :{state:'skipped',error:'approved_ready_template_required',messageId:undefined};
+    const [window]=await tx`SELECT last_inbound_at FROM public.whatsapp_customer_windows WHERE phone=${phone}
+     AND phone_number_id=${process.env.META_WHATSAPP_PHONE_NUMBER_ID||''}
+     AND last_inbound_at>clock_timestamp()-INTERVAL '24 hours'+INTERVAL '10 seconds'
+     AND last_inbound_at<=clock_timestamp()`;
+    const result=!window?{state:'skipped',error:'customer_service_window_closed',messageId:undefined}
+     :process.env.WHATSAPP_WINDOW_TEXT_ENABLED==='true'?await sendMetaMessage({messaging_product:'whatsapp',to:phone,type:'text',biz_opaque_callback_data:id,
+       text:{body:`Mo Bistro - District 5\n\nHi ${party.name}, your table is ready. Please come to reception for booking #${party.id}.\n\nTo unsubscribe, reply STOP.`}})
+     :{state:'skipped',error:'window_text_disabled',messageId:undefined};
     state=result.state==='pending'?'failed':result.state;error=result.error??null;messageId=result.messageId??null;
    }
   }

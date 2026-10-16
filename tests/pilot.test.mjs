@@ -46,11 +46,11 @@ test('Pilot only exposes selected routes',()=>{const {pilotPathAllowed}=load('sr
 test('Ready sender is consent-gated and claims each Call at most once',async()=>{const {db,h,store}=await setup();try{
  await db.exec('CREATE TABLE whatsapp_contact_preferences(phone text PRIMARY KEY,opted_out_at timestamptz); CREATE TABLE whatsapp_customer_windows(phone text,phone_number_id text,last_inbound_at timestamptz);');
  let sends=0;const payloads=[];h.mocks['@/lib/whatsapp/transport']={requestMetaTemplate:async p=>{sends++;payloads.push(p);return {state:'sent',messageId:'synthetic-provider-id'};}};
- const globals={process:{env:{MO_BISTRO_DB:'postgres',WHATSAPP_ENABLED:'true',WHATSAPP_MODE:'live',WHATSAPP_ALLOW_LIVE_SEND:'true',VERCEL_ENV:'preview',WHATSAPP_TEST_RECIPIENT:'01000000001',WHATSAPP_READY_TEMPLATE:'table_ready',META_WHATSAPP_PHONE_NUMBER_ID:'123'}}};
+ const globals={process:{env:{MO_BISTRO_DB:'postgres',WHATSAPP_ENABLED:'true',WHATSAPP_MODE:'live',WHATSAPP_ALLOW_LIVE_SEND:'true',WHATSAPP_WINDOW_TEXT_ENABLED:'true',VERCEL_ENV:'preview',WHATSAPP_TEST_RECIPIENT:'01000000001',META_WHATSAPP_PHONE_NUMBER_ID:'123'}}};
  const sender=load('src/lib/pilot/whatsapp.ts',h.mocks,globals);
  const party=await store.createParty(input,'qr');await store.transition(party.id,'call');const id=(await db.query('SELECT id FROM pilot_ready_messages')).rows[0].id;
  await db.query("INSERT INTO whatsapp_customer_windows VALUES('201000000001','123',clock_timestamp())");
- await sender.deliverPilotCall(id);await sender.deliverPilotCall(id);assert.equal(sends,1);assert.equal(payloads[0].type,'template');assert.equal(payloads[0].template.name,'table_ready');
+ await sender.deliverPilotCall(id);await sender.deliverPilotCall(id);assert.equal(sends,1);assert.equal(payloads[0].type,'text');assert.match(payloads[0].text.body,/your table is ready/);
  await store.transition(party.id,'left');await db.query("UPDATE pilot_parties SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[party.id]);const next=await store.createParty({...input,whatsapp_consent:false},'qr');await store.transition(next.id,'call');const job=(await db.query('SELECT id FROM pilot_ready_messages WHERE party_id=$1',[next.id])).rows[0].id;
  await sender.deliverPilotCall(job);assert.equal(sends,1);assert.equal((await db.query('SELECT last_error FROM pilot_ready_messages WHERE id=$1',[job])).rows[0].last_error,'guest_not_opted_in');
  }finally{await db.close();}});
@@ -74,14 +74,36 @@ test('Removal has a durable five-second undo, keeps timestamps on undo, and reco
  const csv=store.csv(await store.exportRows());assert.match(csv,/no_show_after_call/);assert.match(csv,/cancelled_before_call/);assert.doesNotMatch(csv,/Synthetic Guest|01000000001/);
  }finally{await db.close();}
 });
-test('Notify requires an approved template and holds delivery during a pending no-show',async()=>{
+test('Notify requires an inbound window and holds delivery during a pending no-show',async()=>{
  const {db,h,store}=await setup();try{
- await db.exec('CREATE TABLE whatsapp_contact_preferences(phone text PRIMARY KEY,opted_out_at timestamptz);');let sends=0;
+ await db.exec('CREATE TABLE whatsapp_contact_preferences(phone text PRIMARY KEY,opted_out_at timestamptz); CREATE TABLE whatsapp_customer_windows(phone text,phone_number_id text,last_inbound_at timestamptz);');let sends=0;
  h.mocks['@/lib/whatsapp/transport']={requestMetaTemplate:async()=>{sends++;return {state:'sent',messageId:'test-id'};}};
- const env={MO_BISTRO_DB:'postgres',WHATSAPP_ENABLED:'true',WHATSAPP_MODE:'live',WHATSAPP_ALLOW_LIVE_SEND:'true',VERCEL_ENV:'preview',WHATSAPP_TEST_RECIPIENT:input.phone};
+ const env={MO_BISTRO_DB:'postgres',WHATSAPP_ENABLED:'true',WHATSAPP_MODE:'live',WHATSAPP_ALLOW_LIVE_SEND:'true',WHATSAPP_WINDOW_TEXT_ENABLED:'true',VERCEL_ENV:'preview',WHATSAPP_TEST_RECIPIENT:input.phone};
  const sender=load('src/lib/pilot/whatsapp.ts',h.mocks,{process:{env}});
  const party=await store.createParty(input,'qr');await store.transition(party.id,'notify');const id=(await db.query('SELECT id FROM pilot_ready_messages')).rows[0].id;
  const pending=await store.transition(party.id,'no_show');await sender.deliverPilotCall(id);assert.equal(sends,0);assert.equal((await db.query('SELECT status FROM pilot_ready_messages')).rows[0].status,'pending');
- await store.undoExit(party.id,pending.undo_token);await sender.deliverPilotCall(id);assert.equal(sends,0);assert.equal((await db.query('SELECT last_error FROM pilot_ready_messages')).rows[0].last_error,'approved_ready_template_required');
+ await store.undoExit(party.id,pending.undo_token);await sender.deliverPilotCall(id);assert.equal(sends,0);assert.equal((await db.query('SELECT last_error FROM pilot_ready_messages')).rows[0].last_error,'customer_service_window_closed');
+ }finally{await db.close();}
+});
+test('Opt-in alone, expired windows, wrong business number and STOP never send',async()=>{
+ const {db,h,store}=await setup();try{
+ await db.exec('CREATE TABLE whatsapp_contact_preferences(phone text PRIMARY KEY,opted_out_at timestamptz); CREATE TABLE whatsapp_customer_windows(phone text,phone_number_id text,last_inbound_at timestamptz);');
+ let sends=0;h.mocks['@/lib/whatsapp/transport']={requestMetaTemplate:async()=>{sends++;return {state:'sent',messageId:'test-id'};}};
+ const env={MO_BISTRO_DB:'postgres',WHATSAPP_ENABLED:'true',WHATSAPP_MODE:'live',WHATSAPP_ALLOW_LIVE_SEND:'true',WHATSAPP_WINDOW_TEXT_ENABLED:'true',VERCEL_ENV:'preview',WHATSAPP_TEST_RECIPIENT:input.phone,META_WHATSAPP_PHONE_NUMBER_ID:'123',WHATSAPP_READY_TEMPLATE:'must_not_be_used'};
+ const sender=load('src/lib/pilot/whatsapp.ts',h.mocks,{process:{env}});
+ for(const scenario of ['missing','expired','wrong_business','future','disabled','stopped']){
+  env.WHATSAPP_WINDOW_TEXT_ENABLED=scenario==='disabled'?'false':'true';
+  const party=await store.createParty(input,'qr');await store.transition(party.id,'notify');
+  const id=(await db.query('SELECT id FROM pilot_ready_messages WHERE party_id=$1',[party.id])).rows[0].id;
+  await db.query('DELETE FROM whatsapp_customer_windows');
+  if(scenario==='expired')await db.query("INSERT INTO whatsapp_customer_windows VALUES('201000000001','123',clock_timestamp()-INTERVAL '25 hours')");
+  if(scenario==='wrong_business')await db.query("INSERT INTO whatsapp_customer_windows VALUES('201000000001','456',clock_timestamp())");
+  if(scenario==='future')await db.query("INSERT INTO whatsapp_customer_windows VALUES('201000000001','123',clock_timestamp()+INTERVAL '1 hour')");
+  if(scenario==='disabled')await db.query("INSERT INTO whatsapp_customer_windows VALUES('201000000001','123',clock_timestamp())");
+  if(scenario==='stopped'){await db.query("INSERT INTO whatsapp_customer_windows VALUES('201000000001','123',clock_timestamp())");await db.query("INSERT INTO whatsapp_contact_preferences VALUES('201000000001',clock_timestamp())");}
+  await sender.deliverPilotCall(id);assert.equal(sends,0,scenario);
+  assert.equal((await db.query('SELECT last_error FROM pilot_ready_messages WHERE id=$1',[id])).rows[0].last_error,scenario==='stopped'?'guest_unsubscribed':scenario==='disabled'?'window_text_disabled':'customer_service_window_closed');
+  await store.transition(party.id,'seated');
+ }
  }finally{await db.close();}
 });

@@ -15,7 +15,7 @@ export function messageLabel(p:Party){
  return p.status==='called'?'Sending message…':p.whatsapp_consent?'Subscribed':'Not subscribed';
 }
 function failureDetail(p:Party){
- const reasons:Record<string,string>={guest_not_opted_in:'Guest has not subscribed to WhatsApp. Call them directly.',guest_unsubscribed:'Guest unsubscribed. Call them directly.',approved_ready_template_required:'The approved table-ready template needs setup. Call this guest.',preview_recipient_not_allowed:'Dev can message only the configured test number. Call this guest.',scheduler_unavailable:'Message scheduling failed. Call this guest.',whatsapp_disabled:'WhatsApp is disabled. Call this guest.'};
+ const reasons:Record<string,string>={guest_not_opted_in:'Guest has not subscribed to WhatsApp. Call them directly.',guest_unsubscribed:'Guest unsubscribed. Call them directly.',customer_service_window_closed:'The guest needs to send a new WhatsApp message before we can reply. Call them directly.',window_text_disabled:'WhatsApp text sending is disabled. Call this guest.',preview_recipient_not_allowed:'Dev can message only the configured test number. Call this guest.',scheduler_unavailable:'Message scheduling failed. Call this guest.',whatsapp_disabled:'WhatsApp is disabled. Call this guest.'};
  return p.message_error?reasons[p.message_error]||'The message could not be confirmed. Call this guest.':'';
 }
 const time=(value:string)=>new Intl.DateTimeFormat('en-GB',{timeZone:'Africa/Cairo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));
