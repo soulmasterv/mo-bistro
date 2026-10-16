@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import {load,harness,request,context,requireDependency} from './handler-harness.mjs';
 const {PGlite}=requireDependency('@electric-sql/pglite');
 function adapter(db){const sql=async(strings,...values)=>{let q='';strings.forEach((s,i)=>{q+=s;if(i<values.length)q+='$'+(i+1);});return(await db.query(q,values)).rows;};sql.begin=cb=>db.transaction(tx=>cb(adapter(tx)));return sql;}
-async function setup(){const db=new PGlite();await db.exec(fs.readFileSync('migrations/20261016_queue_pilot.sql','utf8'));const h=harness({actor:{id:1,username:'OmarMohsen',role:'manager'}});h.mocks['@/lib/postgres-db']={getPostgres:()=>adapter(db)};
+async function setup(){const db=new PGlite();await db.exec(fs.readFileSync('migrations/20261016_queue_pilot.sql','utf8'));await db.exec(fs.readFileSync('migrations/20261016_pilot_reception_actions.sql','utf8'));const h=harness({actor:{id:1,username:'OmarMohsen',role:'manager'}});h.mocks['@/lib/postgres-db']={getPostgres:()=>adapter(db)};
  const config=load('src/lib/pilot/config.ts');h.mocks['./config']=config;
  h.mocks['next/server']={after:()=>{},NextResponse:{json:(body,init)=>Response.json(body,init)}};
  h.mocks['@/lib/pilot/whatsapp']={publishPilotCalls:async()=>{}};
@@ -27,6 +27,7 @@ test('Pilot records lifecycle, arrival position, source, private status and anon
  assert.equal((await store.partyStatus(second.token)).position,1);
  await action.PATCH(request('PATCH',{action:'seated'}),context(first.id));
  await action.PATCH(request('PATCH',{action:'left'}),context(second.id));
+ await db.query("UPDATE pilot_parties SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[second.id]);
  assert.equal((await action.PATCH(request('PATCH',{action:'call'}),context(first.id))).status,409);
  assert.equal((await store.listQueue()).length,0);
  const rows=await store.exportRows();assert.ok(rows[0].joined_at&&rows[0].called_at&&rows[0].seated_at);assert.ok(rows[1].left_at);assert.equal(rows[1].source,'walk_in');
@@ -45,11 +46,42 @@ test('Pilot only exposes selected routes',()=>{const {pilotPathAllowed}=load('sr
 test('Ready sender is consent-gated and claims each Call at most once',async()=>{const {db,h,store}=await setup();try{
  await db.exec('CREATE TABLE whatsapp_contact_preferences(phone text PRIMARY KEY,opted_out_at timestamptz); CREATE TABLE whatsapp_customer_windows(phone text,phone_number_id text,last_inbound_at timestamptz);');
  let sends=0;const payloads=[];h.mocks['@/lib/whatsapp/transport']={requestMetaTemplate:async p=>{sends++;payloads.push(p);return {state:'sent',messageId:'synthetic-provider-id'};}};
- const globals={process:{env:{MO_BISTRO_DB:'postgres',WHATSAPP_ENABLED:'true',WHATSAPP_MODE:'live',WHATSAPP_ALLOW_LIVE_SEND:'true',VERCEL_ENV:'preview',WHATSAPP_TEST_RECIPIENT:'01000000001',WHATSAPP_WINDOW_TEXT_ENABLED:'true',META_WHATSAPP_PHONE_NUMBER_ID:'123'}}};
+ const globals={process:{env:{MO_BISTRO_DB:'postgres',WHATSAPP_ENABLED:'true',WHATSAPP_MODE:'live',WHATSAPP_ALLOW_LIVE_SEND:'true',VERCEL_ENV:'preview',WHATSAPP_TEST_RECIPIENT:'01000000001',WHATSAPP_READY_TEMPLATE:'table_ready',META_WHATSAPP_PHONE_NUMBER_ID:'123'}}};
  const sender=load('src/lib/pilot/whatsapp.ts',h.mocks,globals);
  const party=await store.createParty(input,'qr');await store.transition(party.id,'call');const id=(await db.query('SELECT id FROM pilot_ready_messages')).rows[0].id;
  await db.query("INSERT INTO whatsapp_customer_windows VALUES('201000000001','123',clock_timestamp())");
- await sender.deliverPilotCall(id);await sender.deliverPilotCall(id);assert.equal(sends,1);assert.equal(payloads[0].type,'text');assert.match(payloads[0].text.body,/your table is ready/);
- await store.transition(party.id,'left');const next=await store.createParty({...input,whatsapp_consent:false},'qr');await store.transition(next.id,'call');const job=(await db.query('SELECT id FROM pilot_ready_messages WHERE party_id=$1',[next.id])).rows[0].id;
+ await sender.deliverPilotCall(id);await sender.deliverPilotCall(id);assert.equal(sends,1);assert.equal(payloads[0].type,'template');assert.equal(payloads[0].template.name,'table_ready');
+ await store.transition(party.id,'left');await db.query("UPDATE pilot_parties SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[party.id]);const next=await store.createParty({...input,whatsapp_consent:false},'qr');await store.transition(next.id,'call');const job=(await db.query('SELECT id FROM pilot_ready_messages WHERE party_id=$1',[next.id])).rows[0].id;
  await sender.deliverPilotCall(job);assert.equal(sends,1);assert.equal((await db.query('SELECT last_error FROM pilot_ready_messages WHERE id=$1',[job])).rows[0].last_error,'guest_not_opted_in');
  }finally{await db.close();}});
+test('Removal has a durable five-second undo, keeps timestamps on undo, and records distinct outcomes',async()=>{
+ const {db,h,store}=await setup();try{
+ const party=await store.createParty(input,'qr');const api=h.route('pilot/parties/[id]');
+ assert.equal((await api.PATCH(request('PATCH',{action:'no_show'}),context(party.id))).status,409);
+ const begin=await api.PATCH(request('PATCH',{action:'cancel'}),context(party.id));assert.equal(begin.status,200);const pending=await begin.json();assert.ok(pending.undo_token&&pending.undo_until);
+ const repeat=await(await api.PATCH(request('PATCH',{action:'cancel'}),context(party.id))).json();assert.equal(repeat.undo_token,pending.undo_token);assert.equal(repeat.undo_until,pending.undo_until);
+ assert.equal((await api.PATCH(request('PATCH',{action:'notify'}),context(party.id))).status,409);
+ assert.equal((await api.PATCH(request('PATCH',{action:'undo',undo_token:'11111111-1111-4111-8111-111111111111'}),context(party.id))).status,409);
+ assert.equal((await api.PATCH(request('PATCH',{action:'undo',undo_token:pending.undo_token}),context(party.id))).status,200);
+ let row=(await db.query('SELECT * FROM pilot_parties WHERE id=$1',[party.id])).rows[0];assert.equal(row.status,'waiting');assert.equal(row.left_at,null);assert.equal(row.exit_reason,null);
+ assert.equal((await api.PATCH(request('PATCH',{action:'notify'}),context(party.id))).status,200);
+ assert.equal((await api.PATCH(request('PATCH',{action:'cancel'}),context(party.id))).status,409);
+ const noShow=await(await api.PATCH(request('PATCH',{action:'no_show'}),context(party.id))).json();
+ assert.equal((await store.listQueue()).length,1);await db.query("UPDATE pilot_parties SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[party.id]);
+ assert.equal((await api.PATCH(request('PATCH',{action:'undo',undo_token:noShow.undo_token}),context(party.id))).status,409);
+ assert.equal((await store.listQueue()).length,0);row=(await store.exportRows())[0];assert.equal(row.exit_reason,'no_show_after_call');assert.ok(row.called_at&&row.left_at);
+ const second=await store.createParty(input,'qr');await store.transition(second.id,'cancel');await db.query("UPDATE pilot_parties SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[second.id]);
+ const csv=store.csv(await store.exportRows());assert.match(csv,/no_show_after_call/);assert.match(csv,/cancelled_before_call/);assert.doesNotMatch(csv,/Synthetic Guest|01000000001/);
+ }finally{await db.close();}
+});
+test('Notify requires an approved template and holds delivery during a pending no-show',async()=>{
+ const {db,h,store}=await setup();try{
+ await db.exec('CREATE TABLE whatsapp_contact_preferences(phone text PRIMARY KEY,opted_out_at timestamptz);');let sends=0;
+ h.mocks['@/lib/whatsapp/transport']={requestMetaTemplate:async()=>{sends++;return {state:'sent',messageId:'test-id'};}};
+ const env={MO_BISTRO_DB:'postgres',WHATSAPP_ENABLED:'true',WHATSAPP_MODE:'live',WHATSAPP_ALLOW_LIVE_SEND:'true',VERCEL_ENV:'preview',WHATSAPP_TEST_RECIPIENT:input.phone};
+ const sender=load('src/lib/pilot/whatsapp.ts',h.mocks,{process:{env}});
+ const party=await store.createParty(input,'qr');await store.transition(party.id,'notify');const id=(await db.query('SELECT id FROM pilot_ready_messages')).rows[0].id;
+ const pending=await store.transition(party.id,'no_show');await sender.deliverPilotCall(id);assert.equal(sends,0);assert.equal((await db.query('SELECT status FROM pilot_ready_messages')).rows[0].status,'pending');
+ await store.undoExit(party.id,pending.undo_token);await sender.deliverPilotCall(id);assert.equal(sends,0);assert.equal((await db.query('SELECT last_error FROM pilot_ready_messages')).rows[0].last_error,'approved_ready_template_required');
+ }finally{await db.close();}
+});
