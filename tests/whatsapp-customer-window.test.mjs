@@ -30,6 +30,20 @@ test("expired window falls back only to configured applicable template",async()=
  const h=setup({open:false,template:true});await h.service.deliverNotification("notification-id",1);assert.equal(h.calls[0].type,"template");
  const skip=setup({open:false});await skip.service.deliverNotification("notification-id",1);assert.equal(skip.calls.length,0);assert.equal(skip.state.status,"skipped");assert.ok(skip.queries.some(q=>q.values.includes("customer_window_closed_template_unconfigured")));
 });
+
+test("subscribed confirmation sends a thank-you once without asking the guest to subscribe again",async()=>{
+ const h=setup({booking:{kind:'confirmation'}});
+ await h.service.deliverNotification('notification-id',1);
+ await h.service.deliverNotification('notification-id',1);
+ assert.equal(h.calls.length,1);
+ assert.equal(h.calls[0].type,'text');
+ assert.match(h.calls[0].text.body,/Thanks for booking with Mo Bistro, Guest!/);
+ assert.match(h.calls[0].text.body,/booking #1/);
+ assert.match(h.calls[0].text.body,/subscribed to WhatsApp updates/);
+ assert.match(h.calls[0].text.body,/UNSUBSCRIBE or STOP/);
+ assert.ok(!h.calls[0].text.body.includes('SUBSCRIBE 1'));
+ assert.ok(!h.calls[0].text.body.includes('{'));
+});
 test("missing consent, STOP and unsubscribe block open-window sends",async()=>{
  for(const booking of [{subscribed_at:null},{opted_out_at:new Date()},{unsubscribed_at:new Date()},{kind:"confirmation",confirmation_consent:false},{kind:"review",guest_status:"seated",seated_at:new Date(Date.now()-3600000),feedback_consent:false}]) {
  const h=setup({booking});await h.service.deliverNotification("notification-id",1);assert.equal(h.calls.length,0);

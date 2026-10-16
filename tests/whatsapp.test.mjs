@@ -197,10 +197,10 @@ function inbound(b, id = randomUUID(), extra = {}) {
     ...extra,
   };
 }
-async function jobs() {
+async function jobs(kind) {
   return (
     await database.query("SELECT * FROM whatsapp_notifications ORDER BY kind")
-  ).rows;
+  ).rows.filter(row => !kind || row.kind === kind);
 }
 const cases = [];
 function check(name, fn) {
@@ -250,7 +250,7 @@ check(
     const state = await service.subscriptionState(b.token);
     assert.equal(state.available, true);
     assert.equal(state.subscribed, false);
-    assert.ok(state.url.includes("SUBSCRIBE"));
+    assert.match(decodeURIComponent(state.url),/I'd like to receive updates about booking \d+\.\nCode: [a-z]{4}-\d{4}$/);
     await service.subscriptionState(b.token);
     assert.equal((await jobs()).length, 0);
   },
@@ -484,7 +484,7 @@ check(
     assert.equal((await jobs()).length, 0);
     await webhook.processMetaWebhook(envelope(inbound(b)));
     await sql.begin((tx) => service.scheduleReview(tx, b.id, seated));
-    const [job] = await jobs();
+    const [job] = await jobs("review");
     assert.equal(new Date(job.due_at).getTime(), seated.getTime() + 3600000);
     await database.query(
       "UPDATE guests SET status='seated',seated_at=NOW()-INTERVAL '61 minutes'",
@@ -493,10 +493,10 @@ check(
       "UPDATE whatsapp_notifications SET due_at=NOW()-INTERVAL '1 second'",
     );
     await service.dispatchOutbox();
-    assert.equal((await jobs())[0].status, "simulated");
+    assert.equal((await jobs("review"))[0].status, "simulated");
     await service.dispatchOutbox();
     assert.equal(
-      (await database.query("SELECT * FROM whatsapp_delivery_logs")).rows
+      (await database.query("SELECT l.* FROM whatsapp_delivery_logs l JOIN whatsapp_notifications n ON n.id=l.notification_id WHERE n.kind='review'")).rows
         .length,
       1,
     );
@@ -508,7 +508,7 @@ check(
     const b = await booking();
     await webhook.processMetaWebhook(envelope(inbound(b)));
     await sql.begin((tx) => service.scheduleReview(tx, b.id, new Date()));
-    assert.equal((await jobs()).length, 0);
+    assert.equal((await jobs("review")).length, 0);
   },
 );
 check(
@@ -522,7 +522,7 @@ check(
     const seating = load("src/lib/seating-postgres.ts");
     await seating.assignTablePostgres(b.id, 1);
     const [guest] = (await database.query("SELECT seated_at FROM guests")).rows;
-    const [review] = await jobs();
+    const [review] = await jobs("review");
     assert.equal(
       new Date(review.due_at).getTime(),
       new Date(guest.seated_at).getTime() + 3600000,
@@ -924,7 +924,7 @@ check(
     const simple = load("src/lib/simple-table-postgres.ts");
     await simple.assignSimpleTable(b.id, "indoor", 1);
     const [guest] = (await database.query("SELECT seated_at FROM guests")).rows;
-    const [review] = await jobs();
+    const [review] = await jobs("review");
     assert.ok(guest.seated_at);
     assert.equal(
       new Date(review.due_at).getTime(),
@@ -1015,11 +1015,61 @@ test("review preference is relevant before review dispatch or deadline",async()=
   assert.equal((await service.subscriptionState(b.token)).feedbackEditable,false);
 });
 
-test("bundled review consent requires the received REVIEWS command; legacy choices are preserved",async()=>{
+test("friendly subscription verifies its sender and queues one acknowledgement without exposing the long token",async()=>{
+  await reset(); const b=await booking();
+  const state=await service.subscriptionState(b.token);
+  const text=new URL(state.url).searchParams.get('text');
+  assert.match(text,new RegExp(`^I'd like to receive updates about booking ${b.id}\\.\\nCode: [a-z]{4}-\\d{4}$`));
+  assert.ok(!text.includes(b.code));
+  assert.equal((await jobs()).length,0);
+  for(const extra of [{from:'201111111111'},{text:{body:text.replace(/Code: .+/, 'Code: xxxx-0000')}}]) {
+    await webhook.processMetaWebhook(envelope(inbound(b,randomUUID(),{text:{body:text},...extra})));
+    assert.equal((await service.subscriptionState(b.token)).subscribed,false);
+    assert.equal((await jobs()).length,0);
+  }
+  const message=inbound(b,'friendly-subscription',{text:{body:text}});
+  await webhook.processMetaWebhook(envelope(message));
+  let [job]=await jobs('confirmation');
+  assert.equal(job.status,'pending');
+  const consent=(await sql`SELECT confirmation_consent,feedback_consent FROM whatsapp_booking_consents WHERE guest_id=${b.id}`)[0];
+  assert.equal(consent.confirmation_consent,true); assert.equal(consent.feedback_consent,true);
+  await webhook.processMetaWebhook(envelope(message));
+  await webhook.processMetaWebhook(envelope({...message,id:'friendly-subscription-again'}));
+  assert.equal((await jobs('confirmation')).length,1);
+  assert.equal((await jobs('confirmation'))[0].revision,job.revision);
+  await service.dispatchOutbox();
+  assert.equal((await jobs('confirmation'))[0].status,'simulated');
+  await webhook.processMetaWebhook(envelope({...message,id:'friendly-after-send'}));
+  assert.equal((await jobs('confirmation'))[0].status,'simulated');
+  assert.equal(networkCalls,0);
+});
+
+test("friendly codes are booking-bound, expire, throttle guesses and preserve STOP suppression",async()=>{
+  await reset(); const b=await booking();
+  const text=new URL((await service.subscriptionState(b.token)).url).searchParams.get('text');
+  const other=await booking({},'01000000001');
+  await webhook.processMetaWebhook(envelope(inbound(other,'other-booking',{text:{body:text.replace(`booking ${b.id}.`,`booking ${other.id}.`)}})));
+  assert.equal((await service.subscriptionState(other.token)).subscribed,false);
+  for(let i=0;i<5;i++) await webhook.processMetaWebhook(envelope(inbound(b,`guess-${i}`,{text:{body:text.replace(/Code: .+/, 'Code: xxxx-0000')}})));
+  await webhook.processMetaWebhook(envelope(inbound(b,'throttled-valid',{text:{body:text}})));
+  assert.equal((await service.subscriptionState(b.token)).subscribed,false);
+  await sql`UPDATE whatsapp_inbound_events SET received_at=NOW()-INTERVAL '2 hours'`;
+  await sql`UPDATE whatsapp_booking_consents SET subscription_expires_at=NOW()-INTERVAL '1 second' WHERE guest_id=${b.id}`;
+  await webhook.processMetaWebhook(envelope(inbound(b,'expired-friendly',{text:{body:text}})));
+  assert.equal((await jobs('confirmation')).length,0);
+  await sql`UPDATE whatsapp_booking_consents SET subscription_expires_at=NOW()+INTERVAL '1 day' WHERE guest_id=${b.id}`;
+  await webhook.processMetaWebhook(envelope(inbound(b,'valid-friendly',{text:{body:text}})));
+  await webhook.processMetaWebhook(envelope(inbound(b,'stop-friendly',{text:{body:'STOP'}})));
+  await service.dispatchOutbox();
+  assert.equal((await jobs('confirmation'))[0].status,'skipped');
+  assert.equal(networkCalls,0);
+});
+
+test("bundled review consent requires a received subscription command; legacy choices are preserved",async()=>{
   await reset(); const b=await booking();
   const before=await service.subscriptionState(b.token);
   assert.equal(before.feedbackConsent,false);
-  assert.match(decodeURIComponent(before.url),/ REVIEWS$/);
+  assert.match(decodeURIComponent(before.url),/Code: [a-z]{4}-\d{4}$/);
   await webhook.processMetaWebhook(envelope(inbound(b,'forged-bundled-review',{from:'201111111111',text:{body:`SUBSCRIBE ${b.id} ${b.code} REVIEWS`}})));
   assert.equal((await service.subscriptionState(b.token)).feedbackConsent,false);
   await webhook.processMetaWebhook(envelope(inbound(b,'bundled-review',{text:{body:`SUBSCRIBE ${b.id} ${b.code} REVIEWS`}})));
@@ -1039,6 +1089,7 @@ test("new ETA migration queues immutable time updates, reschedules alerts, dedup
   await database.exec(fs.readFileSync('migrations/20261015_whatsapp_eta_updates.sql','utf8'));
   const b=await booking();
   await webhook.processMetaWebhook(envelope(inbound(b,'eta-subscriber')));
+  await service.dispatchOutbox(); // Complete the separate subscription acknowledgement.
   const route=load('src/app/api/guests/[id]/eta/route.ts');
   const context={params:Promise.resolve({id:String(b.id)})};
   const save=(minutes,requestId=randomUUID())=>route.PATCH(new Request('https://bistro.test/api/eta',{
@@ -1053,7 +1104,7 @@ test("new ETA migration queues immutable time updates, reschedules alerts, dedup
   const callbackCount=afters.length;
   response=await save(30,firstId);assert.equal(response.status,200);
   assert.equal((await response.json()).eta_at,first.eta_at);assert.equal(afters.length,callbackCount);
-  assert.equal((await sql`SELECT id FROM whatsapp_notifications`).length,2);
+  assert.equal((await sql`SELECT id FROM whatsapp_notifications`).length,3); // Includes completed acknowledgement.
   await save(45);
   assert.equal((await sql`SELECT status FROM whatsapp_notifications WHERE id=${originalAlert.id}`)[0].status,'skipped');
   assert.equal((await sql`SELECT id FROM whatsapp_notifications WHERE status='pending'`).length,2);

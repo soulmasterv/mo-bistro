@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { TransactionSql } from "postgres";
 import { getPostgres } from "@/lib/postgres-db";
 import { CONSENT_VERSION, whatsappEnabled, normalizePhone, subscriptionCode, hashCode,
-  eligible, dueTime, type NotificationKind, type Eligibility } from "@/lib/whatsapp/policy";
+  eligible, dueTime, subscriptionMessage, type NotificationKind, type Eligibility } from "@/lib/whatsapp/policy";
 import { sendWindowNotification } from "@/lib/whatsapp/customer-window";
 import { publishJob } from "@/lib/whatsapp/transport";
 type DeliveryBooking = Eligibility & { id: string; guest_id: number; name: string; phone: string;
@@ -195,5 +195,5 @@ export async function subscriptionState(trackingToken: string) {
   const feedbackEditable = available && !booking.review_dispatched &&
     (!booking.seated_at || new Date(booking.seated_at).getTime() + 60*60_000 > Date.now());
   return { available,subscribed,feedbackConsent: booking.feedback_consent,feedbackEditable,
-    url: available && !subscribed ? `https://wa.me/${number}?text=${encodeURIComponent(`SUBSCRIBE ${booking.guest_id} ${code} REVIEWS`)}` : null };
+    url: available && !subscribed ? `https://wa.me/${number}?text=${encodeURIComponent(subscriptionMessage(booking.guest_id,code!))}` : null };
 }

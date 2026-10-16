@@ -29,7 +29,7 @@ export async function recordCustomerWindow(
 export async function sendWindowNotification(
   sql: TransactionSql,
   job: { id: string; kind: NotificationKind; guest_id: number },
-  booking: { phone: string; name: string; eta_at?: Date | null },
+  booking: { phone: string; name: string; eta_at?: Date | null; subscribed_at?: Date | null },
   code: string,
 ): Promise<SendResult> {
   if (!liveSendingEnabled()) return { state: "simulated" };
@@ -64,7 +64,10 @@ export async function sendWindowNotification(
     review: "WHATSAPP_REVIEW",
     eta_update: "WHATSAPP_ETA_UPDATE",
   }[job.kind];
-  const text = process.env[prefix + "_TEXT"] ?? (job.kind === "eta_update"
+  const subscribedConfirmation = job.kind === "confirmation" && !!booking.subscribed_at;
+  const text = subscribedConfirmation
+    ? "Thanks for booking with Mo Bistro, {name}! Your booking #{booking_id} is on our waitlist. You're subscribed to WhatsApp updates. We'll let you know when your table is nearly ready."
+    : process.env[prefix + "_TEXT"] ?? (job.kind === "eta_update"
     ? "Mo Bistro update: your table is expected to be ready at {eta_time}. This is an estimate; reception will confirm when your table is ready." : undefined);
   if (open && text) {
     let body = text
@@ -78,7 +81,7 @@ export async function sendWindowNotification(
     )
       return { state: "skipped", error: "notification_text_invalid" };
     // Confirmation must preserve the explicit reply path when the guest is not yet subscribed.
-    if (job.kind === "confirmation" && !text.includes("{subscribe_command}"))
+    if (job.kind === "confirmation" && !subscribedConfirmation && !text.includes("{subscribe_command}"))
       return {
         state: "skipped",
         error: "confirmation_subscription_copy_missing",

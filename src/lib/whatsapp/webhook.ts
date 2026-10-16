@@ -2,8 +2,8 @@ import "server-only";
 import { recordPreviewInbound, recordPreviewDelivery } from "@/lib/whatsapp/preview-test";
 import { recordCustomerWindow } from "@/lib/whatsapp/customer-window";
 import { getPostgres } from "@/lib/postgres-db";
-import { hashCode, isStop, normalizePhone, parseSubscription } from "@/lib/whatsapp/policy";
-import { scheduleAlmostReady, scheduleReview } from "@/lib/whatsapp/service";
+import { hashCode, isStop, normalizePhone, parseSubscription, safeEqual, shortSubscriptionCode, subscriptionCode } from "@/lib/whatsapp/policy";
+import { queueNotification, scheduleAlmostReady, scheduleReview } from "@/lib/whatsapp/service";
 
 type InboundMessage = { id: string; from: string; timestamp: string; type: string;
   text?: { body?: string }; button?: { payload?: string }; context?: { id?: string } };
@@ -53,11 +53,24 @@ export async function processMetaWebhook(payload: MetaPayload) {
           return;
         }
         if (!subscription) return;
-        const [booking] = await tx`SELECT c.*,g.status,g.eta_at,g.seated_at FROM whatsapp_booking_consents c
+        const [booking] = await tx`SELECT c.*,g.status,g.eta_at,g.seated_at,g.tracking_token_hash FROM whatsapp_booking_consents c
           JOIN guests g ON g.id=c.guest_id WHERE c.guest_id=${subscription.guestId} AND c.phone=${phone}
-            AND c.subscription_token_hash=${hashCode(subscription.code)} AND c.subscription_expires_at>NOW()
+            AND c.subscription_expires_at>NOW()
           FOR UPDATE OF c`;
         if (!booking || !["waiting","called","seated"].includes(booking.status)) return;
+        if (subscription.short) {
+          const [attempts] = await tx`SELECT COUNT(*)::integer AS count FROM whatsapp_inbound_events
+            WHERE phone=${phone} AND guest_id=${booking.guest_id} AND action='invalid_subscription_code'
+              AND received_at>NOW()-INTERVAL '1 hour'`;
+          if (attempts.count >= 5) return;
+          const fullCode = subscriptionCode(booking.guest_id, booking.tracking_token_hash);
+          if (!safeEqual(hashCode(fullCode),booking.subscription_token_hash) ||
+              !safeEqual(shortSubscriptionCode(fullCode),subscription.code)) {
+            await tx`UPDATE whatsapp_inbound_events SET guest_id=${booking.guest_id},action='invalid_subscription_code'
+              WHERE message_id=${message.id}`;
+            return;
+          }
+        } else if (!safeEqual(hashCode(subscription.code),booking.subscription_token_hash)) return;
         const [preference] = await tx`SELECT opted_out_at FROM whatsapp_contact_preferences WHERE phone=${phone}`;
         if (preference?.opted_out_at && timestamp*1000 <= new Date(preference.opted_out_at).getTime()) return;
         if (message.type === "button") {
@@ -69,12 +82,15 @@ export async function processMetaWebhook(payload: MetaPayload) {
         await tx`INSERT INTO whatsapp_contact_preferences (phone,opted_out_at) VALUES (${phone},NULL)
           ON CONFLICT (phone) DO UPDATE SET opted_out_at=NULL`;
         await tx`UPDATE whatsapp_booking_consents SET subscribed_at=COALESCE(subscribed_at,NOW()),
-          unsubscribed_at=NULL,subscribed_message_id=${message.id} WHERE guest_id=${booking.guest_id}`;
+          unsubscribed_at=NULL,confirmation_consent=TRUE,subscribed_message_id=${message.id} WHERE guest_id=${booking.guest_id}`;
         // New displayed opt-in includes one review. Legacy commands retain their saved choice.
         if (message.type === "text" && subscription.reviews) await tx`UPDATE whatsapp_booking_consents
           SET feedback_consent=TRUE,consent_recorded_at=NOW(),consent_version='whatsapp-bundled-review-v1-2026-10-15'
           WHERE guest_id=${booking.guest_id}`;
         await tx`UPDATE whatsapp_inbound_events SET guest_id=${booking.guest_id},action='subscribe' WHERE message_id=${message.id}`;
+        // One acknowledgement per booking; retries/resubscriptions cannot rearm a completed send.
+        if (!booking.subscribed_at && ["waiting","called"].includes(booking.status))
+          await queueNotification(tx,booking.guest_id,"confirmation",new Date());
         await scheduleAlmostReady(tx,booking.guest_id,booking.eta_at ? new Date(booking.eta_at) : null);
         if (booking.seated_at) await scheduleReview(tx,booking.guest_id,new Date(booking.seated_at));
       });

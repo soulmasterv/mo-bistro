@@ -23,6 +23,15 @@ export function subscriptionCode(guestId: number, trackingHash: string) {
   if (!secret || secret.length < 32) throw new Error("WhatsApp association secret is missing");
   return createHmac("sha256", secret).update(`subscribe:v1:${guestId}:${trackingHash}`).digest("hex");
 }
+/** Display code is bound to the existing secret token, booking and verified sender. */
+export function shortSubscriptionCode(code: string) {
+  const letters = [0, 2, 4, 6].map(i => String.fromCharCode(97 + parseInt(code.slice(i, i + 2), 16) % 26)).join("");
+  const digits = String(parseInt(code.slice(8, 16), 16) % 10000).padStart(4, "0");
+  return `${letters}-${digits}`;
+}
+export function subscriptionMessage(guestId: number, code: string) {
+  return `I'd like to receive updates about booking ${guestId}.\nCode: ${shortSubscriptionCode(code)}`;
+}
 export function safeEqual(a: string, b: string) {
   const aa = Buffer.from(a), bb = Buffer.from(b);
   return aa.length === bb.length && timingSafeEqual(aa, bb);
@@ -33,9 +42,15 @@ export function verifyMetaSignature(raw: string, signature: string | null) {
   return safeEqual(signature, `sha256=${createHmac("sha256", secret).update(raw).digest("hex")}`);
 }
 export function parseSubscription(message: string) {
+  const friendly = /^I['’]d like to receive updates about booking (\d+)\.?\s*\nCode:\s*([a-z]{4}-\d{4})\s*$/i.exec(message.trim());
+  if (friendly) {
+    const guestId = Number(friendly[1]);
+    return Number.isSafeInteger(guestId) && guestId > 0
+      ? { guestId, code: friendly[2].toLowerCase(), reviews: true, short: true } : null;
+  }
   const match = /^(?:subscribe:|SUBSCRIBE\s+)(\d+)(?::|\s+)([a-f0-9]{64})(?:\s+(REVIEWS))?$/i.exec(message.trim());
   if (!match || !Number.isSafeInteger(Number(match[1])) || Number(match[1]) < 1) return null;
-  return { guestId: Number(match[1]), code: match[2].toLowerCase(), reviews: !!match[3] };
+  return { guestId: Number(match[1]), code: match[2].toLowerCase(), reviews: !!match[3], short: false };
 }
 export function isStop(text: string) {
   return /^(stop|unsubscribe|cancel updates|إلغاء|الغاء)$/iu.test(text.trim());
