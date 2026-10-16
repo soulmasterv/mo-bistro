@@ -61,7 +61,7 @@
 .pill { display:inline-flex; align-items:center; min-height:29px; padding:6px 12px; border-radius:99px; background:#fff0d5; color:#9b540b; font-size:11px; white-space:nowrap; }
 .pillNotified { background:#2c3540; color:#c3d9ee; }
 .queueTable .rowActions { text-align:right; }
-.rowActions .actions { justify-content:flex-end; }
+.rowActions .actions { justify-content:flex-start; }
 .actions :is(a,button) { gap:8px; min-height:42px; padding:9px 12px; font-size:12px; white-space:nowrap; }
 .actions .secondary { background:#151717; }
 .waitAmber { color:#edbd65; font-weight:700; }
