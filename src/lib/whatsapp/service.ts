@@ -6,6 +6,7 @@ import { CONSENT_VERSION, whatsappEnabled, normalizePhone, subscriptionCode, has
   eligible, dueTime, subscriptionMessage, type NotificationKind, type Eligibility } from "@/lib/whatsapp/policy";
 import { sendWindowNotification } from "@/lib/whatsapp/customer-window";
 import { publishJob } from "@/lib/whatsapp/transport";
+import { schedulerErrorCode } from "@/lib/whatsapp/scheduler-error";
 type DeliveryBooking = Eligibility & { id: string; guest_id: number; name: string; phone: string;
   revision: number; attempts: number; tracking_token_hash: string; subscription_expires_at: Date; eta_snapshot_at?: string | null };
 
@@ -105,8 +106,10 @@ export async function dispatchOutbox() {
       if (result.messageId.startsWith("test:") && new Date(job.due_at).getTime() <= Date.now()) {
         await deliverNotification(job.id, job.revision);
       }
-    } catch {
-      await sql`UPDATE whatsapp_notifications SET publish_lease_until=NULL,last_error='publish_failed'
+    } catch (error) {
+      const code = schedulerErrorCode(error);
+      console.error("WhatsApp scheduler publication failed", { code });
+      await sql`UPDATE whatsapp_notifications SET publish_lease_until=NULL,last_error=${code}
         WHERE id=${job.id} AND revision=${job.revision} AND status='pending'`;
     }
   }

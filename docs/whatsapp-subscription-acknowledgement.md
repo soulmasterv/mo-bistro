@@ -39,3 +39,13 @@ Changing the live flags applies to existing eligible jobs too, not exclusively t
 - Lint for changed WhatsApp source and tests: passed.
 - Webpack production build: passed after retrying outside the filesystem sandbox following a Windows EPERM in generated `.next` files. This is `next build --webpack`, not a claim that the default Turbopack build passed.
 - No real Meta or QStash request was made by these tests. No remote database migration/write or live delivery test was performed. Provider responses in sender tests were mocked.
+
+## Scheduler follow-up
+
+After controlled Preview activation, real booking 88 successfully subscribed and queued its acknowledgement, but publication stopped at `pending`, attempts 0, `publish_failed`, without a scheduler or provider message ID. This establishes subscription/queueing only, not delivery.
+
+The publisher now uses the destination URL directly after `/v2/publish/`, matching [Upstash's documentation](https://upstash.com/docs/qstash/howto/publishing) and the installed SDK. It previously encoded the complete destination, including the protocol/slashes. It rejects unexpected scheduler hosts, embedded credentials, query strings and redirects before forwarding the scheduler token.
+
+Publication failures retain only bounded operational codes for missing token, invalid callback/service URL, HTTP rejection, network failure or invalid response. Provider response bodies and credential values are never logged or stored. Management maps common codes to actionable messages; unknown exceptions remain the generic `publish_failed`. An unsuccessful publication leaves the existing job pending with the same deduplication ID and no Meta attempt. Completed/uncertain sends are not rearmed.
+
+Follow-up offline regression result: 173 passed, 4 opt-in skipped. Focused publisher/WhatsApp/operations tests: 49 passed, using mocked provider requests. Webpack production build passed. Real publication and Meta delivery must still be checked for booking 88 after deployment; do not call this a confirmed provider fix solely from offline results.

@@ -716,6 +716,16 @@ check(
     );
   },
 );
+check('scheduler rejection is recorded safely without claiming a Meta send or losing the pending job',async()=>{
+  env.WHATSAPP_MODE='live';env.WHATSAPP_ALLOW_LIVE_SEND='true';env.QSTASH_TOKEN='synthetic-scheduler-token';
+  await booking({whatsapp_confirmation_consent:true});
+  transportFetch=async()=>{networkCalls++;return new Response('private-provider-error',{status:401});};
+  await service.dispatchOutbox();
+  const [job]=await jobs();
+  assert.equal(job.status,'pending');assert.equal(job.last_error,'scheduler_http_401');
+  assert.equal(job.attempts,0);assert.equal(job.qstash_message_id,null);assert.equal(job.provider_message_id,null);
+  assert.equal(networkCalls,1);
+});
 check(
   "feedback preference route does not subscribe and rejects malformed token",
   async () => {

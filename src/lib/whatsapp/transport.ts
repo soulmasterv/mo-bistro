@@ -1,6 +1,7 @@
 import "server-only";
 import { Receiver } from "@upstash/qstash";
 import { callbackUrl, liveSendingEnabled, type NotificationKind } from "@/lib/whatsapp/policy";
+import { SchedulerError } from "@/lib/whatsapp/scheduler-error";
 
 export function templatePayload(job: { id: string; kind: NotificationKind; guest_id: number },
   booking: { phone: string; name: string; eta_at?: Date | null }, code: string) {
@@ -32,21 +33,29 @@ export function templatePayload(job: { id: string; kind: NotificationKind; guest
 export async function publishJob(id: string, revision: number, due: Date) {
   if (!liveSendingEnabled()) return { messageId: `test:${id}:${revision}` };
   const token = process.env.QSTASH_TOKEN;
-  if (!token) throw new Error("QStash token is missing");
-  const destination = callbackUrl("/api/whatsapp/jobs");
-  const base = new URL(process.env.QSTASH_URL || "https://qstash.upstash.io");
-  if (base.protocol !== "https:" || !base.hostname.endsWith(".upstash.io")) throw new Error("Invalid QStash URL");
-  const response = await fetch(`${base.origin}/v2/publish/${encodeURIComponent(destination)}`, {
+  if (!token) throw new SchedulerError("scheduler_token_missing");
+  let destination: string, base: URL;
+  try { destination = callbackUrl("/api/whatsapp/jobs"); }
+  catch { throw new SchedulerError("scheduler_callback_invalid"); }
+  try {
+    base = new URL(process.env.QSTASH_URL || "https://qstash.upstash.io");
+    if (base.protocol !== "https:" || !/^qstash(?:-[a-z0-9-]+)?\.upstash\.io$/.test(base.hostname) ||
+        base.username || base.password || base.port || base.search || base.hash || base.pathname !== "/") throw Error();
+  } catch { throw new SchedulerError("scheduler_url_invalid"); }
+  let response: Response;
+  try { response = await fetch(`${base.origin}/v2/publish/${destination}`, {
     method: "POST", signal: AbortSignal.timeout(10_000),
+    redirect: "error",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json",
       "Upstash-Not-Before": String(Math.ceil(due.getTime() / 1000)), "Upstash-Retries": "5",
       "Upstash-Deduplication-Id": `${id}:${revision}` },
     body: JSON.stringify({ notificationId: id, revision }),
-  });
-  if (!response.ok) throw new Error(`QStash publish rejected (${response.status})`);
-  const body = await response.json();
-  if (typeof body.messageId !== "string") throw new Error("Invalid QStash publish response");
-  return body as { messageId: string };
+  }); } catch { throw new SchedulerError("scheduler_network_failed"); }
+  if (!response.ok) throw new SchedulerError(`scheduler_http_${response.status}`);
+  const body = await response.json().catch(() => null);
+  if (!body || typeof body.messageId !== "string" || !body.messageId || body.messageId.length > 256)
+    throw new SchedulerError("scheduler_response_invalid");
+  return { messageId: body.messageId as string };
 }
 
 export async function verifyQstash(raw: string, signature: string | null, path: string) {
