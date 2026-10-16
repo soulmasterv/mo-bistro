@@ -40,6 +40,10 @@ function load(file, mocks = {}, globals = {}, cache = new Map()) {
       require(id) {
         if (Object.hasOwn(mocks, id)) return mocks[id];
         if (id === "server-only") return {};
+        // Node handler/component tests do not process browser CSS assets.
+        // Actual module styles are checked in the local rendered UI fixture.
+        if (id.endsWith(".module.css")) return { __esModule: true,
+          default: new Proxy({}, { get: (_target, key) => String(key) }) };
         if (id === "next/server")
           return {
             NextResponse: { json: (body, init) => Response.json(body, init) },

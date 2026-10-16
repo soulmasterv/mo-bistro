@@ -1,5 +1,6 @@
 "use client";
 import GuestEtaEditor from "@/components/guest-eta-editor";
+import GuestBookingEditor from "@/components/guest-booking-editor";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Phone, Users, MessageCircle, Clock, ChevronDown, CheckCircle2 } from "lucide-react";
@@ -28,7 +29,7 @@ type WhatsApp = {
 };
 export default function GuestDetailSheet({
   guest,
-  busy,
+  busy: externalBusy,
   pendingAction,
   error,
   onClose,
@@ -45,6 +46,8 @@ export default function GuestDetailSheet({
   onSeat: () => void;
   onAction: (action: "call" | "confirm" | "cancel" | "no_show") => void;
 }) {
+  const [editorBusy, setEditorBusy] = useState(false);
+  const busy = externalBusy || editorBusy;
   const ref = useRef<HTMLDivElement>(null);
   useStaffDialog(true, ref, onClose);
   const [whatsapp, setWhatsapp] = useState<WhatsApp | null>(null);
@@ -232,6 +235,7 @@ export default function GuestDetailSheet({
             automatically.
           </p>
         </details>
+        <GuestBookingEditor key={guest.id} guestId={guest.id} disabled={externalBusy} onSaved={onRefresh} onBusyChange={setEditorBusy} />
         {["waiting","called"].includes(guest.status) && <GuestEtaEditor guestId={guest.id} onSaved={onRefresh} />}
         {guest.status === "waiting" && (
           <button
