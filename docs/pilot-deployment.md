@@ -34,3 +34,11 @@ The QStash ready callback is bound to the Dev domain. Branch previews can test f
 6. Check join/status/queue at mobile width. Retest login, private-link access, CSV authorization and disabled controls on a slow connection.
 
 Before a real two-week trial: agree the trial and success definition with the owner, record a baseline, confirm permitted WhatsApp sending and approved templates, and choose a retention period for personal data. This development deployment is not a real trial launch.
+
+## Deployment verification — 16 October 2026
+
+Implementation commit `634a840` passed the Next.js production build, changed-file lint and four migration-backed pilot tests. Vercel deployment `mo-bistro-omuuci1xb-mo-bistro-system.vercel.app` is Ready. Live checks passed shared login (busy button), QR join, walk-in entry, arrival ordering, Call (disabled controls), guest auto-refresh through Called and Seated, Left, CSV download, and blocking the old `/api/guests` endpoint. Preview schema creation and application permissions were verified. Synthetic tickets **1 and 2** are finished test records; exclude them from any trial baseline or results.
+
+The Dev custom domain is assigned to `pilot/mo-bistro-shrunk`, but Vercel reports Invalid Configuration pending Cloudflare DNS: CNAME `development.mo-bistro` → `7f6fcaa721e131c0.vercel-dns-017.com`, DNS only (proxy disabled). No end-to-end ready-message delivery is claimed until DNS/callback and an opted-in permitted test number are verified. No WhatsApp was sent to the synthetic phones.
+
+Desktop appearance was inspected. The browser viewport override returned successfully but continued to report 1280px, so an actual mobile-width visual check remains pending. Responsive CSS is implemented; this is not a claimed mobile acceptance pass. Production and the advanced Preview branch were not changed.
