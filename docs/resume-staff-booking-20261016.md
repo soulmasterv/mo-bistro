@@ -1,5 +1,13 @@
 # Resume checkpoint — 16 October 2026
 
+## Latest completion update — overrides the pending steps below
+
+User resumed, then asked to finish promptly for a new critical task. The audit JSON repair migration is now APPLIED on the verified shared Preview/Development database; COMMIT succeeded, invalid snapshots zero, object-only check present. Repaired the original serialized test snapshots and verified a fresh application write creates structured objects.
+
+Live booking 90 checks PASSED: persisted name/party/preference/notes; before/after history and authenticated actor displayed; second loaded editor's stale save rejected while retaining its draft; explicit reload recovered the saved note. Final database check found two audit rows, revision 2, zero WhatsApp jobs for the synthetic booking. Canceled booking 90 through Reception's custom confirmation and verified the queue is empty. No other bookings or Production were changed. No backup created, per user instruction.
+
+Application code remains `6af4913`; latest full offline suite 183 passed, four skipped. Live evidence is saved in workspace outputs/comments-20261014/staff-booking-live-audit.jpg and staff-booking-live-conflict.jpg. WhatsApp formatting was deliberately left on today's checklist because the user has a new critical task. No further staff-editor work is required for this completion; simultaneous multi-session concurrency remains outside the verified scope. Older pending instructions below are historical.
+
 User requested saving/pushing current work and stopping until they ask to continue. Do not resume automatically.
 
 ## Pushed application code
