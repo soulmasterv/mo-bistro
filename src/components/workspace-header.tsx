@@ -5,6 +5,7 @@ import { Menu, Bell, LogOut, UtensilsCrossed } from "lucide-react";
 import type { StaffRole } from "@/lib/staff-session-shared";
 
 import { ThemeSwitcher } from "@/components/theme-preference";
+import StaffLicenseGuard from "@/components/staff-license-guard";
 
 const workspaces = [
   { label: "Management", href: "/management" },
@@ -86,6 +87,7 @@ export default function WorkspaceHeader({
   }
   return (
     <header className="workspace-header bistro-workspace-header">
+      <StaffLicenseGuard />
       <div className="workspace-header-inner bistro-header-inner">
         <div className="flex min-w-0 items-center gap-3">
           <UtensilsCrossed

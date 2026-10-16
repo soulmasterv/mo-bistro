@@ -6,13 +6,16 @@ const date=value=>value?new Date(value).toLocaleString('en-GB',{timeZone:'Africa
 function render() {
   const license=snapshot?.license;
   byId('plan').textContent=license?.plan??'Unknown';
-  byId('status').textContent=license?.status??'Unavailable';
+  byId('status').textContent=license?.status==='grace'?'24-hour notice':license?.status??'Unavailable';
   byId('expiry').textContent=date(license?.expires_at);
   const ready=!!snapshot?.ready && !!snapshot?.version && !!snapshot?.csrfToken && !busy;
   byId('activate').disabled=!ready || license?.status!=='unconfigured';
   byId('renew').disabled=!ready || !license || license.status==='unconfigured';
-  byId('suspend').disabled=!ready || license?.status!=='active';
-  byId('reactivate').disabled=!ready || license?.status!=='suspended' || new Date(license.expires_at).getTime()<=Date.now();
+  byId('suspend').disabled=!ready || !['active','grace','expired'].includes(license?.status);
+  byId('suspend-notice').disabled=!ready || !snapshot?.graceReady || license?.status!=='active';
+  byId('grace-message').textContent=license?.suspension_due_at?`Service pause deadline: ${date(license.suspension_due_at)} (Cairo).`
+    :snapshot?.ready&&!snapshot.graceReady?'24-hour notice requires the reviewed license grace migration.':'';
+  byId('reactivate').disabled=!ready || !['suspended','grace'].includes(license?.status) || new Date(license.expires_at).getTime()<=Date.now();
   byId('refresh').disabled=busy;
   byId('audit').disabled=busy || !snapshot?.writerReady;
 }
@@ -39,14 +42,15 @@ buttons.forEach(button=>button.addEventListener('click',()=>{
   if(busy || !snapshot?.ready) return;
   returnFocus=button;pendingAction={action:button.dataset.action,version:snapshot.version,csrfToken:snapshot.csrfToken};
   const reactivate=button.id==='reactivate';
-  const title=pendingAction.action==='renew'?'Renew for one month?':pendingAction.action==='suspend'?'Suspend Mo Bistro Preview?':reactivate?'Reactivate Mo Bistro Preview?':'Activate Mo Bistro Preview?';
+  const notice=pendingAction.action==='suspend-notice';
+  const title=notice?'Give Mo Bistro Preview 24 hours?':pendingAction.action==='renew'?'Renew for one month?':pendingAction.action==='suspend'?'Suspend Mo Bistro Preview immediately?':reactivate?'Reactivate Mo Bistro Preview?':'Activate Mo Bistro Preview?';
   byId('confirm-title').textContent=title;
-  byId('confirm-description').textContent=pendingAction.action==='renew'
+  byId('confirm-description').textContent=notice?'A shared 24-hour deadline starts now. Restaurant actions remain available until then and stop automatically afterward. No email is sent by this action yet.':pendingAction.action==='renew'
     ?'This adds one month to the later of today or the current expiry. It changes the Preview license only.'
     :pendingAction.action==='suspend'?'Protected restaurant actions in Preview will stop until the license is reactivated or renewed.'
     :reactivate?'This removes suspension and keeps the current expiry. It does not add another month.'
     :'This creates the first monthly Preview license.';
-  byId('confirm').textContent=reactivate?'Reactivate':pendingAction.action==='renew'?'Renew one month':pendingAction.action==='suspend'?'Suspend':'Activate';
+  byId('confirm').textContent=notice?'Start 24-hour notice':reactivate?'Reactivate':pendingAction.action==='renew'?'Renew one month':pendingAction.action==='suspend'?'Suspend immediately':'Activate';
   byId('confirm').classList.toggle('danger',pendingAction.action==='suspend');
   byId('confirmation').hidden=false;document.body.classList.add('modal-open');
   document.querySelector('main').inert=true;document.querySelector('header').inert=true;byId('cancel').focus();
@@ -63,7 +67,7 @@ byId('confirmation').addEventListener('keydown',event=>{
 byId('confirm').addEventListener('click',async()=>{
   if(busy || !pendingAction) return;
   busy=true;render();byId('cancel').disabled=true;byId('confirm').disabled=true;
-  byId('confirm').textContent=pendingAction.action==='renew'?'Renewing…':pendingAction.action==='suspend'?'Suspending…':'Activating…';
+  byId('confirm').textContent=pendingAction.action==='suspend-notice'?'Starting notice…':pendingAction.action==='renew'?'Renewing…':pendingAction.action==='suspend'?'Suspending…':'Activating…';
   try {
     const result=await json('/api/license/action',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':pendingAction.csrfToken},
       body:JSON.stringify({action:pendingAction.action,version:pendingAction.version,confirm:true})});

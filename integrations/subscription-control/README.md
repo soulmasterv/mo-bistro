@@ -23,7 +23,7 @@ The six source files were installed into `Y:\subscription-control` during this t
 1. Deploy the feature branch's updated Mo Bistro API to **Preview** first. This task did not push or deploy it. The branch also contains earlier unpublished UI/WhatsApp changes; review the complete pending branch before deployment.
 2. Verify the existing panel `LICENSE_ADMIN_TOKEN` hashes to Preview's `LICENSE_ADMIN_KEY_SHA256`. Compare privately; never paste either value into logs or commits. No values were changed or verified against deployed secrets in this task.
 3. Preview's license reader uses `MO_BISTRO_POSTGRES_URL` (required when `MO_BISTRO_DB=postgres`), otherwise the existing `DATABASE_URL` fallback. `LICENSE_ADMIN_DATABASE_URL` must identify the same host/endpoint, port and database. Separate restricted reader/writer credentials are supported; pooled/unpooled URLs for the same Neon endpoint are accepted. Ambiguous connection-routing query parameters are rejected.
-4. Existing `migrations/002_licensing.sql` defines `public.restaurant_license` and `public.license_audit_log`. **No new licensing migration is required by these changes.** The actual Preview schema/privileges were not inspected. Do not rerun migrations blindly. The writer needs SELECT/INSERT/UPDATE on the license, SELECT/INSERT on the audit table and USAGE on its sequence. The reader needs SELECT on the license.
+4. Existing `migrations/002_licensing.sql` defines `public.restaurant_license` and `public.license_audit_log`. Immediate actions remain compatible with that schema. **24-hour notices require the separately reviewed `20261016_license_grace.sql` migration**; see [the ordered rollout and read-only checks](../../docs/license-grace-preview-rollout.md). Do not rerun migrations blindly. The writer needs SELECT/INSERT/UPDATE on the license, SELECT/INSERT on the audit table and USAGE on its sequence. The reader needs SELECT on the license.
 5. Restart the existing panel Node process on `127.0.0.1:5065` after approval, preserving its Cloudflare tunnel and authentication configuration.
 6. Sign in through Cloudflare Access and select **Check connection**. This only reads setup/status. Confirm readiness and Preview identity. Setup failures keep mutations disabled. Testing Activate/Renew/Suspend/Reactivate changes the actual Preview license and requires explicit approval.
 
@@ -31,7 +31,7 @@ If a mutation response is uncertain, refresh status and audit history before dec
 
 ## Validation evidence
 
-- Offline suite: 158 passed, 0 failed; two optional browser tests skipped in that invocation.
+- Updated offline suite: 162 passed, 0 failed; four opt-in/environment-dependent tests skipped in that invocation. Both licensing browser tests were also run explicitly and passed locally.
 - Explicit panel browser run: passed separately at 390px and 1440px, including custom confirmations, processing locks, audit display and no horizontal overflow.
 - Actual API handlers and embedded PostgreSQL-compatible SQL were exercised with synthetic data: activation, renewal, suspension, reactivation, expiry, stale requests, authorization/CSRF rejection, target mismatch, provider failure and audit-failure transaction rollback.
 - TypeScript, lint and production build passed.

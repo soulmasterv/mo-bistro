@@ -21,10 +21,13 @@ export function licenseTargetsMatch() {
   } catch { return false; }
 }
 
-type LicenseVersionRow = { status?: string; plan?: string | null; expires_at?: Date | string | null };
+type LicenseVersionRow = { status?: string; raw_status?: string; plan?: string | null; expires_at?: Date | string | null;
+  suspension_due_at?: Date | string | null; license_revision?: string | number | null };
 export function licenseVersion(row?: LicenseVersionRow) {
-  const canonical = { status: row?.status === "expired" ? "active" : row?.status ?? "unconfigured",
-    plan: row?.plan ?? null, expires_at: row?.expires_at ? new Date(row.expires_at).toISOString() : null };
+  const canonical = { status: row?.raw_status ?? (["expired", "grace"].includes(row?.status ?? "") ? "active" : row?.status ?? "unconfigured"),
+    plan: row?.plan ?? null, expires_at: row?.expires_at ? new Date(row.expires_at).toISOString() : null,
+    suspension_due_at: row?.suspension_due_at ? new Date(row.suspension_due_at).toISOString() : null,
+    license_revision: String(row?.license_revision ?? 0) };
   return `"license-${createHash("sha256").update(JSON.stringify(canonical)).digest("hex")}"`;
 }
 
@@ -89,9 +92,10 @@ export async function licenseStatus() {
   const sql = licenseDb();
 
   const rows = await sql`
-    SELECT status, plan, expires_at,
-           expires_at > NOW() AS not_expired
-    FROM public.restaurant_license
+    SELECT status, plan, expires_at, NOW() AS server_now,
+      to_jsonb(l)->>'suspension_due_at' AS suspension_due_at,
+      to_jsonb(l)->>'license_revision' AS license_revision
+    FROM public.restaurant_license l
     WHERE id = 1
   `;
 
@@ -101,22 +105,30 @@ export async function licenseStatus() {
       status: "unconfigured",
       plan: null,
       expires_at: null,
+      suspension_due_at: null,
+      license_revision: "0",
+      server_now: new Date().toISOString(),
     };
   }
 
   const row = rows[0];
 
-  const status =
-    row.status === "suspended"
-      ? "suspended"
-      : row.not_expired
-        ? "active"
-        : "expired";
+  const now = new Date(row.server_now).getTime();
+  const due = row.suspension_due_at ? new Date(row.suspension_due_at).getTime() : null;
+  // An owner-issued grace period explicitly allows operations until this one
+  // database deadline. No client clock, browser acknowledgement or cron controls access.
+  const status = row.status === "suspended" ? "suspended"
+    : due !== null ? (due > now ? "grace" : "suspended")
+    : new Date(row.expires_at).getTime() > now ? "active" : "expired";
 
   return {
-    licensed: status === "active",
+    licensed: status === "active" || status === "grace",
     status,
+    raw_status: row.status,
     plan: row.plan,
     expires_at: row.expires_at,
+    suspension_due_at: row.suspension_due_at,
+    license_revision: row.license_revision ?? "0",
+    server_now: row.server_now,
   };
 }

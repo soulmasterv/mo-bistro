@@ -3,6 +3,55 @@ import assert from 'node:assert/strict';
 import {licenseHarness,TEST_KEY} from './license-control-harness.mjs';
 import {createLicenseControlClient} from '../integrations/subscription-control/license-control-client.mjs';
 
+test('one database deadline grants 24 hours, rejects reset/replay and blocks at expiry without a cron or browser acknowledgement',async()=>{
+  const h=await licenseHarness();
+  const client=createLicenseControlClient({baseUrl:'https://preview.mo-bistro.labbing.space',adminKey:TEST_KEY,fetchImpl:h.backendFetch});
+  try {
+    let setup=await client.inspect();assert.equal(setup.graceReady,true);
+    await client.act('activate',setup.version);setup=await client.inspect();const activeVersion=setup.version;
+    const expiry=setup.license.expires_at;
+    await client.act('suspend-notice',setup.version);setup=await client.inspect();
+    assert.equal(setup.license.status,'grace');assert.equal(setup.license.licensed,true);
+    assert.ok(Math.abs(Date.parse(setup.license.suspension_due_at)-Date.parse(setup.license.server_now)-86400000)<2000);
+    const due=setup.license.suspension_due_at;
+    assert.equal(await h.enforce.requireActiveLicense(),null);
+    await assert.rejects(client.act('suspend-notice',setup.version),e=>e.status===409);
+    await assert.rejects(client.act('suspend-notice',activeVersion),e=>e.status===412);
+    assert.equal((await client.inspect()).license.suspension_due_at,due);
+    // Explicit owner grace remains usable even if normal billing expiry passes.
+    await h.db.exec("UPDATE restaurant_license SET expires_at=NOW()-INTERVAL '1 second'");
+    assert.equal(await h.enforce.requireActiveLicense(),null);
+    await h.db.exec("UPDATE restaurant_license SET suspension_due_at=NOW()-INTERVAL '1 millisecond'");
+    assert.equal((await h.enforce.requireActiveLicense()).status,403);
+    setup=await client.inspect();assert.equal(setup.license.status,'suspended');
+    await assert.rejects(client.act('suspend-notice',setup.version),e=>e.status===409);
+    await assert.rejects(client.act('activate',setup.version),e=>e.status===409); // Expired billing requires renewal.
+    await client.act('renew',setup.version);setup=await client.inspect();
+    assert.equal(setup.license.status,'active');assert.equal(setup.license.suspension_due_at,null);
+    await client.act('suspend-notice',setup.version);setup=await client.inspect();
+    const beforeImmediate=setup.license.expires_at;
+    await client.act('suspend',setup.version);setup=await client.inspect();
+    assert.equal(setup.license.status,'suspended');assert.equal(setup.license.suspension_due_at,null);
+    assert.equal((await h.enforce.requireActiveLicense()).status,403);
+    await client.act('activate',setup.version);setup=await client.inspect();
+    assert.equal(setup.license.expires_at,beforeImmediate);assert.notEqual(setup.version,activeVersion);
+    await assert.rejects(client.act('renew',activeVersion),e=>e.status===412);
+    const audit=await client.audit();assert.ok(audit.entries.some(e=>e.details.mode==='grace'));
+    assert.notEqual(expiry,null);
+  }finally{await h.close();}
+});
+
+test('legacy licensing schema keeps immediate suspension working but refuses 24-hour notices explicitly',async()=>{
+  const h=await licenseHarness({grace:false});
+  const client=createLicenseControlClient({baseUrl:'https://preview.mo-bistro.labbing.space',adminKey:TEST_KEY,fetchImpl:h.backendFetch});
+  try {
+    let setup=await client.inspect();assert.equal(setup.graceReady,false);
+    await client.act('activate',setup.version);setup=await client.inspect();
+    await assert.rejects(client.act('suspend-notice',setup.version),e=>e.status===409);
+    await client.act('suspend',setup.version);assert.equal((await client.inspect()).license.status,'suspended');
+  }finally{await h.close();}
+});
+
 test('server-to-server panel client activates, renews, rejects repeated versions, suspends and reactivates without extending expiry',async()=>{
   const h=await licenseHarness();
   try {

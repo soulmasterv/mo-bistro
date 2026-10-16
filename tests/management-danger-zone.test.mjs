@@ -1,6 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {harness,request} from './handler-harness.mjs';
+import {licenseHarness} from './license-control-harness.mjs';
+
+test('a saved suspension blocks bulk cancellation before any booking SQL; reactivation restores the action',async()=>{
+  const license=await licenseHarness();
+  try {
+    await license.db.exec("INSERT INTO restaurant_license(id,status,plan,expires_at) VALUES(1,'suspended','monthly',NOW()+INTERVAL '1 month')");
+    const h=harness({query:q=>q.startsWith('UPDATE guests')?[{id:8}]:[]});
+    h.mocks['@/lib/licensing/enforce']=license.enforce;
+    const denied=await h.route('management/danger-zone').POST(request('POST',{action:'cancel_queue',confirm:true}));
+    assert.equal(denied.status,403);assert.equal((await denied.json()).license_status,'suspended');
+    assert.equal(h.queries.length,0);
+    await license.db.exec("UPDATE restaurant_license SET status='active' WHERE id=1");
+    const allowed=await h.route('management/danger-zone').POST(request('POST',{action:'cancel_queue',confirm:true}));
+    assert.equal(allowed.status,200);assert.equal((await allowed.json()).cancelled,1);
+  } finally {await license.close();}
+});
 
 test('bulk actions reject anonymous/non-manager, cross-origin, inactive license and malformed requests before SQL',async()=>{
   for(const actor of [null,{id:2,role:'reception'},{id:3,role:'waiter'}]) {

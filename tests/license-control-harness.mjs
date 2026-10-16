@@ -3,9 +3,10 @@ import {createHash} from 'node:crypto';
 import {load,requireDependency} from './handler-harness.mjs';
 const {PGlite}=requireDependency('@electric-sql/pglite');
 export const TEST_KEY='ab'.repeat(32);
-export async function licenseHarness() {
+export async function licenseHarness({grace=true}={}) {
   const db=new PGlite();
   await db.exec(fs.readFileSync('migrations/002_licensing.sql','utf8'));
+  if(grace) await db.exec(fs.readFileSync('migrations/20261016_license_grace.sql','utf8'));
   const queries=[];
   function adapter(connection) {
     const sql=async(strings,...values)=>{

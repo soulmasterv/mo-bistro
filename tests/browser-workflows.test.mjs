@@ -301,6 +301,9 @@ test(
             res.statusCode = sessionStatus;
             data = { id: 1, role, username: role };
             break;
+          case "/api/license/status":
+            data = { licensed: true, status: "active" };
+            break;
           case "/api/guests/4/eta":
           case "/api/guests/1/eta":
             data={success:true,eta_at:null};break;

@@ -41,7 +41,7 @@ export function createApp({authorize,client,publicDir}) {
     if(req.get('origin')!==PANEL_ORIGIN || (req.get('sec-fetch-site') && req.get('sec-fetch-site')!=='same-origin') || !validCsrf(req))
       return res.status(403).json({error:'Refresh the panel and confirm this action from its own page.'});
     const body=req.body;
-    if(!body || Object.keys(body).length!==3 || body.confirm!==true || !['activate','renew','suspend'].includes(body.action) || !VERSION.test(body.version??''))
+    if(!body || Object.keys(body).length!==3 || body.confirm!==true || !['activate','renew','suspend','suspend-notice'].includes(body.action) || !VERSION.test(body.version??''))
       return res.status(400).json({error:'A supported action, current license version and explicit confirmation are required.'});
     if(!client) return res.status(503).json({error:'Private license API connection is not configured.'});
     try {res.json(await client.act(body.action,body.version));}

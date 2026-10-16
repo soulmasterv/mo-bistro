@@ -27,7 +27,7 @@ test('real panel routes and custom confirmations wire to real license handlers o
   const app=createApp({publicDir:path.resolve('integrations/subscription-control/public'),
     authorize:(req,res,next)=>{
       if(req.get('x-synthetic-owner')!=='yes') return res.status(401).json({error:'Synthetic authentication required'});
-      req.adminEmail='synthetic-owner@example.test';next();
+      req.adminEmail=req.get('x-synthetic-probe')==='security'?'synthetic-security@example.test':'synthetic-owner@example.test';next();
     },client:{...client,act:async(...args)=>{mutations++;if(hold)await new Promise(resolve=>{release=resolve;});return client.act(...args);}}});
   let origin;
   const server=http.createServer((req,res)=>{
@@ -45,7 +45,7 @@ test('real panel routes and custom confirmations wire to real license handlers o
     assert.match(first.headers.get('content-security-policy'),/script-src 'self'/);
     const state=await first.json();assert.equal(state.ready,true);assert.equal(JSON.stringify(state).includes(TEST_KEY),false);
     for(const extra of [{Origin:'https://evil.test','X-CSRF-Token':state.csrfToken},{Origin:'https://subscribtion.labbing.space'}]) {
-      assert.equal((await fetch(origin+'/api/license/action',{method:'POST',headers:{...ownerHeaders,...extra,'Content-Type':'application/json'},body:JSON.stringify({action:'activate',version:state.version,confirm:true})})).status,403);
+      assert.equal((await fetch(origin+'/api/license/action',{method:'POST',headers:{...ownerHeaders,...extra,'x-synthetic-probe':'security','Content-Type':'application/json'},body:JSON.stringify({action:'activate',version:state.version,confirm:true})})).status,403);
     }
     assert.equal(mutations,0);
     const page=await browser.newPage({viewport:{width:390,height:844},extraHTTPHeaders:ownerHeaders});
@@ -72,14 +72,23 @@ test('real panel routes and custom confirmations wire to real license handlers o
     const stale=await fetch(origin+'/api/license/action',{method:'POST',headers:{...ownerHeaders,Origin:'https://subscribtion.labbing.space','Content-Type':'application/json','X-CSRF-Token':freshCsrf.csrfToken},
       body:JSON.stringify({action:'renew',version:prior.version,confirm:true})});
     assert.equal(stale.status,412);assert.equal((await client.inspect()).license.expires_at,renewed.license.expires_at);
-    await page.getByRole('button',{name:'Suspend',exact:true}).click();await page.getByRole('alertdialog').getByRole('button',{name:'Suspend',exact:true}).click();
+    await page.getByRole('button',{name:'Suspend immediately',exact:true}).click();await page.getByRole('alertdialog').getByRole('button',{name:'Suspend immediately',exact:true}).click();
     await page.waitForFunction(()=>document.getElementById('status').textContent==='suspended');
     assert.equal((await h.enforce.requireActiveLicense()).status,403);
     await page.getByRole('button',{name:'Reactivate',exact:true}).click();await page.getByRole('alertdialog').getByRole('button',{name:'Reactivate',exact:true}).click();
     await page.waitForFunction(()=>document.getElementById('status').textContent==='active');
     assert.equal((await client.inspect()).license.expires_at,renewed.license.expires_at);
+    await page.getByRole('button',{name:'Suspend with 24-hour notice',exact:true}).click();
+    await page.getByRole('alertdialog').getByRole('button',{name:'Start 24-hour notice',exact:true}).click();
+    await page.waitForFunction(()=>document.getElementById('status').textContent==='24-hour notice');
+    assert.equal(await page.getByRole('button',{name:'Suspend with 24-hour notice',exact:true}).isDisabled(),true);
+    assert.equal(await h.enforce.requireActiveLicense(),null);
+    await page.getByRole('button',{name:'Reactivate',exact:true}).click();
+    await page.getByRole('alertdialog').getByRole('button',{name:'Reactivate',exact:true}).click();
+    await page.waitForFunction(()=>document.getElementById('status').textContent==='active');
+    assert.equal((await client.inspect()).license.expires_at,renewed.license.expires_at);
     await page.getByRole('button',{name:'View history',exact:true}).click();await page.getByRole('heading',{name:'Audit history',exact:true}).waitFor();
-    assert.equal(await page.locator('.audit-entry').count(),4);assert.deepEqual(dialogs,[]);
+    assert.equal(await page.locator('.audit-entry').count(),6);assert.deepEqual(dialogs,[]);
     if(screenshots) fs.mkdirSync(screenshots,{recursive:true});
     for(const width of [390,1440]) {
       await page.setViewportSize({width,height:900});

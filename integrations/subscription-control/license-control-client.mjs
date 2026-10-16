@@ -30,7 +30,7 @@ export function createLicenseControlClient({baseUrl,adminKey,fetchImpl=fetch}) {
     // Use the version from the snapshot shown to the owner in the custom confirmation.
     // Caller must retain existing Cloudflare Access + server authorization and CSRF checks.
     act:async(action,version)=>{
-      if(!['activate','renew','suspend'].includes(action)) throw Error('Unsupported license action');
+      if(!['activate','renew','suspend','suspend-notice'].includes(action)) throw Error('Unsupported license action');
       if(!/^"license-[a-f0-9]{64}"$/.test(version??'')) throw Error('Refresh license setup and confirm its version first');
       return call('/api/license/admin/'+action,'POST',version);
     },
