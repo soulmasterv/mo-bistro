@@ -48,7 +48,7 @@ export async function publishJob(id: string, revision: number, due: Date) {
     redirect: "error",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json",
       "Upstash-Not-Before": String(Math.ceil(due.getTime() / 1000)), "Upstash-Retries": "5",
-      "Upstash-Deduplication-Id": `${id}:${revision}` },
+      "Upstash-Deduplication-Id": `${id}-${revision}` },
     body: JSON.stringify({ notificationId: id, revision }),
   }); } catch { throw new SchedulerError("scheduler_network_failed"); }
   if (!response.ok) throw new SchedulerError(`scheduler_http_${response.status}`);

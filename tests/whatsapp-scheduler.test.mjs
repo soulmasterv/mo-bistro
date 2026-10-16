@@ -17,7 +17,7 @@ test('QStash publish uses the documented destination path and retains deduplicat
   assert.equal(h.calls.length,1);
   const {url,init}=h.calls[0];
   assert.equal(url,'https://qstash.upstash.io/v2/publish/https://preview.mo-bistro.labbing.space/api/whatsapp/jobs');
-  assert.equal(init.headers['Upstash-Deduplication-Id'],'synthetic-job:3');
+  assert.equal(init.headers['Upstash-Deduplication-Id'],'synthetic-job-3');
   assert.equal(init.headers['Upstash-Not-Before'],String(Math.ceil(due.getTime()/1000)));
   assert.equal(init.redirect,'error');
   assert.deepEqual(JSON.parse(init.body),{notificationId:'synthetic-job',revision:3});

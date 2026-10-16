@@ -775,7 +775,7 @@ check(
     assert.equal(calls.length, 1);
     assert.equal(
       calls[0].init.headers["Upstash-Deduplication-Id"],
-      `${job.id}:${job.revision}`,
+      `${job.id}-${job.revision}`,
     );
     assert.equal(
       await service.deliverNotification(job.id, job.revision),
