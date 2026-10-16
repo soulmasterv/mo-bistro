@@ -33,7 +33,9 @@ export default function StaffLicenseGuard(){
  // The database clock defines the deadline. Every protected mutation independently enforces it.
  const remaining=snapshot.due?Math.max(0,Date.parse(snapshot.due)-snapshot.server-Math.max(0,elapsed-snapshot.received)):0;
  const state=snapshot.state==="grace"&&remaining<=0?"suspended":snapshot.state,grace=state==="grace";
- const noticeOpen=state!=="active"&&(!grace||acknowledged!==snapshot.due);
+ // A pending request runs silently; only a verified notice or failed check opens the dialog.
+ // Protected mutations still check the license on the server during this initial request.
+ const noticeOpen=state!=="checking"&&state!=="active"&&(!grace||acknowledged!==snapshot.due);
  const minutes=Math.ceil(remaining/60000),countdown=`${Math.floor(minutes/60)}h ${String(minutes%60).padStart(2,"0")}m`;
  useEffect(()=>{const element=dialog.current;if(!element)return;if(!noticeOpen)element.close();else if(!element.open)element.showModal();},[noticeOpen]);
  function continueWorking(){setAcknowledged(snapshot.due);try{sessionStorage.setItem("mo-bistro-grace-notice",snapshot.due!);}catch{/* Acknowledgement never changes the deadline. */}}
@@ -41,7 +43,7 @@ export default function StaffLicenseGuard(){
  const title=grace?"Your service will pause":state==="suspended"?"Subscription suspended":state==="expired"?"Subscription expired":state==="unconfigured"?"Subscription not configured":state==="checking"?"Checking subscription…":"Subscription check unavailable";
  return <>
   {grace&&!noticeOpen&&<div className="staff-license-banner" role="status"><div><strong>Service pauses in {countdown}</strong><span>Contact the account owner. Normal operations remain available until the deadline.</span></div><button type="button" className="bistro-button" onClick={()=>{setAcknowledged(null);try{sessionStorage.removeItem("mo-bistro-grace-notice");}catch{/* Keep the notice open without storage. */}}}>View notice</button></div>}
-  <dialog ref={dialog} className={`staff-license-notice ${grace?"license-grace":"license-blocked"}`} aria-labelledby="staff-license-title" aria-describedby="staff-license-description" onCancel={event=>event.preventDefault()}>
+  <dialog ref={dialog} data-license-state={state} className={`staff-license-notice ${grace?"license-grace":"license-blocked"}`} aria-labelledby="staff-license-title" aria-describedby="staff-license-description" onCancel={event=>event.preventDefault()}>
    {grace?<div className="license-grace-icon"><Clock3 size={23} aria-hidden="true"/></div>:<div className="license-signature"><UtensilsCrossed size={22} aria-hidden="true"/><span>MO BISTRO</span></div>}
    <div className="license-notice-content">
     {grace&&<p className="license-eyebrow">24-HOUR GRACE PERIOD</p>}

@@ -24,14 +24,19 @@ test('open staff sessions visibly lock on suspension, recover on reactivation an
       resolve:{modules:['node_modules',path.resolve('node_modules')]},output:{path:temp,filename:'bundle.js'}});
     compiler.run((error,stats)=>compiler.close(()=>error||stats.hasErrors()?reject(error||Error(stats.toString({all:false,errors:true}))):resolve()));
   });
-  let state='active',fail=false,due=Date.now()+86400000;
+  let state='active',fail=false,due=Date.now()+86400000,holdChecks=true;
+  const held=[];
   const css=fs.readFileSync('src/app/globals.css','utf8').replace('@import "tailwindcss";','');
   const server=http.createServer((req,res)=>{
     if(req.url==='/bundle.js'){res.setHeader('Content-Type','application/javascript');return res.end(fs.readFileSync(path.join(temp,'bundle.js')));}
     if(req.url==='/api/license/status'){
+      if(holdChecks){held.push(()=>reply());return;}
+      return reply();
+      function reply(){
       const licensed=['active','grace'].includes(state);
       res.setHeader('Content-Type','application/json');res.statusCode=fail?503:licensed?200:403;
       return res.end(JSON.stringify(fail?{error:'unavailable'}:{licensed,status:state,server_now:new Date().toISOString(),suspension_due_at:state==='grace'?new Date(due).toISOString():null}));
+      }
     }
     res.setHeader('Content-Type','text/html');res.end(`<style>${css}body{margin:0;font-family:Arial,sans-serif}</style><button id="underlying">Seat guest</button><div id="root"></div><script src="/bundle.js"></script>`);
   });
@@ -39,9 +44,29 @@ test('open staff sessions visibly lock on suspension, recover on reactivation an
   const browser=await chromium.launch({headless:true});
   try {
     const page=await browser.newPage({viewport:{width:390,height:844}});
+    await page.addInitScript(()=>{
+      window.openedNotices=[];
+      const original=HTMLDialogElement.prototype.showModal;
+      HTMLDialogElement.prototype.showModal=function(){window.openedNotices.push(this.querySelector('h1')?.textContent);return original.call(this);};
+    });
     const errors=[];page.on('pageerror',error=>errors.push(error.message));
-    await page.goto(`http://127.0.0.1:${server.address().port}`);
+    const initialCheck=page.waitForRequest(request=>request.url().endsWith('/api/license/status'));
+    await page.goto(`http://127.0.0.1:${server.address().port}`);await initialCheck;
     await page.waitForFunction(()=>document.querySelector('dialog')&&!document.querySelector('dialog').open);
+    assert.deepEqual(await page.evaluate(()=>window.openedNotices),[]); // Slow first check must never flash a dialog.
+    await page.locator('#underlying').click();
+    const initialResponse=page.waitForResponse(response=>response.url().endsWith('/api/license/status'));
+    holdChecks=false;held.splice(0).forEach(reply=>reply());await initialResponse;
+    await page.waitForFunction(()=>document.querySelector('dialog').dataset.licenseState==='active');
+    // A refresh/remount must also check silently without cached permission or a loading popup.
+    holdChecks=true;
+    const refreshCheck=page.waitForRequest(request=>request.url().endsWith('/api/license/status'));
+    await page.reload();await refreshCheck;
+    assert.equal(await page.locator('dialog').evaluate(e=>e.open),false);
+    assert.deepEqual(await page.evaluate(()=>window.openedNotices),[]);
+    const refreshResponse=page.waitForResponse(response=>response.url().endsWith('/api/license/status'));
+    holdChecks=false;held.splice(0).forEach(reply=>reply());await refreshResponse;
+    await page.waitForFunction(()=>document.querySelector('dialog').dataset.licenseState==='active');
     state='suspended';await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
     await page.getByRole('heading',{name:'Subscription suspended',exact:true}).waitFor();
     assert.equal(await page.locator('dialog').evaluate(e=>e.matches(':modal')),true);
@@ -76,6 +101,7 @@ test('open staff sessions visibly lock on suspension, recover on reactivation an
     assert.equal(await page.locator('dialog').evaluate(e=>e.matches(':modal')),true);
     state='active';await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
     await page.waitForFunction(()=>!document.querySelector('dialog').open);
+    assert.equal((await page.evaluate(()=>window.openedNotices)).includes('Checking subscription…'),false);
     assert.deepEqual(errors,[]);
   } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}
 });
