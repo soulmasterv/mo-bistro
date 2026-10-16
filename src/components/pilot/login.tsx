@@ -16,7 +16,7 @@ export default function PilotLogin() {
   }catch(e){setError(e instanceof Error?e.message:'Unable to sign in.');pending.current=false;setBusy(false);}
  }
  return <main className={styles.page}><section className={`${styles.panel} ${styles.guest}`}>
-  <p className={styles.brand}>mo bistro.</p><h1>Reception login</h1><p className={styles.hint}>Sign in with the shared staff account.</p>
+  <p className={styles.brand}>Mo Bistro - District 5</p><h1>Reception login</h1><p className={styles.hint}>Sign in with the shared staff account.</p>
   <form className={styles.form} onSubmit={submit} aria-busy={busy}>
    <label>Username<input required autoComplete="username" value={username} disabled={busy} onChange={e=>setUsername(e.target.value)}/></label>
    <label>Password<input required type="password" autoComplete="current-password" value={password} disabled={busy} onChange={e=>setPassword(e.target.value)}/></label>

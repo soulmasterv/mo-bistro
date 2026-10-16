@@ -19,9 +19,15 @@ export default function PilotReception({username}:{username:string}){
   try{const r=await fetch(`/api/pilot/parties/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:value})});const data=await r.json();if(!r.ok)throw Error(data.error||'Action failed.');await refresh();}catch(e){setError(e instanceof Error?e.message:'Action failed.');}finally{pending.current.delete(id);setBusy([...pending.current]);}
  }
  return <main className={styles.page}><div className={styles.wrap}>
-  <header className={styles.header}><div><p className={styles.brand}>mo bistro.</p><small>Reception · {username}</small></div><div className={styles.tools}>
-   <a className={styles.secondary} href="/api/pilot/export">Export CSV</a><button className={styles.secondary} onClick={()=>void fetch('/api/auth/logout',{method:'POST'}).then(()=>{router.replace('/login');router.refresh();})}>Sign out</button>
-  </div></header>
+  <header className={styles.header}><div><p className={styles.brand}>Mo Bistro - District 5</p><small>Reception · {username}</small></div>
+   <details className={styles.menu} onKeyDown={event=>{if(event.key==='Escape'){event.currentTarget.open=false;event.currentTarget.querySelector('summary')?.focus();}}}>
+    <summary aria-label="Reception menu" title="Reception menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></summary>
+    <nav className={styles.menuItems} aria-label="Reception options">
+     <a href="/api/pilot/export" onClick={event=>{const details=event.currentTarget.closest('details');if(details)details.open=false;}}>Export CSV</a>
+     <button onClick={()=>void fetch('/api/auth/logout',{method:'POST'}).then(()=>{router.replace('/login');router.refresh();})}>Sign out</button>
+    </nav>
+   </details>
+  </header>
   <div className={styles.two}>
    <details className={styles.panel}><summary>Add walk-in</summary><PartyForm staff onCreated={party=>{setHandoff(party);void refresh();}}/></details>
    <details className={styles.panel}><summary>QR join</summary><div className={styles.qr}><QRCodeSVG value={PILOT_ORIGIN+'/join'} size={140}/><a className={styles.secondary} href="/join" target="_blank" rel="noreferrer">Open join page</a></div></details>

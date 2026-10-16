@@ -5,11 +5,11 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#151913",
+  themeColor: "#101111",
 };
 
 export const metadata: Metadata = {
-  title: "Mo Bistro",
+  title: "Mo Bistro - District 5",
   description: "Mo Bistro — Join the waiting queue",
   referrer: "no-referrer",
 };
