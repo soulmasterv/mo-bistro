@@ -26,7 +26,7 @@ function load(file, mocks = {}, globals = {}, cache = new Map()) {
     {
       module: loadedModule,
       exports: loadedModule.exports,
-      console: { error() {}, log() {} },
+      console: { error() {}, log() {}, warn() {} },
       process: { env: { MO_BISTRO_DB: "postgres" } },
       Buffer,
       URL,

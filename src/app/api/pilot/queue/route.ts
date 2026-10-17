@@ -2,10 +2,13 @@ import { after } from 'next/server';
 import { PartyInput,createParty,listQueue } from '@/lib/pilot/store';
 import { pilotStaff,pilotOrigin,pilotUnavailable,privateHeaders } from '@/lib/pilot/http';
 import { publishPilotCalls } from '@/lib/pilot/whatsapp';
+import { timedPilotRoute } from '@/lib/pilot/timing';
 export const maxDuration=30;
 export async function GET(){
- const denied=await pilotStaff();if(denied)return denied;
- try{const parties=await listQueue();after(async()=>{try{await publishPilotCalls();}catch{}});return Response.json(parties,{headers:privateHeaders});}catch{return pilotUnavailable();}
+ return timedPilotRoute(async db=>{
+ const denied=await db(()=>pilotStaff());if(denied)return denied;
+ try{const parties=await db(()=>listQueue());after(async()=>{try{await publishPilotCalls();}catch{}});return Response.json(parties,{headers:privateHeaders});}catch{return pilotUnavailable();}
+ });
 }
 export async function POST(request:Request){
  const denied=await pilotStaff();if(denied)return denied;const origin=pilotOrigin(request);if(origin)return origin;
