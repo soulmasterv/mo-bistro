@@ -9,12 +9,12 @@ type ActionHandler=(id:number,action:QueueAction,reason?:string)=>void;
 const failedStates=['failed','unknown','skipped','simulated'];
 export const messageFailed=(p:Party)=>failedStates.includes(p.message_status||'')||!!p.message_error;
 export const needsPhone=(p:Party)=>!p.whatsapp_consent||messageFailed(p);
-export function messageLabel(p:Party){
- if(p.informed_via==='staff_confirmed')return 'Guest informed by staff';
- if(p.message_status==='sent')return 'Message accepted · delivery unconfirmed';
- if(p.message_status==='simulated')return 'Test mode — message not sent';
- if(p.message_status==='unknown')return 'Send unconfirmed — call guest';
- if(messageFailed(p))return 'Message failed — call guest';
+export function messageLabel(p:Party,compact=false){
+ if(p.informed_via==='staff_confirmed')return compact?'Informed':'Guest informed by staff';
+ if(p.message_status==='sent')return compact?'Accepted':'Message accepted · delivery unconfirmed';
+ if(p.message_status==='simulated')return compact?'Test only':'Test mode — message not sent';
+ if(p.message_status==='unknown')return compact?'Unconfirmed':'Send unconfirmed — call guest';
+ if(messageFailed(p))return compact?'Failed · call':'Message failed — call guest';
  return p.message_status?'Sending message…':p.whatsapp_consent?'WhatsApp enabled':'Not subscribed';
 }
 function failureDetail(p:Party){
@@ -51,7 +51,7 @@ export function PilotQueue({parties,now,busy,onAction,onOpen}:{parties:Party[];n
    <td data-label="Party"><span className={styles.inline}><Users size={14}/>{p.party_size}</span></td>
    <td data-label="Preference">{p.preference==='indoor'?'Indoor':'Outdoor'}</td>
    <td data-label="Wait time"><span className={waitStyle(minutes)}>{minutes} min</span></td>
-   <td data-label="Status"><div className={styles.statusCell}><span className={`${styles.pill} ${p.status==='called'?styles.pillNotified:''}`}>{p.called_at?`${p.informed_via==='staff_confirmed'?'Informed':'Notified'} ${time(p.called_at)}`:'Waiting'}</span>{p.message_status&&<small className={messageFailed(p)?styles.failed:styles.hint}>{messageLabel(p)}</small>}</div></td>
+   <td data-label="Status"><div className={styles.statusCell}><span className={`${styles.pill} ${p.status==='called'?styles.pillNotified:''}`}>{p.called_at?`${p.informed_via==='staff_confirmed'?'Informed':'Notified'} ${time(p.called_at)}`:'Waiting'}</span>{p.message_status&&<small title={messageLabel(p)} className={messageFailed(p)?styles.failed:styles.hint}>{messageLabel(p,true)}</small>}</div></td>
    <td className={styles.rowActions}><div className={styles.actions} aria-busy={busy.includes(p.id)}>
     <a href={'tel:'+p.phone} aria-label={`Call ${p.name}`} className={`${styles.secondary} ${needsPhone(p)?styles.callProminent:''}`} aria-disabled={disabled} onClick={e=>{if(disabled)e.preventDefault();else onAction(p.id,'phone_call');}}><Phone size={15}/>Call</a>
     <Primary party={p} busy={busy.includes(p.id)} onAction={onAction}/>
