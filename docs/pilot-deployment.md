@@ -53,4 +53,6 @@ Apply migrations/20261017_pilot_measurement.sql once to the same Preview/Dev dat
 
 The inbound metric means a verified inbound message from the matching phone/business observed after this booking's explicit opt-in (and before closure). It is not proof of the exact prepared text, delivery, or continued consent after STOP. Sending still checks STOP and the 24-hour window independently. No inbound message is fabricated for testing.
 
-Ten isolated migration-backed tests, changed-file lint and the Next.js build cover this batch. Real-number delivery and actual mobile-width acceptance remain separate trial checks.
+Eleven isolated tests, changed-file lint and the Next.js build cover this batch. Real-number delivery and actual mobile-width acceptance remain separate trial checks.
+
+Live Dev verification confirmed a non-consenting synthetic party stays Waiting after Notify with Message failed / call guest, and all four removal reasons are visible. Synthetic ticket 7 was removed as duplicate/test and is excluded from CSV. A roughly 28-second browser/database clock difference exposed an early-disabled undo control; countdowns and wait duration now anchor to database time plus elapsed client time. Server-side expiry remains authoritative.

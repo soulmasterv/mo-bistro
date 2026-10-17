@@ -94,7 +94,7 @@ export async function observeOptInReplies() {
 export async function listQueue() {
  await finalizePendingExits();
  await observeOptInReplies();
- return getPostgres()`SELECT p.id,p.name,p.phone,p.party_size,p.preference,p.source,p.status,p.joined_at,
+ return getPostgres()`SELECT clock_timestamp() AS server_now,p.id,p.name,p.phone,p.party_size,p.preference,p.source,p.status,p.joined_at,
  p.called_at,p.whatsapp_consent_at IS NOT NULL AS whatsapp_consent,p.pending_exit_kind,p.pending_exit_at,p.pending_exit_token,
  p.phone_call_taps,p.informed_via,p.whatsapp_inbound_after_opt_in_at,m.status AS message_status,m.last_error AS message_error
  FROM public.pilot_parties p LEFT JOIN LATERAL (SELECT status,last_error FROM public.pilot_ready_messages WHERE party_id=p.id ORDER BY created_at DESC,id DESC LIMIT 1) m ON TRUE

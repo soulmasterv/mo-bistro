@@ -3,7 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 import {ArrowUpRight,Clock3,MessageCircle,MoreHorizontal,Phone,Users,X} from 'lucide-react';
 import styles from './pilot.module.css';
 
-export type Party={id:number;name:string;phone:string;party_size:number;preference:string;status:string;joined_at:string;called_at:string|null;whatsapp_consent:boolean;message_status:string|null;message_error:string|null;pending_exit_kind:string|null;pending_exit_at:string|null;pending_exit_token:string|null;phone_call_taps:number;informed_via:string|null};
+export type Party={id:number;name:string;phone:string;party_size:number;preference:string;status:string;joined_at:string;called_at:string|null;whatsapp_consent:boolean;message_status:string|null;message_error:string|null;pending_exit_kind:string|null;pending_exit_at:string|null;pending_exit_token:string|null;phone_call_taps:number;informed_via:string|null;server_now?:string;received_at?:number};
 export type QueueAction='notify'|'retry'|'seated'|'remove'|'phone_call'|'guest_informed'|'undo';
 type ActionHandler=(id:number,action:QueueAction,reason?:string)=>void;
 const failedStates=['failed','unknown','skipped','simulated'];
@@ -23,7 +23,8 @@ function failureDetail(p:Party){
 }
 const time=(value:string)=>new Intl.DateTimeFormat('en-GB',{timeZone:'Africa/Cairo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));
 const whatsapp=(p:Party)=>'https://wa.me/'+(p.phone.startsWith('0')?'2'+p.phone:p.phone);
-const wait=(p:Party,now:number)=>Math.max(0,Math.floor((now-new Date(p.joined_at).getTime())/60000));
+export const observedPartyTime=(p:Pick<Party,'server_now'|'received_at'>,now:number)=>p.server_now&&p.received_at!==undefined?new Date(p.server_now).getTime()+Math.max(0,now-p.received_at):now;
+const wait=(p:Party,now:number)=>Math.max(0,Math.floor((observedPartyTime(p,now)-new Date(p.joined_at).getTime())/60000));
 const waitStyle=(minutes:number)=>minutes>=30?styles.waitRed:minutes>=15?styles.waitAmber:'';
 
 function Primary({party,busy,onAction}:{party:Party;busy:boolean;onAction:ActionHandler}){
@@ -37,7 +38,7 @@ function Primary({party,busy,onAction}:{party:Party;busy:boolean;onAction:Action
 }
 function Undo({party,now,busy,onAction}:{party:Party;now:number;busy:boolean;onAction:ActionHandler}){
  if(!party.pending_exit_kind)return null;
- const seconds=Math.max(0,Math.ceil((new Date(party.pending_exit_at!).getTime()-now)/1000));
+ const seconds=Math.max(0,Math.ceil((new Date(party.pending_exit_at!).getTime()-observedPartyTime(party,now))/1000));
  return <div className={styles.undo} role="status"><span>Removal {seconds?'pending':'saving…'}</span>
   <button className={styles.secondary} disabled={busy||!seconds} onClick={()=>onAction(party.id,'undo')}>Undo{seconds?` (${seconds}s)`:''}</button>
  </div>;

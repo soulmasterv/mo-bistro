@@ -10,6 +10,13 @@ async function setup(){const db=new PGlite();await db.exec(fs.readFileSync('migr
  h.mocks['@/lib/pilot/whatsapp']={publishPilotCalls:async()=>{}};
  return {db,h,store:load('src/lib/pilot/store.ts',h.mocks)};}
 const input={name:'Synthetic Guest',phone:'01000000001',party_size:2,preference:'indoor',whatsapp_consent:true};
+test('Undo countdown uses database time even when the reception device clock is ahead',()=>{
+ const {observedPartyTime}=load('src/components/pilot/queue.tsx');const server=Date.parse('2026-10-17T12:00:00Z');
+ const party={server_now:new Date(server).toISOString(),received_at:server+28000};
+ assert.equal(observedPartyTime(party,server+28000),server);
+ assert.equal(observedPartyTime(party,server+30000),server+2000);
+ assert.equal(Math.ceil((server+5000-observedPartyTime(party,server+30000))/1000),3);
+});
 test('Failures stay Waiting; definite rejection retries once, unknown acceptance requires a phone fallback',async()=>{
  const {db,h,store}=await setup();try{
   await db.query("INSERT INTO whatsapp_customer_windows VALUES('201000000001','123',clock_timestamp())");
