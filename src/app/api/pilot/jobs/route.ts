@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { readWebhookBody } from '@/lib/whatsapp/http';
 import { deliverPilotCall,verifyPilotJob } from '@/lib/pilot/whatsapp';
 const Input=z.object({notificationId:z.uuid()}).strict();
+export const maxDuration=30;
 export async function POST(request:Request){
  let raw:string;try{raw=await readWebhookBody(request,4096);}catch{return Response.json({error:'Invalid body'},{status:413});}
  if(!await verifyPilotJob(raw,request.headers.get('upstash-signature')))return Response.json({error:'Invalid signature'},{status:401});

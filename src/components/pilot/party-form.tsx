@@ -10,7 +10,7 @@ export default function PartyForm({staff=false,onCreated}:{staff?:boolean;onCrea
  }
  return <form className={styles.form} onSubmit={submit} aria-busy={busy}>
   <label>Name<input required minLength={2} maxLength={100} autoComplete="name" value={name} disabled={busy} onChange={e=>setName(e.target.value)}/></label>
-  <label>Egyptian mobile number<input required type="tel" inputMode="tel" pattern="01[0125][0-9]{8}" placeholder="01xxxxxxxxx" autoComplete="tel" value={phone} disabled={busy} onChange={e=>setPhone(e.target.value)}/></label>
+  <label>Phone Number<input required type="tel" inputMode="tel" pattern="01[0125][0-9]{8}" placeholder="01xxxxxxxxx" autoComplete="tel" value={phone} disabled={busy} onChange={e=>setPhone(e.target.value)}/></label>
   <div className={styles.two}><label>Party size<input required type="number" min={1} max={30} value={size} disabled={busy} onChange={e=>setSize(e.target.value)}/></label>
   <label>Seating<select value={preference} disabled={busy} onChange={e=>setPreference(e.target.value)}><option value="indoor">Indoor</option><option value="outdoor">Outdoor</option></select></label></div>
   {!staff&&<label className={styles.consent}><input type="checkbox" checked={consent} disabled={busy} onChange={e=>setConsent(e.target.checked)}/><span>Send me one WhatsApp message when reception calls my party. No marketing. Reply STOP to unsubscribe.</span></label>}

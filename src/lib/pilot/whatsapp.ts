@@ -11,36 +11,18 @@ export async function verifyPilotJob(raw:string,signature:string|null) {
  if(!current||!next||!signature)return false;
  try{return await new Receiver({currentSigningKey:current,nextSigningKey:next}).verify({signature,body:raw,url:PILOT_ORIGIN+PILOT_JOB_PATH});}catch{return false;}
 }
-export async function publishPilotCalls() {
+// Pilot Notify is immediate: do not wait for an external scheduling callback.
+// Leases avoid waste; the durable delivery claim remains the at-most-once boundary.
+export async function publishPilotCalls(partyId?:number) {
  const sql=getPostgres();
  await sql`UPDATE public.pilot_ready_messages SET status='unknown',last_error='send_interrupted',updated_at=NOW()
- WHERE status='sending' AND updated_at<NOW()-INTERVAL '2 minutes'`;
- await sql`UPDATE public.pilot_ready_messages SET status='unknown',last_error='scheduler_callback_missing',updated_at=NOW()
- WHERE status='scheduled' AND updated_at<NOW()-INTERVAL '10 minutes'`;
- const jobs=await sql`UPDATE public.pilot_ready_messages SET publish_lease_until=NOW()+INTERVAL '1 minute'
- WHERE id IN (SELECT id FROM public.pilot_ready_messages WHERE status='pending'
+ WHERE status='sending' AND updated_at<NOW()-INTERVAL '1 minute'`;
+ const jobs=await sql`UPDATE public.pilot_ready_messages SET publish_lease_until=NOW()+INTERVAL '30 seconds'
+ WHERE id IN (SELECT id FROM public.pilot_ready_messages WHERE status IN ('pending','scheduled')
+ AND (${partyId??null}::integer IS NULL OR party_id=${partyId??null})
  AND publish_retry_at<=NOW() AND (publish_lease_until IS NULL OR publish_lease_until<NOW())
- ORDER BY created_at LIMIT 10 FOR UPDATE SKIP LOCKED) RETURNING id`;
- for(const job of jobs) {
-  if(!liveSendingEnabled()){await deliverPilotCall(job.id);continue;}
-  try {
-   const token=process.env.QSTASH_TOKEN;
-   const base=new URL(process.env.QSTASH_URL||'https://qstash.upstash.io');
-   if(!token||base.protocol!=='https:'||!/^qstash(?:-[a-z0-9-]+)?\.upstash\.io$/.test(base.hostname)||base.username||base.password||base.port||base.search||base.hash||base.pathname!=='/')throw Error();
-   const response=await fetch(`${base.origin}/v2/publish/${PILOT_ORIGIN+PILOT_JOB_PATH}`,{
-    method:'POST',redirect:'error',signal:AbortSignal.timeout(10000),
-    headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json','Upstash-Retries':'5','Upstash-Deduplication-Id':`pilot-${job.id}`},
-    body:JSON.stringify({notificationId:job.id}),
-   });
-   const result=await response.json().catch(()=>null);
-   if(!response.ok||typeof result?.messageId!=='string'||result.messageId.length>256)throw Error();
-   await sql`UPDATE public.pilot_ready_messages SET status='scheduled',qstash_message_id=${result.messageId},publish_lease_until=NULL,last_error=NULL,updated_at=NOW()
-    WHERE id=${job.id} AND status='pending'`;
-  } catch {
-   await sql`UPDATE public.pilot_ready_messages SET publish_lease_until=NULL,publish_retry_at=NOW()+INTERVAL '1 minute',
-    last_error='scheduler_unavailable',updated_at=NOW() WHERE id=${job.id} AND status='pending'`;
-  }
- }
+ ORDER BY created_at LIMIT 2 FOR UPDATE SKIP LOCKED) RETURNING id`;
+ await Promise.all(jobs.map(job=>deliverPilotCall(job.id)));
 }
 export async function deliverPilotCall(id:string) {
  await finalizePendingExits();

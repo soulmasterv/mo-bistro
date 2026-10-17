@@ -17,6 +17,26 @@ test('Undo countdown uses database time even when the reception device clock is 
  assert.equal(observedPartyTime(party,server+30000),server+2000);
  assert.equal(Math.ceil((server+5000-observedPartyTime(party,server+30000))/1000),3);
 });
+test('Immediate Notify drains pending and legacy scheduled jobs without a scheduler callback, once only',async()=>{
+ const {db,h,store}=await setup();try{
+  await db.query("INSERT INTO whatsapp_customer_windows VALUES('201000000001','123',clock_timestamp())");
+  let sends=0,schedulerRequests=0;
+  h.mocks['@/lib/whatsapp/transport']={requestMetaTemplate:async()=>{sends++;return {state:'sent',messageId:'test-accepted'};}};
+  const env={MO_BISTRO_DB:'postgres',WHATSAPP_ENABLED:'true',WHATSAPP_MODE:'live',WHATSAPP_ALLOW_LIVE_SEND:'true',WHATSAPP_WINDOW_TEXT_ENABLED:'true',VERCEL_ENV:'preview',WHATSAPP_TEST_RECIPIENT:input.phone,META_WHATSAPP_PHONE_NUMBER_ID:'123'};
+  const sender=load('src/lib/pilot/whatsapp.ts',h.mocks,{process:{env},fetch:async()=>{schedulerRequests++;throw Error('No scheduler required');}});
+  const p=await store.createParty(input,'qr');await store.transition(p.id,'notify');
+  const id=(await db.query('SELECT id FROM pilot_ready_messages')).rows[0].id;
+  await db.query("UPDATE pilot_ready_messages SET status='scheduled' WHERE id=$1",[id]);
+  await sender.publishPilotCalls(p.id);await sender.deliverPilotCall(id);await sender.publishPilotCalls();
+  assert.equal(schedulerRequests,0);assert.equal(sends,1);
+  assert.equal((await store.partyStatus(p.token)).status,'called');
+  await store.transition(p.id,'seated');
+  const next=await store.createParty(input,'qr');await store.transition(next.id,'notify');
+  await db.query("UPDATE pilot_ready_messages SET status='sending',attempts=1,updated_at=clock_timestamp()-INTERVAL '2 minutes' WHERE party_id=$1",[next.id]);
+  await sender.publishPilotCalls();assert.equal(sends,1);
+  assert.equal((await db.query('SELECT status FROM pilot_ready_messages WHERE party_id=$1',[next.id])).rows[0].status,'unknown');
+ }finally{await db.close();}
+});
 test('Failures stay Waiting; definite rejection retries once, unknown acceptance requires a phone fallback',async()=>{
  const {db,h,store}=await setup();try{
   await db.query("INSERT INTO whatsapp_customer_windows VALUES('201000000001','123',clock_timestamp())");
