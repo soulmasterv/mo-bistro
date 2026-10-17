@@ -15,7 +15,7 @@ export async function publishPilotCalls() {
  const sql=getPostgres();
  await sql`UPDATE public.pilot_ready_messages SET status='unknown',last_error='send_interrupted',updated_at=NOW()
  WHERE status='sending' AND updated_at<NOW()-INTERVAL '2 minutes'`;
- await sql`UPDATE public.pilot_ready_messages SET status='failed',last_error='scheduler_callback_missing',updated_at=NOW()
+ await sql`UPDATE public.pilot_ready_messages SET status='unknown',last_error='scheduler_callback_missing',updated_at=NOW()
  WHERE status='scheduled' AND updated_at<NOW()-INTERVAL '10 minutes'`;
  const jobs=await sql`UPDATE public.pilot_ready_messages SET publish_lease_until=NOW()+INTERVAL '1 minute'
  WHERE id IN (SELECT id FROM public.pilot_ready_messages WHERE status='pending'
@@ -55,7 +55,7 @@ export async function deliverPilotCall(id:string) {
    return;
   }
   let state='skipped',error:string|null=null,messageId:string|null=null;
-  if(!party||party.status!=='called')error='party_not_called';
+  if(!party||party.status!=='waiting')error='party_not_waiting';
   else if(!party.whatsapp_consent_at)error='guest_not_opted_in';
   else if(!whatsappEnabled())error='whatsapp_disabled';
   else if(!liveSendingEnabled())state='simulated';
@@ -78,6 +78,7 @@ export async function deliverPilotCall(id:string) {
    }
   }
   await tx`UPDATE public.pilot_ready_messages SET status=${state},last_error=${error},provider_message_id=${messageId},updated_at=NOW() WHERE id=${id}`;
+  if(state==='sent')await tx`UPDATE public.pilot_parties SET status='called',called_at=clock_timestamp(),informed_via='whatsapp_accepted' WHERE id=${party.id} AND status='waiting'`;
  });
 }
 function safeTestPhone(){try{return normalizePhone(process.env.WHATSAPP_TEST_RECIPIENT||'');}catch{return null;}}

@@ -2,7 +2,7 @@
 import { useEffect,useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {Bell,CheckCircle2,Clock3,UtensilsCrossed,XCircle} from 'lucide-react';
-type Status={id:number;status:string;position:number|null;whatsapp_consent:boolean;whatsapp_url?:string|null};
+type Status={id:number;status:string;position:number|null;whatsapp_consent:boolean;whatsapp_reply_observed:boolean;whatsapp_url?:string|null};
 export default function PilotStatus(){
  const token=useSearchParams().get('token')||'';const [party,setParty]=useState<Status|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  async function enable(){if(busy)return;setBusy(true);try{const r=await fetch('/api/pilot/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,consent:true})});if(!r.ok)throw Error('Could not enable your message. Please try again.');const next=await fetch('/api/pilot/status?token='+encodeURIComponent(token),{cache:'no-store'});if(!next.ok)throw Error('Please refresh your status.');setParty(await next.json());setError('');}catch(e){setError(e instanceof Error?e.message:'Please try again.');}finally{setBusy(false);}}
@@ -31,9 +31,10 @@ export default function PilotStatus(){
    <div className="guest-welcome-card"><UtensilsCrossed size={38}/><p>MO BISTRO · DISTRICT 5</p><h2>Good food.<br/>Good company.</h2><p>A little time, well spent.</p></div>
    {party&&status==='waiting'&&<section className="guest-whatsapp-card space-y-3 rounded-xl" aria-label="WhatsApp table-ready alert">
     <p>Get your table-ready message</p>
-    <p className="guest-small-note">Receive one WhatsApp message when reception calls your party. No marketing.</p>
+    <p className="guest-small-note">Optional: receive one WhatsApp message when reception calls your party. No marketing.</p>
     {!party.whatsapp_consent&&<button disabled={busy} className="guest-subscription-refresh" onClick={()=>void enable()}>{busy?'Enabling…':'Enable WhatsApp alert'}</button>}
     {party.whatsapp_consent&&party.whatsapp_url&&<><p className="guest-small-note">Open WhatsApp and send the prepared message to receive your alert.</p><a className="block rounded-xl bg-[#34382E] px-4 py-3 text-center font-medium text-white" href={party.whatsapp_url} rel="noreferrer">Open WhatsApp</a></>}
+    {party.whatsapp_reply_observed&&<p className="guest-small-note" role="status">Your WhatsApp message has been received.</p>}
     {party.whatsapp_consent&&!party.whatsapp_url&&<p className="guest-small-note">Your choice is saved. Please keep this page open for updates.</p>}
     <p className="guest-small-note">To unsubscribe, reply STOP on WhatsApp.</p>
    </section>}

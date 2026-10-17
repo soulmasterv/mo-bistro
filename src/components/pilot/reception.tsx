@@ -15,9 +15,9 @@ export default function PilotReception({username}:{username:string}){
  const refreshVersion=useRef(0);
  const refresh=useCallback(async(signal?:AbortSignal)=>{const version=++refreshVersion.current;try{const r=await fetch('/api/pilot/queue',{cache:'no-store',signal});if(r.status===401){router.replace('/login');return;}const data=await r.json();if(!r.ok)throw Error(data.error||'Queue unavailable.');if(!signal?.aborted&&version===refreshVersion.current){setParties(data);setNow(Date.now());setLoaded(true);setError('');}}catch(e){if(!signal?.aborted&&version===refreshVersion.current)setError(e instanceof Error?e.message:'Queue unavailable.');}},[router]);
  useEffect(()=>{const controller=new AbortController();void Promise.resolve().then(()=>refresh(controller.signal));const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refresh(controller.signal);},2000);const clock=window.setInterval(()=>setNow(Date.now()),250);return()=>{controller.abort();window.clearInterval(timer);window.clearInterval(clock);};},[refresh]);
- async function action(id:number,value:QueueAction){
+ async function action(id:number,value:QueueAction,reason?:string){
   if(pending.current.has(id))return;pending.current.add(id);refreshVersion.current++;setBusy([...pending.current]);setError('');
-  try{const undo_token=value==='undo'?parties.find(p=>p.id===id)?.pending_exit_token:undefined;const r=await fetch(`/api/pilot/parties/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:value,...(undo_token?{undo_token}:{})})});const data=await r.json();if(!r.ok)throw Error(data.error||'Action failed.');await refresh();}catch(e){setError(e instanceof Error?e.message:'Action failed.');}finally{pending.current.delete(id);setBusy([...pending.current]);}
+  try{const undo_token=value==='undo'?parties.find(p=>p.id===id)?.pending_exit_token:undefined;const r=await fetch(`/api/pilot/parties/${id}`,{method:'PATCH',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({action:value,...(undo_token?{undo_token}:{}),...(reason?{reason}:{}),...(['phone_call','retry'].includes(value)?{event_id:crypto.randomUUID()}:{})})});const data=await r.json();if(!r.ok)throw Error(data.error||'Action failed.');await refresh();}catch(e){setError(e instanceof Error?e.message:'Action failed.');}finally{pending.current.delete(id);setBusy([...pending.current]);}
  }
  const selected=parties.find(p=>p.id===openParty);
  return <main className={styles.page}><div className={styles.wrap}>
@@ -39,7 +39,7 @@ export default function PilotReception({username}:{username:string}){
   {error&&<p className={styles.notice} role="alert">{error}</p>}
   {!loaded&&!error&&<p role="status">Loading queue…</p>}
   {loaded&&!parties.length&&<p className={styles.empty}>The waiting queue is empty.</p>}
-  {!!parties.length&&<PilotQueue parties={parties} now={now} busy={busy} onAction={(id,value)=>void action(id,value)} onOpen={setOpenParty}/>}
-  {selected&&<PilotDrawer key={selected.id} party={selected} now={now} busy={busy.includes(selected.id)} onAction={(id,value)=>void action(id,value)} onClose={()=>setOpenParty(null)}/>}
+  {!!parties.length&&<PilotQueue parties={parties} now={now} busy={busy} onAction={(id,value,reason)=>void action(id,value,reason)} onOpen={setOpenParty}/>}
+  {selected&&<PilotDrawer key={selected.id} party={selected} now={now} busy={busy.includes(selected.id)} onAction={(id,value,reason)=>void action(id,value,reason)} onClose={()=>setOpenParty(null)}/>}
  </div></main>;
 }

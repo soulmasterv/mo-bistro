@@ -112,3 +112,4 @@
 }
 @media(max-width:650px) { .page { padding:16px; } .header { align-items:flex-start; } .tools { gap:6px; } .tools :is(button,a) { padding:8px 10px; font-size:12px; } .party { grid-template-columns:36px minmax(0,1fr); gap:10px; padding:14px; } .actions { grid-column:1/-1; } .actions button { flex:1; } .title h1 { font-size:23px; } .guest { margin:28px auto; } }
 .rowActions .actions button:last-child { flex:0; }
+.reasonChoices{display:grid;gap:8px;margin-top:12px}.reasonChoices button{text-align:left;justify-content:flex-start;white-space:normal}
