@@ -70,7 +70,7 @@ const labels: Record<GuestStatus, string> = {
   cancelled: "Cancelled",
 };
 
-export default function Home() {
+export default function Home({previewMessages=false}:{previewMessages?:boolean}={}) {
   const confirmAction = useConfirmation();
   const guestsController = useRef<AbortController | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
@@ -613,6 +613,7 @@ export default function Home() {
       </nav>
       {selectedGuest && (
         <GuestDetailSheet
+          previewMessages={previewMessages}
           onRefresh={()=>void loadGuests(true)}
           key={selectedGuest.id}
           guest={selectedGuest}

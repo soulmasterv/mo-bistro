@@ -2,10 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {load} from "./handler-harness.mjs";
 const base={MO_BISTRO_DB:"postgres",WHATSAPP_ENABLED:"true",WHATSAPP_MODE:"live",WHATSAPP_ALLOW_LIVE_SEND:"true",WHATSAPP_WINDOW_TEXT_ENABLED:"true",VERCEL_ENV:"preview",WHATSAPP_TEST_RECIPIENT:"201000000000",META_WHATSAPP_PHONE_NUMBER_ID:"1234",WHATSAPP_ASSOCIATION_SECRET:"synthetic-association-secret-long-enough",WHATSAPP_ALMOST_READY_TEXT:"Hi {name}, your booking {booking_id} is almost ready."};
+const manualKey=load('src/lib/advanced/manual-nearly-ready.ts').manualNearlyReadyKey(1);
 function setup(options={}) {
  const state={open:true,claimed:false,status:"pending",providerResult:{state:"sent",messageId:"mock-id"},...options};const calls=[],queries=[];
- const booking={id:"notification-id",kind:"almost_ready",guest_id:1,revision:1,attempts:1,phone:"201000000000",name:"Guest",confirmation_consent:true,feedback_consent:true,subscribed_at:new Date(),unsubscribed_at:null,opted_out_at:null,guest_status:"waiting",eta_at:new Date(Date.now()+5*60000),seated_at:null,subscription_expires_at:new Date(Date.now()+86400000),tracking_token_hash:"hash",...options.booking};
+ const booking={id:"notification-id",kind:"almost_ready",guest_id:1,revision:1,attempts:1,phone:"201000000000",name:"Guest",confirmation_consent:true,feedback_consent:true,subscribed_at:new Date(),unsubscribed_at:null,opted_out_at:null,guest_status:"waiting",eta_at:new Date(Date.now()+10*60000),seated_at:null,subscription_expires_at:new Date(Date.now()+86400000),tracking_token_hash:"hash",...options.booking};
+ booking.event_key=options.booking?.event_key??manualKey;
  const sql=async(strings,...values)=>{const q=strings.join("?");queries.push({q,values});
+  if(q.includes('AS used'))return [{used:0}];
   if(q.includes("UPDATE whatsapp_notifications SET status='sending'")){if(state.claimed)return [];state.claimed=true;return [{guest_id:1}];}
   if(q.includes("SELECT due_at,status"))return [{status:state.status,due_at:new Date(Date.now()-60000),revision:1}];
   if(q.includes("SELECT phone FROM"))return [{phone:booking.phone}];
@@ -23,12 +26,13 @@ function setup(options={}) {
 }
 test("open verified window sends existing event as text once and logs delivery",async()=>{
  const h=setup();await h.service.deliverNotification("notification-id",1);await h.service.deliverNotification("notification-id",1);
- assert.equal(h.calls.length,1);assert.equal(h.calls[0].type,"text");assert.match(h.calls[0].text.body,/booking 1/);assert.equal(h.state.status,"sent");assert.ok(h.queries.some(q=>q.q.includes("INSERT INTO whatsapp_delivery_logs")));
+ assert.equal(h.calls.length,1);assert.equal(h.calls[0].type,"text");assert.match(h.calls[0].text.body,/booking #1/);assert.equal(h.state.status,"sent");assert.ok(h.queries.some(q=>q.q.includes("INSERT INTO whatsapp_delivery_logs")));
  const proof=h.queries.find(q=>q.q.includes("FROM whatsapp_customer_windows"));assert.deepEqual(Array.from(proof.values),["201000000000","1234"]);assert.match(proof.q,/24 hours/);assert.match(proof.q,/last_inbound_at<=clock_timestamp/);
 });
-test("expired window falls back only to configured applicable template",async()=>{
- const h=setup({open:false,template:true});await h.service.deliverNotification("notification-id",1);assert.equal(h.calls[0].type,"template");
- const skip=setup({open:false});await skip.service.deliverNotification("notification-id",1);assert.equal(skip.calls.length,0);assert.equal(skip.state.status,"skipped");assert.ok(skip.queries.some(q=>q.values.includes("customer_window_closed_template_unconfigured")));
+test("Preview closed window skips and logs even with templates configured; Production fallback is unchanged",async()=>{
+ const h=setup({open:false,template:true});await h.service.deliverNotification("notification-id",1);assert.equal(h.calls.length,0);assert.equal(h.state.status,'skipped');
+ assert.ok(h.queries.some(q=>q.values.includes('customer_window_closed')));
+ const legacy=setup({open:false,template:true,env:{VERCEL_ENV:'production'}});await legacy.service.deliverNotification('notification-id',1);assert.equal(legacy.calls[0].type,'template');
 });
 
 test("almost-ready has default window text without a configured template or text override",async()=>{
@@ -39,8 +43,8 @@ test("almost-ready has default window text without a configured template or text
  assert.equal(h.calls[0].type,'text');
  assert.match(h.calls[0].text.body,/Hi Guest/);
  assert.match(h.calls[0].text.body,/booking #1/);
- assert.match(h.calls[0].text.body,/reception will confirm/);
- assert.match(h.calls[0].text.body,/UNSUBSCRIBE or STOP/);
+ assert.match(h.calls[0].text.body,/wait for our confirmation/);
+ assert.doesNotMatch(h.calls[0].text.body,/UNSUBSCRIBE or STOP/);
  assert.equal(h.state.status,'sent');
  const closed=setup({open:false,env:{WHATSAPP_ALMOST_READY_TEXT:undefined}});
  await closed.service.deliverNotification('notification-id',1);
@@ -54,10 +58,10 @@ test("subscribed confirmation sends a thank-you once without asking the guest to
  await h.service.deliverNotification('notification-id',1);
  assert.equal(h.calls.length,1);
  assert.equal(h.calls[0].type,'text');
- assert.match(h.calls[0].text.body,/Thanks for booking with Mo Bistro, Guest!/);
- assert.match(h.calls[0].text.body,/booking #1/);
- assert.match(h.calls[0].text.body,/subscribed to WhatsApp updates/);
- assert.match(h.calls[0].text.body,/UNSUBSCRIBE or STOP/);
+ assert.match(h.calls[0].text.body,/Hi Guest,/);
+ assert.match(h.calls[0].text.body,/Thanks for joining Mo Bistro/);
+ assert.match(h.calls[0].text.body,/Your booking: #1/);
+ assert.doesNotMatch(h.calls[0].text.body,/UNSUBSCRIBE or STOP/);
  assert.ok(!h.calls[0].text.body.includes('SUBSCRIBE 1'));
  assert.ok(!h.calls[0].text.body.includes('{'));
 });
@@ -72,7 +76,7 @@ test("review due after seating sends one placeholder reply button, with no URL",
  assert.equal(payload.biz_opaque_callback_data,'notification-id');
  assert.equal(payload.interactive.type,'button');
  assert.match(payload.interactive.body.text,/review page is coming soon/);
- assert.match(payload.interactive.body.text,/UNSUBSCRIBE or STOP/);
+ assert.doesNotMatch(payload.interactive.body.text,/UNSUBSCRIBE or STOP/);
  assert.equal(payload.interactive.action.buttons.length,1);
  assert.equal(payload.interactive.action.buttons[0].type,'reply');
  assert.equal(payload.interactive.action.buttons[0].reply.id,'review_placeholder');
@@ -87,8 +91,8 @@ test("review due after seating sends one placeholder reply button, with no URL",
  assert.equal(closed.state.status,'skipped');
  const long=setup({booking,env:{WHATSAPP_REVIEW_TEXT:'x'.repeat(1024)}});
  await long.service.deliverNotification('notification-id',1);
- assert.equal(long.calls.length,0);
- assert.equal(long.state.status,'skipped');
+ assert.equal(long.calls.length,1);
+ assert.ok(long.calls[0].interactive.body.text.length<1024);
 });
 
 test("missing consent, STOP and unsubscribe block open-window sends",async()=>{

@@ -6,8 +6,11 @@ const keys = {
   tableEditor: 'ADV_TABLE_EDITOR',
 } as const;
 export type AdvancedFeature = keyof typeof keys;
+export function advancedPreview(){
+  return process.env.VERCEL_ENV === 'preview' && process.env.MO_BISTRO_DB === 'postgres';
+}
 export function advancedEnabled(feature: AdvancedFeature) {
-  return process.env.VERCEL_ENV === 'preview' && process.env.MO_BISTRO_DB === 'postgres' && process.env[keys[feature]] === 'true';
+  return advancedPreview() && process.env[keys[feature]] === 'true';
 }
 function integer(key:string,fallback:number,min:number,max:number) {
   const value=Number(process.env[key]);

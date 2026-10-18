@@ -9,8 +9,10 @@ import { publishJob } from "@/lib/whatsapp/transport";
 import { schedulerErrorCode } from "@/lib/whatsapp/scheduler-error";
 import {dispatchReminders,preNotifyBudget} from '@/lib/advanced/reminders';
 import {estimateAccepted} from '@/lib/advanced/estimates';
+import {advancedPreview} from '@/lib/advanced/flags';
+import {manualNearlyReadyKey} from '@/lib/advanced/manual-nearly-ready';
 type DeliveryBooking = Eligibility & { id: string; guest_id: number; name: string; phone: string;
-  revision: number; attempts: number; tracking_token_hash: string; subscription_expires_at: Date; eta_snapshot_at?: string | null };
+  revision: number; attempts: number; tracking_token_hash: string; subscription_expires_at: Date; eta_snapshot_at?: string | null; event_key?:string|null };
 
 export type BookingConsent = { whatsapp_confirmation_consent?: boolean; whatsapp_feedback_consent?: boolean };
 export async function recordBookingConsent(tx: TransactionSql, guestId: number, phone: string,
@@ -45,6 +47,13 @@ export async function scheduleEtaUpdate(tx: TransactionSql, guestId: number, eta
 }
 export async function scheduleAlmostReady(tx: TransactionSql, guestId: number, eta: Date | null) {
   if (!whatsappEnabled()) return;
+  if(advancedPreview()){
+    // No new automatic job. Pre-existing automatic callbacks are also blocked at delivery.
+    await tx`UPDATE whatsapp_notifications SET status='skipped',revision=revision+1,last_error='manual_only',updated_at=NOW()
+      WHERE guest_id=${guestId} AND kind='almost_ready' AND status IN ('pending','scheduled')
+      AND (to_jsonb(whatsapp_notifications)->>'event_key') IS DISTINCT FROM ${manualNearlyReadyKey(guestId)}`;
+    return;
+  }
   const [consent] = await tx`SELECT subscribed_at,unsubscribed_at FROM whatsapp_booking_consents WHERE guest_id=${guestId}`;
   const [schema] = await tx`SELECT to_regclass('public.guest_eta_changes') IS NOT NULL AS eta_updates`;
   if (schema?.eta_updates) {
@@ -141,7 +150,7 @@ export async function deliverNotification(id: string, revision: number): Promise
     const [booking] = await tx<DeliveryBooking[]>`SELECT n.id,n.kind,n.guest_id,n.revision,n.attempts,
       c.phone,c.confirmation_consent,c.feedback_consent,c.subscribed_at,c.unsubscribed_at,
       c.subscription_token_hash,c.subscription_expires_at,g.name,g.status AS guest_status,
-      g.eta_at,g.seated_at,g.tracking_token_hash,p.opted_out_at,to_jsonb(n)->>'eta_snapshot_at' AS eta_snapshot_at
+      g.eta_at,g.seated_at,g.tracking_token_hash,p.opted_out_at,to_jsonb(n)->>'eta_snapshot_at' AS eta_snapshot_at,to_jsonb(n)->>'event_key' AS event_key
       FROM whatsapp_notifications n JOIN whatsapp_booking_consents c ON c.guest_id=n.guest_id
       JOIN guests g ON g.id=n.guest_id LEFT JOIN whatsapp_contact_preferences p ON p.phone=c.phone
       WHERE n.id=${id} AND n.revision=${revision} AND n.status='sending' FOR UPDATE OF n,c`;
@@ -153,10 +162,19 @@ export async function deliverNotification(id: string, revision: number): Promise
     if ((kind === "eta_update" || (kind === "almost_ready" && booking.eta_snapshot_at)) &&
         (!booking.eta_snapshot_at || !booking.eta_at || new Date(booking.eta_snapshot_at).getTime() !== new Date(booking.eta_at).getTime())) {
       await tx`UPDATE whatsapp_notifications SET status='skipped',last_error='eta_superseded',updated_at=NOW() WHERE id=${id}`;
+      await tx`INSERT INTO whatsapp_delivery_logs(notification_id,event_key,event,error_code)
+        VALUES(${id},${'superseded:'+id+':'+booking.attempts},'skipped','eta_superseded') ON CONFLICT(event_key) DO NOTHING`;
       return "done";
     }
+    const manualNearlyReady=advancedPreview()&&kind==='almost_ready'&&booking.event_key===manualNearlyReadyKey(booking.guest_id);
+    if(advancedPreview()&&kind==='almost_ready'&&!manualNearlyReady){
+      await tx`UPDATE whatsapp_notifications SET status='skipped',last_error='manual_only',updated_at=NOW() WHERE id=${id}`;
+      await tx`INSERT INTO whatsapp_delivery_logs(notification_id,event_key,event,error_code)
+        VALUES(${id},${'manual-only:'+id+':'+booking.attempts},'skipped','manual_only') ON CONFLICT(event_key) DO NOTHING`;
+      return 'done';
+    }
     const currentDue = kind === "review" && booking.seated_at ? dueTime(kind,new Date(booking.seated_at)) :
-      kind === "almost_ready" && booking.eta_at ? dueTime(kind,new Date(booking.eta_at)) : null;
+      kind === "almost_ready" && !manualNearlyReady && booking.eta_at ? dueTime(kind,new Date(booking.eta_at)) : null;
     if (eligible({ ...booking, kind }) && currentDue && currentDue.getTime() > Date.now()) {
       await tx`UPDATE whatsapp_notifications SET status='pending',revision=revision+1,due_at=${currentDue},
         qstash_message_id=NULL,publish_lease_until=NULL,updated_at=NOW() WHERE id=${id}`;
@@ -166,9 +184,11 @@ export async function deliverNotification(id: string, revision: number): Promise
         (["almost_ready","eta_update"].includes(kind) && (!booking.eta_at || new Date(booking.eta_at).getTime() < Date.now())) ||
         (kind === "confirmation" && new Date(booking.subscription_expires_at).getTime() < Date.now())) {
       await tx`UPDATE whatsapp_notifications SET status='skipped',last_error='consent_or_booking_ineligible',updated_at=NOW() WHERE id=${id}`;
+      await tx`INSERT INTO whatsapp_delivery_logs(notification_id,event_key,event,error_code)
+        VALUES(${id},${'ineligible:'+id+':'+booking.attempts},'skipped','consent_or_booking_ineligible') ON CONFLICT(event_key) DO NOTHING`;
       return "done";
     }
-    if(kind!=='review'&&booking.guest_status==='waiting'&&!await preNotifyBudget(tx,booking.guest_id,id)){
+    if(kind!=='review'&&!await preNotifyBudget(tx,booking.guest_id,id)){
       await tx`UPDATE whatsapp_notifications SET status='skipped',last_error='pre_notify_budget_exhausted',updated_at=NOW() WHERE id=${id}`;
       await tx`INSERT INTO whatsapp_delivery_logs(notification_id,event_key,event,error_code) VALUES(${id},${'budget:'+id+':'+booking.attempts},'skipped','pre_notify_budget_exhausted') ON CONFLICT(event_key) DO NOTHING`;
       return 'done';

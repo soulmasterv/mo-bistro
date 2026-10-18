@@ -8,7 +8,7 @@ export function estimateRange(samples:number[],minimum:number) {
   const middle=Math.floor(valid.length/2);
   const median=valid.length%2?valid[middle]:(valid[middle-1]+valid[middle])/2;
   const low=Math.max(0,Math.floor((median-5)/5)*5),high=Math.max(5,Math.ceil((median+5)/5)*5);
-  return {median,low,high,copy:`about ${low}-${high} min, an estimate`};
+  return {median,low,high,copy:`about ${low}-${high} min (an estimate)`};
 }
 
 export async function confirmationEstimate(tx:TransactionSql,notificationId:string,guestId:number) {

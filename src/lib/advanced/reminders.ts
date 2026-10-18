@@ -2,18 +2,24 @@ import 'server-only';
 import {randomUUID} from 'node:crypto';
 import type {TransactionSql} from 'postgres';
 import {getPostgres} from '@/lib/postgres-db';
-import {advancedConfig,advancedEnabled} from '@/lib/advanced/flags';
+import {advancedConfig,advancedEnabled,advancedPreview} from '@/lib/advanced/flags';
+import {reminderCopy} from '@/lib/advanced/message-copy';
 import {liveSendingEnabled,normalizePhone,whatsappEnabled} from '@/lib/whatsapp/policy';
 import {requestMetaTemplate,publishAdvancedReminder} from '@/lib/whatsapp/transport';
 
 export async function preNotifyBudget(tx:TransactionSql,guestId:number,notificationId:string|null=null,reminderId:string|null=null) {
- if(!advancedEnabled('reminders'))return true;
+ if(!advancedPreview())return true;
  await tx`SELECT pg_advisory_xact_lock(hashtext(${'advanced-pre-notify:'+guestId}))`;
- const [row]=await tx`SELECT
+ const [schema]=await tx`SELECT to_regclass('public.advanced_reminder_jobs') IS NOT NULL AS reminders`;
+ // Turning reminders OFF does not erase messages already sent under that flag.
+ const [row]=(schema?.reminders||advancedEnabled('reminders'))?await tx`SELECT
   (SELECT count(*) FROM whatsapp_notifications WHERE guest_id=${guestId} AND kind<>'review'
    AND id IS DISTINCT FROM ${notificationId}::uuid AND status IN ('sending','sent','unknown'))+
   (SELECT count(*) FROM advanced_reminder_jobs WHERE guest_id=${guestId}
-   AND id IS DISTINCT FROM ${reminderId}::uuid AND status IN ('sending','sent','unknown')) AS used`;
+   AND id IS DISTINCT FROM ${reminderId}::uuid AND status IN ('sending','sent','unknown')) AS used`
+  :await tx`SELECT count(*) AS used FROM whatsapp_notifications WHERE guest_id=${guestId} AND kind<>'review'
+   AND id IS DISTINCT FROM ${notificationId}::uuid AND status IN ('sending','sent','unknown')`;
+ if(!row||!Number.isFinite(Number(row.used)))return false;
  return Number(row.used)<advancedConfig().preNotifyMax;
 }
 
@@ -32,9 +38,7 @@ export async function prepareReminderJobs() {
  if(head)await sql`INSERT INTO advanced_reminder_jobs(id,guest_id,kind,due_at) VALUES(${randomUUID()},${head.id},'next',NOW()) ON CONFLICT(guest_id,kind) DO NOTHING`;
 }
 
-export const reminderText=(kind:'timer'|'next',name:string,guestId:number)=>
- kind==='next'?`Hi ${name}, your Mo Bistro booking #${guestId} is next in the queue. Please stay nearby; reception will confirm when your table is ready.`
- :`Hi ${name}, you're still on Mo Bistro's waitlist for booking #${guestId}. Thank you for waiting. Reception will contact you when your table is ready.`;
+export const reminderText=reminderCopy;
 
 export async function deliverReminder(id:string) {
  if(!advancedEnabled('reminders')||!whatsappEnabled())return;
@@ -75,7 +79,7 @@ export async function deliverReminder(id:string) {
       else {
        try{
         const result=await requestMetaTemplate({messaging_product:'whatsapp',to:booking.phone,type:'text',biz_opaque_callback_data:id,
-         text:{body:reminderText(claimed.kind,booking.name,booking.id)+'\n\nTo unsubscribe, reply STOP.'}});
+         text:{body:reminderText(claimed.kind,booking.name,booking.id)}});
         state=result.state==='pending'?'failed':result.state;
         reason=result.error??(state==='sent'?'provider_accepted':state==='unknown'?'send_outcome_unconfirmed':'provider_'+state);
         providerId=result.messageId??null;

@@ -53,15 +53,15 @@ test('fewer than ten matching completed parties yields plain acknowledgement; me
   await sql`INSERT INTO whatsapp_customer_windows(phone,phone_number_id,last_inbound_at) VALUES('201000000001','1234',NOW())`;
   const booking={name:'Synthetic',phone:'201000000001',subscribed_at:new Date()};
   await windowSender.sendWindowNotification(sql,{id:first,guest_id:guest.id,kind:'confirmation'},booking,'unused');
-  assert.match(payloads[0].text.body,/Thanks for booking/);assert.doesNotMatch(payloads[0].text.body,/Estimated wait|an estimate/);
+  assert.match(payloads[0].text.body,/Thanks for joining/);assert.doesNotMatch(payloads[0].text.body,/Estimated wait|an estimate/);
   await db.exec("INSERT INTO guests(name,phone,party_size,seating_preference,status,created_at,seated_at) VALUES('History','01000000004',2,'indoor','seated',(NOW()-INTERVAL '25 minutes')::text,NOW())");
   // Existing acknowledgement stays plain on retries, even if history changes.
   assert.equal(await estimates.confirmationEstimate(sql,first,guest.id),null);
   await sql`DELETE FROM whatsapp_notifications WHERE id=${first}`;
   const second=await makeJob();const text=await estimates.confirmationEstimate(sql,second,guest.id);
-  assert.match(text,/about 20-30 min, an estimate/);
+  assert.match(text,/about 20-30 min \(an estimate\)/);
   await windowSender.sendWindowNotification(sql,{id:second,guest_id:guest.id,kind:'confirmation'},booking,'unused');
-  assert.match(payloads[1].text.body,/Estimated wait: about 20-30 min, an estimate/);
+  assert.match(payloads[1].text.body,/Estimated wait: about 20-30 min \(an estimate\)/);
  }finally{await db.close();}
 });
 

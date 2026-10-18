@@ -1,5 +1,7 @@
 import "server-only";
 import {confirmationEstimate} from '@/lib/advanced/estimates';
+import {advancedPreview} from '@/lib/advanced/flags';
+import {sendAdvancedPlain} from '@/lib/advanced/plain-messages';
 import type { Sql, TransactionSql } from "postgres";
 import {
   liveSendingEnabled,
@@ -45,6 +47,7 @@ export async function sendWindowNotification(
       return { state: "skipped", error: "preview_recipient_not_configured" };
     }
   }
+  if(advancedPreview())return sendAdvancedPlain(sql,job,booking);
   if (!customerWindowEnabled())
     return sendTemplate(templatePayload(job, booking, code));
   const business = process.env.META_WHATSAPP_PHONE_NUMBER_ID;

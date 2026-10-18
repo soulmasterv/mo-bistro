@@ -36,6 +36,7 @@ export default function GuestDetailSheet({
   onSeat,
   onAction,
   onRefresh,
+  previewMessages=false,
 }: {
   guest: Guest;
   busy: boolean;
@@ -43,6 +44,7 @@ export default function GuestDetailSheet({
   error: string;
   onClose: () => void;
   onRefresh: () => void;
+  previewMessages?:boolean;
   onSeat: () => void;
   onAction: (action: "call" | "confirm" | "cancel" | "no_show") => void;
 }) {
@@ -236,7 +238,7 @@ export default function GuestDetailSheet({
           </p>
         </details>
         <GuestBookingEditor key={guest.id} guestId={guest.id} disabled={externalBusy} onSaved={onRefresh} onBusyChange={setEditorBusy} />
-        {["waiting","called"].includes(guest.status) && <GuestEtaEditor guestId={guest.id} onSaved={onRefresh} />}
+          {["waiting","called"].includes(guest.status) && <GuestEtaEditor guestId={guest.id} onSaved={onRefresh} manualNearlyReady={previewMessages} />}
         {guest.status === "waiting" && (
           <button
             type="button"

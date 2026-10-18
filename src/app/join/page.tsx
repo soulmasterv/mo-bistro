@@ -434,6 +434,9 @@ export default function JoinPage() {
                   <p className="text-[12px] leading-5 text-[#777367]">
                     We&apos;ll use your details to manage your place in the
                     queue. Seating preferences depend on availability.
+                    After booking, you can subscribe to WhatsApp waitlist updates
+                    and one review request 60 minutes after seating. WhatsApp is
+                    not required to join.
                   </p>
                 </div>
 
