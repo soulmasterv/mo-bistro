@@ -6,6 +6,21 @@ import {PGlite} from '@electric-sql/pglite';
 import {load,harness,request,context} from './handler-harness.mjs';
 const payload=(name='Guest')=>({guests:[{id:1,name}],tables:[],requests:[],next:{areas:[]},mode:{mode:'simple'},simple:{areas:[]},wait:{minutes:30}});
 const settle=async()=>{for(let n=0;n<20;n++)await Promise.resolve();};
+test('browser singleton binds native timers to the browser global, not the feed options',async()=>{
+ const browser={},tasks=new Map();let sequence=0,reads=0;
+ const loadedFeed=load('src/lib/reception-feed.ts',{}, {
+  globalThis:browser,document:{visibilityState:'visible'},
+  fetch:async()=>{reads++;return Response.json(payload());},
+  setTimeout:function(fn,delay){assert.equal(this,browser,'native setTimeout receiver');const id=++sequence;tasks.set(id,{fn,delay});return id;},
+  clearTimeout:function(id){assert.equal(this,browser,'native clearTimeout receiver');tasks.delete(id);},
+ });
+ const feed=loadedFeed.receptionFeed();
+ await feed.refresh();
+ assert.equal(reads,1);assert.equal((await(await feed.read('/api/guests')).json())[0].name,'Guest');
+ const stop=feed.start();await settle();
+ assert.ok([...tasks.values()].some(task=>task.delay===5000));
+ stop();assert.equal(tasks.size,0);
+});
 function fixture(handler=async()=>Response.json(payload())){
  let now=0,visible=true,sequence=0;const tasks=new Map(),calls=[];
  const options={fetch:async(...args)=>{calls.push({time:now,args});return handler(...args);},now:()=>now,random:()=>.5,visible:()=>visible,

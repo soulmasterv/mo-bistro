@@ -68,7 +68,8 @@ export function createReceptionFeed(options:Options){
 }
 let feed:ReturnType<typeof createReceptionFeed>|null=null;
 export function receptionFeed(){
- if(!feed)feed=createReceptionFeed({fetch:(...args)=>fetch(...args),now:Date.now,random:Math.random,setTimeout,clearTimeout,visible:()=>document.visibilityState==='visible'});
+ // Native browser timers require the browser global as their receiver.
+ if(!feed)feed=createReceptionFeed({fetch:(...args)=>fetch(...args),now:Date.now,random:Math.random,setTimeout:setTimeout.bind(globalThis),clearTimeout:clearTimeout.bind(globalThis),visible:()=>document.visibilityState==='visible'});
  return feed;
 }
 export const receptionRead=(url:string,init?:RequestInit)=>receptionFeed().read(url,init);
