@@ -2,11 +2,11 @@
 
 Applies only to PostgreSQL deployments with `VERCEL_ENV=preview` on the separate Advanced branch. No pilot source, pilot tables, Development deployment, inbound/STOP webhook source or Production sending policy changes. No schema migration or environment change is needed for this patch; manual sending requires the existing ETA migration (`20261015_whatsapp_eta_updates.sql`).
 
-Every new Preview message begins `Hi {first name},` or `Hi there,`. Names are normalized, URLs/email addresses, controls, emoji and message markup are removed, and the first word is capped at 24 Unicode code points. Stored guest names are unchanged; Arabic letters and combining marks are retained. The message footer is removed; unsubscribe instructions remain on the guest subscription screen and STOP handling is unchanged.
+Every new Preview message begins `Hi {first name},` or `Hi there,`. URLs/email addresses, controls, emoji and message markup are removed, and the first word is capped at 24 Unicode code points. Stored guest names are unchanged, with no language-specific processing. Only the acknowledgement ends with `To unsubscribe at any time, reply "STOP".` The same shared wording appears on Join and the subscription screen. The opt-out parser accepts case differences, trailing punctuation and surrounding whitespace; the webhook transport and verification are unchanged.
 
 | Event | Copy / behavior |
 | --- | --- |
-| Acknowledgement | Thanks for joining Mo Bistro's waitlist! Your booking: #98. Estimated wait: about 20-30 min (an estimate). We'll message you when your table is ready. |
+| Acknowledgement | Thanks for joining Mo Bistro's waitlist! Your booking: #98. Estimated wait: about 20-30 min (an estimate). We'll message you when your table is ready. To unsubscribe at any time, reply "STOP". |
 | Insufficient history | The acknowledgement omits the estimate. Existing `ADV_WA_WAIT_ESTIMATE` remains default OFF; exact-size/preference cohort and minimum 10 samples are unchanged. Estimate snapshots and acceptance logging remain intact. |
 | Timer reminder | A quick update on booking #98: you're still in the queue. Thanks for waiting. We'll let you know when your table is ready. |
 | First in queue | Booking #98 is next in the queue. Please stay nearby. Reception will confirm when your table is ready. |
@@ -21,8 +21,8 @@ Every Preview text or interactive message requires a subscribed guest, applicabl
 
 Reviews retain the existing one-per-booking job and 60-minute-after-seating schedule. Delivery rechecks `feedback_consent`, subscription, actual `seated` status and `seated_at`; cancelled and no-show parties cannot receive it. Join now discloses the available WhatsApp waitlist updates and one review request after seating. The subscription screen already explains both purposes before the received opt-in message. Existing saved feedback choices are not rewritten.
 
-Language remains English for Preview; Arabic guest names are supported. Language selection and the optional private status link are deferred. Status links require the original private token, which cannot be reconstructed from the stored hash; no raw status token is added to storage or logs here.
+Message copy remains English for Preview. Language-specific handling and tests are out of scope. Language selection and the optional private status link are deferred. Status links require the original private token, which cannot be reconstructed from the stored hash; no raw status token is added to storage or logs here.
 
-Checks: `node --test tests/advanced-message-policy.test.mjs tests/advanced-preview.test.mjs tests/whatsapp*.test.mjs`. Includes real SQL on in-memory PostgreSQL with mocked providers: manual request idempotency, stale estimates, cap with reminders OFF, STOP between scheduling/sending, review eligibility/duplicate callbacks, closed windows even with templates configured, Arabic/long/missing/link/emoji names and no added unsubscribe footer. Hosted real-phone acceptance remains outstanding; automated tests send no actual messages.
+Checks: `node --test tests/advanced-message-policy.test.mjs tests/advanced-preview.test.mjs tests/whatsapp*.test.mjs`. Includes real SQL on in-memory PostgreSQL with mocked providers: manual request idempotency, stale estimates, cap with reminders OFF, STOP between scheduling/sending, review eligibility/duplicate callbacks, closed windows even with templates configured, long/missing/link-containing names, the acknowledgement-only STOP footer and inbound `stop`, `Stop`, `STOP.` and ` stop ` variants (plus ordinary-message negative cases). Hosted real-phone acceptance remains outstanding; automated tests send no actual messages.
 
 Interactive reply buttons use the separate interactive payload, rather than a button embedded in plain text. Reference: [Meta's interactive reply-button example](https://whatsapp.github.io/WhatsApp-Nodejs-SDK/api-reference/messages/interactive/).

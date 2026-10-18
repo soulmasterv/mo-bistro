@@ -59,8 +59,9 @@ test("subscribed confirmation sends a thank-you once without asking the guest to
  assert.equal(h.calls.length,1);
  assert.equal(h.calls[0].type,'text');
  assert.match(h.calls[0].text.body,/Hi Guest,/);
- assert.match(h.calls[0].text.body,/Thanks for joining Mo Bistro/);
+ assert.match(h.calls[0].text.body,/thanks for joining Mo Bistro/i);
  assert.match(h.calls[0].text.body,/Your booking: #1/);
+ assert.ok(h.calls[0].text.body.endsWith('To unsubscribe at any time, reply "STOP".'));
  assert.doesNotMatch(h.calls[0].text.body,/UNSUBSCRIBE or STOP/);
  assert.ok(!h.calls[0].text.body.includes('SUBSCRIBE 1'));
  assert.ok(!h.calls[0].text.body.includes('{'));

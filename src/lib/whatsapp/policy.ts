@@ -53,7 +53,8 @@ export function parseSubscription(message: string) {
   return { guestId: Number(match[1]), code: match[2].toLowerCase(), reviews: !!match[3], short: false };
 }
 export function isStop(text: string) {
-  return /^(stop|unsubscribe|cancel updates|إلغاء|الغاء)$/iu.test(text.trim());
+  const command = text.trim().replace(/[\p{P}\s]+$/gu, "");
+  return /^(stop|unsubscribe|cancel updates|إلغاء|الغاء)$/iu.test(command);
 }
 export function dueTime(kind: NotificationKind, reference: Date) {
   return new Date(reference.getTime() + (kind === "review" ? 60 : kind === "almost_ready" ? -10 : 0) * 60_000);

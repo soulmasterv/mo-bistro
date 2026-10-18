@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import RestaurantWaitDisplay from "@/components/restaurant-wait-display";
+import { STOP_INSTRUCTION } from "@/lib/advanced/message-copy";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -437,6 +438,7 @@ export default function JoinPage() {
                     After booking, you can subscribe to WhatsApp waitlist updates
                     and one review request 60 minutes after seating. WhatsApp is
                     not required to join.
+                    <span className="block">{STOP_INSTRUCTION}</span>
                   </p>
                 </div>
 

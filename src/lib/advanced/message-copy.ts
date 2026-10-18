@@ -1,7 +1,7 @@
 // Guest-supplied names must never become links, markup or extra message lines.
 export function firstName(value:unknown):string|null{
  if(typeof value!=='string')return null;
- const clean=value.normalize('NFKC')
+ const clean=value
   .replace(/(?:https?:\/\/|www\.)\S+|(?:[\p{L}\p{N}-]+\.)+[\p{L}]{2,}(?:\/\S*)?|\S+@\S+/giu,' ')
   .replace(/[\p{Cc}\p{Cf}]/gu,' ')
   .replace(/[^\p{L}\p{M}\s'-]/gu,' ');
@@ -10,9 +10,10 @@ export function firstName(value:unknown):string|null{
  return Array.from(token.replace(/^['-]+|['-]+$/g,'')).slice(0,24).join('')||null;
 }
 export function greeting(value:unknown){const name=firstName(value);return name?`Hi ${name},`:'Hi there,';}
+export const STOP_INSTRUCTION='To unsubscribe at any time, reply "STOP".';
 export function acknowledgement(name:unknown,id:number,estimate:string|null){
- return `${greeting(name)}\n\nThanks for joining Mo Bistro's waitlist!\n\nYour booking: #${id}`+
-  (estimate?`\nEstimated wait: ${estimate}.`:'')+"\n\nWe'll message you when your table is ready.";
+ return `${greeting(name)} thanks for joining Mo Bistro's waitlist!\nYour booking: #${id}`+
+  (estimate?`\nEstimated wait: ${estimate}.`:'')+`\nWe'll message you when your table is ready.\n${STOP_INSTRUCTION}`;
 }
 export function reminderCopy(kind:'timer'|'next',name:unknown,id:number){
  return kind==='next'?`${greeting(name)}\n\nBooking #${id} is next in the queue.\n\nPlease stay nearby. Reception will confirm when your table is ready.`

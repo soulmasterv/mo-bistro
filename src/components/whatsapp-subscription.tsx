@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { STOP_INSTRUCTION } from "@/lib/advanced/message-copy";
 type Subscription = {
   available: boolean;
   subscribed?: boolean;
@@ -115,7 +116,7 @@ export default function WhatsappSubscription({
             updates.{" "}
           </>
         )}
-        To unsubscribe at any time, reply UNSUBSCRIBE or STOP on WhatsApp.
+        {STOP_INSTRUCTION}
       </p>
       {error && (
         <p role="alert" className="text-red-700">

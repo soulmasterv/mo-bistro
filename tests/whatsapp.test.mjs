@@ -1002,8 +1002,8 @@ for (const [name, fn] of cases)
     await reset();
     await fn();
   });
-test("STOP and UNSUBSCRIBE remain case-insensitive received-message opt-outs", async()=>{
-  for(const command of ["STOP","stop","StOp","UNSUBSCRIBE","unsubscribe","UnSuBsCrIbE"]) {
+test("STOP punctuation, whitespace and case variants remain received-message opt-outs", async()=>{
+  for(const command of ["stop","Stop","STOP."," stop ","STOP","StOp","UNSUBSCRIBE","unsubscribe","UnSuBsCrIbE"]) {
     await reset(); const b=await booking();
     await webhook.processMetaWebhook(envelope(inbound(b)));
     assert.equal((await service.subscriptionState(b.token)).subscribed,true);
@@ -1011,6 +1011,15 @@ test("STOP and UNSUBSCRIBE remain case-insensitive received-message opt-outs", a
     assert.equal((await service.subscriptionState(b.token)).subscribed,false);
   }
 });
+test("STOP words inside ordinary messages do not opt guests out",async()=>{
+ for(const command of ["stop by reception", "don't stop", "stop booking"]) {
+  await reset(); const b=await booking();
+  await webhook.processMetaWebhook(envelope(inbound(b)));
+  await webhook.processMetaWebhook(envelope(inbound(b,randomUUID(),{text:{body:command}})));
+  assert.equal((await service.subscriptionState(b.token)).subscribed,true);
+ }
+});
+
 test("review preference is relevant before review dispatch or deadline",async()=>{
   await reset(); const b=await booking({whatsapp_confirmation_consent:true,whatsapp_feedback_consent:true});
   assert.equal((await service.subscriptionState(b.token)).feedbackEditable,true);
