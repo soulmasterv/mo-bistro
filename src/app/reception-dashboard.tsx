@@ -1,4 +1,6 @@
 "use client";
+import {receptionRead,refreshReception,watchReception} from "@/lib/reception-feed";
+
 import { useConfirmation } from "@/components/confirmation-provider";
 import TrackingHandoff from "@/components/tracking-handoff";
 import NextGuestPanel from "@/components/next-guest-panel";
@@ -109,12 +111,13 @@ export default function Home() {
   const tablesDialog = useRef<HTMLDivElement>(null);
   useStaffDialog(showTables, tablesDialog, () => setShowTables(false));
   const loadGuests = useCallback(async (force = false) => {
+    if(force)await refreshReception().catch(()=>{});
     if (guestsController.current && !force) return;
     guestsController.current?.abort();
     const controller = new AbortController();
     guestsController.current = controller;
     try {
-      const response = await fetch("/api/guests", {
+      const response = await receptionRead("/api/guests", {
         cache: "no-store",
         signal: controller.signal,
       });
@@ -135,19 +138,12 @@ export default function Home() {
 
   useEffect(() => {
     const initial = window.setTimeout(() => void loadGuests(), 0);
-    const timer = setInterval(() => {
-      if (document.visibilityState === "visible") void loadGuests();
-    }, 5000);
-    const onTablesChanged = () => {
-      void loadGuests(true);
-    };
-    window.addEventListener("mo-bistro-tables-changed", onTablesChanged);
+    const unsubscribe=watchReception(()=>void loadGuests());
     return () => {
       window.clearTimeout(initial);
       guestsController.current?.abort();
       guestsController.current = null;
-      clearInterval(timer);
-      window.removeEventListener("mo-bistro-tables-changed", onTablesChanged);
+      unsubscribe();
     };
   }, [loadGuests]);
 
@@ -758,7 +754,7 @@ export default function Home() {
                 <XCircle size={22} />
               </button>
             </div>
-            <form onSubmit={addGuest} className="space-y-4">
+            <form id="staff-add-guest-form" onSubmit={addGuest} className="space-y-4">
               {addError && (
                 <div
                   role="alert"

@@ -1,4 +1,6 @@
 "use client";
+import {receptionRead,refreshReception,watchReception} from "@/lib/reception-feed";
+
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Armchair, RefreshCw } from "lucide-react";
@@ -32,19 +34,20 @@ export default function TableAvailability() {
   const [error, setError] = useState("");
 
   const load = useCallback(async (force = false) => {
+    if(force)await refreshReception();
     if (loadController.current && !force) return;
     loadController.current?.abort();
     const controller = new AbortController();
     loadController.current = controller;
     try {
-      const modeResponse = await fetch("/api/table-view-mode", {
+      const modeResponse = await receptionRead("/api/table-view-mode", {
         cache: "no-store",
         signal: controller.signal,
       });
       if (!modeResponse.ok) throw new Error("Unable to load table view mode.");
       const modeData = await modeResponse.json();
       const nextMode = modeData.mode === "simple" ? "simple" : "detailed";
-      const response = await fetch(
+      const response = await receptionRead(
         nextMode === "simple" ? "/api/simple-tables" : "/api/tables",
         { cache: "no-store", signal: controller.signal },
       );
@@ -69,32 +72,8 @@ export default function TableAvailability() {
       void load().catch((err) => setError(String(err)));
     }, 0);
 
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible")
-        void load().catch((err) =>
-          setError(
-            err instanceof Error ? err.message : "Unable to refresh tables.",
-          ),
-        );
-    }, 5000);
-
-    const onTablesChanged = (event: Event) => {
-      if ((event as CustomEvent).detail !== "table-availability") {
-        void load(true).catch((err) =>
-          setError(
-            err instanceof Error ? err.message : "Unable to refresh tables.",
-          ),
-        );
-      }
-    };
-    window.addEventListener("mo-bistro-tables-changed", onTablesChanged);
-    return () => {
-      window.clearTimeout(initial);
-      loadController.current?.abort();
-      loadController.current = null;
-      window.clearInterval(timer);
-      window.removeEventListener("mo-bistro-tables-changed", onTablesChanged);
-    };
+    const unsubscribe=watchReception(()=>{void load().catch(err=>setError(err instanceof Error?err.message:"Unable to refresh tables."));});
+    return () => { window.clearTimeout(initial);loadController.current?.abort();loadController.current=null;unsubscribe(); };
   }, [load]);
 
   const [releaseId, setReleaseId] = useState<number | null>(null);

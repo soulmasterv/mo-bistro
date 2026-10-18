@@ -1,4 +1,6 @@
 "use client";
+import {receptionRead,watchReception} from "@/lib/reception-feed";
+
 
 import { useEffect, useRef, useState } from "react";
 import { BellRing, X } from "lucide-react";
@@ -31,7 +33,7 @@ export default function TableReadyNotifications() {
       running = true;
 
       try {
-        const response = await fetch("/api/tables", {
+        const response = await receptionRead("/api/tables", {
           cache: "no-store",
           credentials: "same-origin",
         });
@@ -95,16 +97,8 @@ export default function TableReadyNotifications() {
 
     void checkTables();
 
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void checkTables();
-      }
-    }, 5000);
-
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-    };
+    const unsubscribe=watchReception(()=>void checkTables());
+    return () => { active=false;unsubscribe(); };
   }, []);
 
   if (notices.length === 0) return null;

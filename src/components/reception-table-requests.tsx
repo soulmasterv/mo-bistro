@@ -1,4 +1,6 @@
 "use client";
+import {receptionRead,refreshReception,watchReception} from "@/lib/reception-feed";
+
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import SeatGuestModal from "@/components/seat-guest-modal";
@@ -92,12 +94,13 @@ export default function ReceptionTableRequests() {
   }
 
   const refresh = useCallback(async (force = false) => {
+    if(force)await refreshReception().catch(()=>{});
     if (refreshController.current && !force) return;
     refreshController.current?.abort();
     const controller = new AbortController();
     refreshController.current = controller;
     try {
-      const response = await fetch("/api/reception/table-requests", {
+      const response = await receptionRead("/api/reception/table-requests", {
         signal: controller.signal,
         cache: "no-store",
         credentials: "same-origin",
@@ -150,7 +153,7 @@ export default function ReceptionTableRequests() {
         setError("");
         return;
       }
-      const tablesResponse = await fetch("/api/tables", {
+      const tablesResponse = await receptionRead("/api/tables", {
         signal: controller.signal,
         cache: "no-store",
         credentials: "same-origin",
@@ -179,20 +182,8 @@ export default function ReceptionTableRequests() {
 
   useEffect(() => {
     void refresh();
-    const timer = setInterval(() => {
-      if (document.visibilityState === "visible") void refresh();
-    }, 3000);
-    const onChanged = (event: Event) => {
-      if ((event as CustomEvent).detail !== "reception-requests")
-        void refresh(true);
-    };
-    window.addEventListener("mo-bistro-tables-changed", onChanged);
-    return () => {
-      clearInterval(timer);
-      refreshController.current?.abort();
-      refreshController.current = null;
-      window.removeEventListener("mo-bistro-tables-changed", onChanged);
-    };
+    const unsubscribe=watchReception(()=>void refresh());
+    return () => { unsubscribe();refreshController.current?.abort();refreshController.current=null; };
   }, [refresh]);
 
   useEffect(() => {

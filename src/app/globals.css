@@ -1,4 +1,25 @@
 @import "tailwindcss";
+
+/* Keep Add guest controls visible regardless of utility/theme overrides. */
+#staff-add-guest-form input,
+#staff-add-guest-form select {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  margin-top: 8px;
+  padding: 11px 13px;
+  border: 1px solid #73766e !important;
+  border-radius: 10px;
+  background: #242723 !important;
+  color: #f5f1e8 !important;
+  color-scheme: dark;
+}
+#staff-add-guest-form input:focus-visible,
+#staff-add-guest-form select:focus-visible {
+  outline: 2px solid #e7c587;
+  outline-offset: 2px;
+}
+.reception-updating { margin: .5rem 1rem; font-size: .8rem; color: #c5bda9; }
 :root {
   --background: #f4f0e9;
   --foreground: #302d28;

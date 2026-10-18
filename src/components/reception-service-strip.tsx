@@ -1,11 +1,13 @@
 "use client";
+import {receptionRead,watchReception} from "@/lib/reception-feed";
+
 
 import { useEffect, useState } from "react";
 
 type Availability = Record<"indoor" | "outdoor", { free: number; total: number }>;
 
 async function readJson(url: string, signal: AbortSignal) {
-  const response = await fetch(url, { cache: "no-store", signal });
+  const response = await receptionRead(url, { cache: "no-store", signal });
   if (!response.ok) throw new Error("Service overview unavailable");
   return response.json();
 }
@@ -58,10 +60,8 @@ export default function ReceptionServiceStrip() {
       if (controller === current) controller = null;
     }
     const initial = window.setTimeout(() => void refresh(), 0);
-    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void refresh(); }, 5000);
-    const changed = () => void refresh(true);
-    window.addEventListener("mo-bistro-tables-changed", changed);
-    return () => { controller?.abort(); window.clearTimeout(initial); window.clearInterval(timer); window.removeEventListener("mo-bistro-tables-changed", changed); };
+    const unsubscribe=watchReception(()=>void refresh());
+    return () => { controller?.abort(); window.clearTimeout(initial); unsubscribe(); };
   }, []);
   const eta = minutes === null ? "—" : minutes >= 60
     ? `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}m` : ""}` : `${minutes}m`;

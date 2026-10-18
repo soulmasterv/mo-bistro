@@ -1,4 +1,6 @@
 "use client";
+import {receptionRead,refreshReception} from "@/lib/reception-feed";
+
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -18,7 +20,7 @@ export default function RestaurantWaitSlider() {
 
   const refresh = useCallback(async () => {
     try {
-      const response = await fetch("/api/wait-estimate", { cache: "no-store" });
+      const response = await receptionRead("/api/wait-estimate", { cache: "no-store" });
       if (!response.ok) throw new Error();
       const data = await response.json();
       if (typeof data.minutes === "number") {
@@ -49,6 +51,7 @@ export default function RestaurantWaitSlider() {
         throw new Error(data.error || "Unable to save.");
       }
       setSaved(minutes);
+      await refreshReception();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save.");
     } finally {
