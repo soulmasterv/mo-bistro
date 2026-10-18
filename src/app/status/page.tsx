@@ -289,11 +289,11 @@ function StatusContent() {
               <UtensilsCrossed size={38} />
               <p>MO BISTRO · DISTRICT 5</p>
               <h2>
-                Good food.
+                Take a moment.
                 <br />
-                Good company.
+                Browse the menu.
               </h2>
-              <p>A little time, well spent.</p>
+              <p>Find your first order while you wait.</p>
               <a href="/menu">Discover our menu →</a>
             </div>
             {token && data && (

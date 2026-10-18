@@ -32,7 +32,7 @@ test('greetings safely handle URLs, missing names and very long names without ch
  assert.ok(texts.every(t=>t.startsWith('Hi Omar,')&&!t.includes('Mohsen')));
  assert.equal(texts[0].split(copy.STOP_INSTRUCTION).length-1,1);
  assert.ok(texts[0].endsWith(copy.STOP_INSTRUCTION));
- assert.ok(texts.slice(1).every(t=>!t.includes('To unsubscribe')));
+ assert.ok(texts.slice(1).every(t=>!t.includes(copy.STOP_INSTRUCTION)));
  assert.equal(copy.acknowledgement(null,98,null),`Hi there, thanks for joining Mo Bistro's waitlist!\nYour booking: #98\nWe'll message you when your table is ready.\n${copy.STOP_INSTRUCTION}`);
  assert.match(texts[0],/20-30 min \(an estimate\)/);assert.match(texts[3],/about 15 minutes \(an estimate\)/);assert.doesNotMatch(texts[3],/AM|PM|\d:\d/);
  assert.match(texts[6],/come to reception and mention booking #98/);assert.doesNotMatch(texts[6],/hold|reserve/i);

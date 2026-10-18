@@ -61,7 +61,7 @@ test("subscribed confirmation sends a thank-you once without asking the guest to
  assert.match(h.calls[0].text.body,/Hi Guest,/);
  assert.match(h.calls[0].text.body,/thanks for joining Mo Bistro/i);
  assert.match(h.calls[0].text.body,/Your booking: #1/);
- assert.ok(h.calls[0].text.body.endsWith('To unsubscribe at any time, reply "STOP".'));
+ assert.ok(h.calls[0].text.body.endsWith('To stop updates, reply "STOP".'));
  assert.doesNotMatch(h.calls[0].text.body,/UNSUBSCRIBE or STOP/);
  assert.ok(!h.calls[0].text.body.includes('SUBSCRIBE 1'));
  assert.ok(!h.calls[0].text.body.includes('{'));
@@ -134,4 +134,19 @@ test("only verified business-matched webhook messages reach window tracking",asy
  const payload=business=>({object:"whatsapp_business_account",entry:[{changes:[{field:"messages",value:{metadata:{phone_number_id:business},messages:[{id:"signed-message",from:"201000000000",timestamp:String(Math.floor(Date.now()/1000)),type:"text",text:{body:"Hello"}}]}}]}]});
  await webhook.processMetaWebhook(payload("other-business"));assert.equal(recorded,0);
  await webhook.processMetaWebhook(payload("1234"));assert.equal(recorded,1);
+});
+
+
+test('legacy configured text strips opt-out footers from follow-ups and keeps calmer copy only on confirmation',async()=>{
+ const old='To unsubscribe at any time, reply UNSUBSCRIBE or STOP on WhatsApp.';
+ for(const kind of ['confirmation','eta_update','almost_ready','review']) {
+  const prefix={confirmation:'CONFIRMATION',eta_update:'ETA_UPDATE',almost_ready:'ALMOST_READY',review:'REVIEW'}[kind];
+  const eta=new Date(Date.now()+9*60000);
+  const h=setup({env:{VERCEL_ENV:'production',['WHATSAPP_'+prefix+'_TEXT']:'Preset update. '+old},booking:{kind,eta_at:eta,eta_snapshot_at:eta,guest_status:kind==='review'?'seated':'waiting',seated_at:new Date(Date.now()-3600001)}});
+  await h.service.deliverNotification('notification-id',1);
+  assert.equal(h.calls.length,1,kind);
+  const body=h.calls[0].text?.body??h.calls[0].interactive.body.text;
+  assert.ok(!body.includes(old));
+  assert.equal(body.includes('To stop updates, reply "STOP".'),kind==='confirmation');
+ }
 });

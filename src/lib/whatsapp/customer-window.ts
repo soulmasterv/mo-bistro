@@ -2,6 +2,7 @@ import "server-only";
 import {confirmationEstimate} from '@/lib/advanced/estimates';
 import {advancedPreview} from '@/lib/advanced/flags';
 import {sendAdvancedPlain} from '@/lib/advanced/plain-messages';
+import {STOP_INSTRUCTION} from '@/lib/advanced/message-copy';
 import type { Sql, TransactionSql } from "postgres";
 import {
   liveSendingEnabled,
@@ -99,9 +100,11 @@ export async function sendWindowNotification(
         state: "skipped",
         error: "confirmation_subscription_copy_missing",
       };
-    const optOut =
-      "To unsubscribe at any time, reply UNSUBSCRIBE or STOP on WhatsApp.";
-    if (!body.includes(optOut)) body += "\n\n" + optOut;
+    // Older configured presets may still contain the former footer.
+    body = body.replaceAll('To unsubscribe at any time, reply UNSUBSCRIBE or STOP on WhatsApp.', '')
+      .replaceAll('To unsubscribe at any time, reply "STOP".', '')
+      .replaceAll(STOP_INSTRUCTION, '').trim();
+    if (job.kind === 'confirmation') body += "\n\n" + STOP_INSTRUCTION;
     if (body.length > 4096)
       return { state: "skipped", error: "notification_text_invalid" };
     if (job.kind === "review") {

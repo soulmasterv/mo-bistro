@@ -1333,7 +1333,7 @@ test(
         await guestPage.getByText("WhatsApp updates enabled",{exact:true}).waitFor();
         assert.equal(await guestPage.getByRole("link",{name:"Get WhatsApp updates"}).count(),0);
         assert.equal(await guestPage.getByRole("checkbox").count(),0); // Review preference is collapsed for subscribers.
-        await guestPage.getByText("To unsubscribe at any time, reply UNSUBSCRIBE or STOP on WhatsApp.",{exact:true}).waitFor();
+        await guestPage.getByText("To stop updates, reply "STOP".",{exact:true}).waitFor();
         feedbackEditable=false; await guestPage.reload();
         await guestPage.getByText("WhatsApp updates enabled",{exact:true}).waitFor();
         assert.equal(await guestPage.getByRole("checkbox").count(),0);

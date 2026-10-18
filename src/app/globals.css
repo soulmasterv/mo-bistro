@@ -2,7 +2,9 @@
 
 /* Keep Add guest controls visible regardless of utility/theme overrides. */
 #staff-add-guest-form input,
-#staff-add-guest-form select {
+#staff-add-guest-form select,
+#guest-eta-minutes,
+#guest-message-preset {
   display: block;
   width: 100%;
   min-height: 46px;
@@ -15,11 +17,16 @@
   color-scheme: dark;
 }
 #staff-add-guest-form input:focus-visible,
-#staff-add-guest-form select:focus-visible {
+#staff-add-guest-form select:focus-visible,
+#guest-eta-minutes:focus-visible,
+#guest-message-preset:focus-visible {
   outline: 2px solid #e7c587;
   outline-offset: 2px;
 }
 .reception-updating { margin: .5rem 1rem; font-size: .8rem; color: #c5bda9; }
+.queue-sheet-contact button:disabled, .guest-eta-form button:disabled, .guest-eta-form select:disabled {
+  opacity: .45; cursor: not-allowed; filter: grayscale(1);
+}
 :root {
   --background: #f4f0e9;
   --foreground: #302d28;

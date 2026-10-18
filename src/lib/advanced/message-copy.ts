@@ -10,7 +10,7 @@ export function firstName(value:unknown):string|null{
  return Array.from(token.replace(/^['-]+|['-]+$/g,'')).slice(0,24).join('')||null;
 }
 export function greeting(value:unknown){const name=firstName(value);return name?`Hi ${name},`:'Hi there,';}
-export const STOP_INSTRUCTION='To unsubscribe at any time, reply "STOP".';
+export const STOP_INSTRUCTION='To stop updates, reply "STOP".';
 export function acknowledgement(name:unknown,id:number,estimate:string|null){
  return `${greeting(name)} thanks for joining Mo Bistro's waitlist!\nYour booking: #${id}`+
   (estimate?`\nEstimated wait: ${estimate}.`:'')+`\nWe'll message you when your table is ready.\n${STOP_INSTRUCTION}`;

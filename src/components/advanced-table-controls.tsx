@@ -1,10 +1,12 @@
 'use client';
 import {useCallback,useEffect,useState} from 'react';
 import styles from './advanced-table-controls.module.css';
+import {useConfirmation} from '@/components/confirmation-provider';
 type Table={id:number;name:string;seats:number;area:'indoor'|'outdoor';status:string;advanced_revision:number};
 type Override={area:'indoor'|'outdoor';available_count:number;revision:number};
 const empty={name:'',seats:2,area:'indoor' as 'indoor'|'outdoor'};
 export default function AdvancedTableControls({editor=false}:{editor?:boolean}){
+ const confirmAction=useConfirmation();
  const [tables,setTables]=useState<Table[]>([]),[counts,setCounts]=useState<Override[]>([]);
  const [draft,setDraft]=useState(empty),[editing,setEditing]=useState<Table|null>(null);
  const [notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
@@ -43,7 +45,7 @@ export default function AdvancedTableControls({editor=false}:{editor?:boolean}){
    <ul>{tables.map(table=><li key={table.id} className={styles.row}>
     <span>{table.name} · {table.seats} seats · {table.area} · {table.status}</span>
     <button disabled={busy||table.status!=='free'} onClick={()=>{setEditing(table);setDraft({name:table.name,seats:table.seats,area:table.area});}}>Edit</button>
-    <button disabled={busy||table.status!=='free'} onClick={()=>{if(window.confirm('Remove '+table.name+' from available tables? Its history will be retained.'))void save('DELETE',{id:table.id,revision:table.advanced_revision});}}>Delete</button>
+    <button disabled={busy||table.status!=='free'} onClick={async()=>{if(await confirmAction({title:'Remove this table?',message:'Remove '+table.name+' from available tables? Its history will be retained.',confirmLabel:'Remove table',destructive:true}))void save('DELETE',{id:table.id,revision:table.advanced_revision});}}>Delete</button>
    </li>)}</ul>
   </>}
   <p role="status">{notice}</p>

@@ -21,6 +21,7 @@ type Guest = {
   eta_at?: string | null;
 };
 type WhatsApp = {
+  guestId?:number;
   available: boolean;
   subscribed?: boolean;
   feedback_consent?: boolean;
@@ -54,6 +55,7 @@ export default function GuestDetailSheet({
   useStaffDialog(true, ref, onClose);
   const [whatsapp, setWhatsapp] = useState<WhatsApp | null>(null);
   const [whatsappError, setWhatsappError] = useState("");
+  const [presetsOpen, setPresetsOpen] = useState(false);
   useEffect(() => {
     let controller: AbortController | null = null;
     async function refresh() {
@@ -69,7 +71,7 @@ export default function GuestDetailSheet({
         return response.json();
       })
       .then((data) => {
-        if (!current.signal.aborted) { setWhatsapp(data); setWhatsappError(""); }
+        if (!current.signal.aborted) { setWhatsapp({...data,guestId:guest.id}); setWhatsappError(""); }
       })
       .catch(() => {
         if (!current.signal.aborted)
@@ -83,12 +85,8 @@ export default function GuestDetailSheet({
     return () => { controller?.abort(); window.clearTimeout(initial); window.clearInterval(timer); window.removeEventListener("focus", focused); };
   }, [guest.id]);
   const dial = guestDialHref(guest.phone);
-  const egypt = /^01[0125]\d{8}$/.test(guest.phone)
-    ? "2" + guest.phone
-    : guest.phone.replace(/^00/, "").replace(/^\+/, "");
-  const whatsappHref = /^[1-9]\d{7,14}$/.test(egypt)
-    ? "https://wa.me/" + egypt
-    : null;
+  const canMessage = !whatsappError && whatsapp?.guestId === guest.id && whatsapp?.available === true && whatsapp.subscribed === true
+    && !whatsapp.opted_out && whatsapp.confirmation_consent === true;
   const joined = new Date(guest.created_at);
   return createPortal(
     <div
@@ -192,18 +190,16 @@ export default function GuestDetailSheet({
               Call guest
             </a>
           )}
-          {whatsappHref && (
-            <a
+          {previewMessages && (
+            <button type="button"
               className="bistro-button bistro-button-secondary"
-              href={busy ? undefined : whatsappHref}
-              aria-disabled={busy}
-              tabIndex={busy ? -1 : undefined}
-              target="_blank"
-              rel="noopener noreferrer"
+              disabled={busy || !canMessage || !['waiting','called'].includes(guest.status)}
+              onClick={()=>setPresetsOpen(open=>!open)}
+              aria-expanded={presetsOpen}
             >
               <MessageCircle size={16} />
-              Open WhatsApp
-            </a>
+              Send preset
+            </button>
           )}
         </div>
         <details className="queue-booking-details">
@@ -233,12 +229,11 @@ export default function GuestDetailSheet({
             </p>
           )}
           <p>
-            Opening WhatsApp does not subscribe this guest or send a message
-            automatically.
+            Preset updates send from Mo Bistro after subscription and sending checks.
           </p>
         </details>
         <GuestBookingEditor key={guest.id} guestId={guest.id} disabled={externalBusy} onSaved={onRefresh} onBusyChange={setEditorBusy} />
-          {["waiting","called"].includes(guest.status) && <GuestEtaEditor guestId={guest.id} onSaved={onRefresh} manualNearlyReady={previewMessages} />}
+          {["waiting","called"].includes(guest.status) && <GuestEtaEditor key={guest.id} guestId={guest.id} onSaved={onRefresh} manualNearlyReady={previewMessages} canMessage={canMessage} presetsOpen={presetsOpen} onPresetsToggle={setPresetsOpen} />}
         {guest.status === "waiting" && (
           <button
             type="button"
