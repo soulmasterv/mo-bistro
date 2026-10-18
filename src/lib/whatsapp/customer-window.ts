@@ -1,4 +1,5 @@
 import "server-only";
+import {confirmationEstimate} from '@/lib/advanced/estimates';
 import type { Sql, TransactionSql } from "postgres";
 import {
   liveSendingEnabled,
@@ -80,6 +81,10 @@ export async function sendWindowNotification(
       .replaceAll("{booking_id}", String(job.guest_id))
       .replaceAll("{eta_time}", booking.eta_at ? new Intl.DateTimeFormat("en-GB", { timeZone:"Africa/Cairo",hour:"numeric",minute:"2-digit",hour12:true }).format(new Date(booking.eta_at)) : "")
       .replaceAll("{subscribe_command}", `SUBSCRIBE ${job.guest_id} ${code}`);
+    if(job.kind==='confirmation'){
+      const estimate=await confirmationEstimate(sql,job.id,job.guest_id);
+      if(estimate)body+='\n\nEstimated wait: '+estimate+'.';
+    }
     if (
       body.length > 4096 ||
       /\{(?:name|booking_id|subscribe_command|eta_time)\}/.test(body)

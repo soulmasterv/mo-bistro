@@ -49,7 +49,7 @@ export async function nextGuestsByArea() {
           await tx`SELECT area,max_party_size AS seats FROM simple_table_capacity WHERE total_tables>occupied_tables`;
     } else
       available =
-        await tx`SELECT area,MAX(seats) AS seats FROM restaurant_tables WHERE status='free' GROUP BY area`;
+        await tx`SELECT area,MAX(seats) AS seats FROM restaurant_tables WHERE status='free' AND (to_jsonb(restaurant_tables)->>'advanced_archived_at') IS NULL GROUP BY area`;
     const areas = ["indoor", "outdoor"].map((area) => ({
       area,
       seats: Number(available.find((a) => a.area === area)?.seats ?? 0),

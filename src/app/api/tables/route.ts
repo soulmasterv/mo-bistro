@@ -15,7 +15,7 @@ export async function GET() {
 
   if (process.env.MO_BISTRO_DB === "postgres") {
     const rows =
-      await getPostgres()`SELECT id,name,seats,area,status,updated_at FROM restaurant_tables ORDER BY id`;
+      await getPostgres()`SELECT id,name,seats,area,status,updated_at FROM restaurant_tables WHERE (to_jsonb(restaurant_tables)->>'advanced_archived_at') IS NULL ORDER BY id`;
     return NextResponse.json(rows, {
       headers: { "Cache-Control": "no-store" },
     });
@@ -65,7 +65,7 @@ export async function PATCH(request: Request) {
             status: 409,
           };
         const rows =
-          await tx`UPDATE restaurant_tables SET status='occupied',updated_at=CURRENT_TIMESTAMP WHERE id=${body.id} AND status='free' RETURNING id`;
+          await tx`UPDATE restaurant_tables SET status='occupied',updated_at=CURRENT_TIMESTAMP WHERE id=${body.id} AND status='free' AND (to_jsonb(restaurant_tables)->>'advanced_archived_at') IS NULL RETURNING id`;
         return rows.length
           ? { success: true, status: 200 }
           : { error: "Table is unavailable or not found.", status: 409 };

@@ -13,7 +13,7 @@ export async function getAssignableTablesPostgres(guestId: number) {
   const allowOverride = (setting?.value ?? "true") === "true";
   const tables = await sql`
     SELECT t.id,t.name,t.seats,t.area,t.status FROM restaurant_tables t
-    WHERE t.status='free' AND t.seats >= ${guest.party_size}
+    WHERE t.status='free' AND t.seats >= ${guest.party_size} AND (to_jsonb(t)->>'advanced_archived_at') IS NULL
       AND NOT EXISTS (SELECT 1 FROM guests g WHERE g.table_id=t.id AND g.status='seated')
     ORDER BY CASE WHEN ${guest.seating_preference}='any' OR t.area=${guest.seating_preference}
       THEN 0 ELSE 1 END, t.seats ASC, t.id ASC
@@ -35,7 +35,7 @@ export async function assignTablePostgres(guestId: number, tableId: number, acto
     const [guest] = await tx`SELECT id,status,party_size,seating_preference,table_id FROM guests WHERE id=${guestId} FOR UPDATE`;
     if (!guest) throw new WorkflowError("Guest not found");
     if (!["waiting", "called"].includes(guest.status)) throw new WorkflowError("Only waiting guests can be seated");
-    const [table] = await tx`SELECT id,seats,area,status FROM restaurant_tables WHERE id=${tableId} FOR UPDATE`;
+    const [table] = await tx`SELECT id,seats,area,status FROM restaurant_tables WHERE id=${tableId} AND (to_jsonb(restaurant_tables)->>'advanced_archived_at') IS NULL FOR UPDATE`;
     if (!table) throw new WorkflowError("Table not found");
     if (table.status !== "free") throw new WorkflowError("Table is occupied");
     if (table.seats < guest.party_size) throw new WorkflowError("Table is too small for this party");

@@ -6,6 +6,8 @@ import { z } from "zod";
 import db from "@/lib/db";
 import { currentStaff } from "@/lib/staff-auth";
 import { initializeTables, listTables } from "@/lib/restaurant-tables";
+import {advancedEnabled} from '@/lib/advanced/flags';
+import {changeTable,TableConflict} from '@/lib/advanced/tables';
 
 const schema = z.object({
   name: z.string().trim().min(1).max(40),
@@ -21,7 +23,7 @@ export async function GET() {
   }
 
   if (process.env.MO_BISTRO_DB === "postgres") {
-    const rows = await getPostgres()`SELECT id,name,seats,area,status,updated_at FROM restaurant_tables ORDER BY id`;
+    const rows = await getPostgres()`SELECT id,name,seats,area,status,updated_at FROM restaurant_tables WHERE (to_jsonb(restaurant_tables)->>'advanced_archived_at') IS NULL ORDER BY id`;
     return NextResponse.json(rows);
   }
   return NextResponse.json(listTables());
@@ -53,6 +55,10 @@ export async function POST(request: Request) {
 
   if (process.env.MO_BISTRO_DB === "postgres") {
     try {
+      if(advancedEnabled('tableEditor')){
+        const row=await changeTable(staff,parsed.data);
+        return NextResponse.json({id:row.id,success:true},{status:201});
+      }
       const [row] = await getPostgres()`
         INSERT INTO restaurant_tables(name,seats,area)
         VALUES (${parsed.data.name},${parsed.data.seats},${parsed.data.area})
@@ -106,9 +112,13 @@ export async function DELETE(request: Request) {
   }
 
   if (process.env.MO_BISTRO_DB === "postgres") {
+    if(advancedEnabled('tableEditor')){
+      try{await changeTable(staff,null,parsed.data.id);return NextResponse.json({success:true});}
+      catch(error){return NextResponse.json({error:error instanceof TableConflict?error.message:'Unable to remove table.'},{status:409});}
+    }
     const rows = await getPostgres()`
       DELETE FROM restaurant_tables
-      WHERE id=${parsed.data.id} AND status='free'
+      WHERE id=${parsed.data.id} AND status='free' AND (to_jsonb(restaurant_tables)->>'advanced_archived_at') IS NULL
       RETURNING id
     `;
     return rows.length

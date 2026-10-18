@@ -35,7 +35,7 @@ export async function GET(request: Request) {
         const [pool]=await sql`SELECT max_party_size FROM simple_table_capacity WHERE area=${area} AND total_tables>occupied_tables`;
         seats=Number(pool?.max_party_size ?? 0);
       } else {
-        const [table]=await sql`SELECT MAX(seats) AS seats FROM restaurant_tables WHERE area=${area} AND status='free'`;
+        const [table]=await sql`SELECT MAX(seats) AS seats FROM restaurant_tables WHERE area=${area} AND status='free' AND (to_jsonb(restaurant_tables)->>'advanced_archived_at') IS NULL`;
         seats=Number(table?.seats ?? 0);
       }
       const guests=seats>0 ? await sql`SELECT id,name,party_size,seating_preference FROM guests
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
     const sql = getPostgres();
     const [table] = await sql`
       SELECT id, name, seats, area, status
-      FROM restaurant_tables WHERE id = ${id}
+      FROM restaurant_tables WHERE id = ${id} AND (to_jsonb(restaurant_tables)->>'advanced_archived_at') IS NULL
     `;
     if (!table || table.status !== "free") {
       return NextResponse.json({ error: "Table is not available" }, { status: 409 });

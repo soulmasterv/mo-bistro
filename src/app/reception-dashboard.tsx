@@ -45,6 +45,7 @@ type Guest = {
   source: string;
   created_at: string;
   eta_at?: string | null;
+  fits_available?: boolean;
 };
 
 type Action = "call" | "seat" | "no_show" | "cancel" | "confirm";
@@ -466,6 +467,7 @@ export default function Home() {
                           >
                             {guest.name}
                           </button>
+                          {guest.fits_available&&<span className="queue-next-badge">Table fits</span>}
                           {nextGuestIds.includes(guest.id) && ["waiting", "called"].includes(guest.status) && <span className="queue-next-badge" aria-label="Next guest">Next</span>}
                         </h3>
                         <p>

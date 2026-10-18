@@ -31,11 +31,19 @@ export function templatePayload(job: { id: string; kind: NotificationKind; guest
 
 // Only explicitly live mode touches providers. Test mode never publishes or sends.
 export async function publishJob(id: string, revision: number, due: Date) {
+  return publishScheduled(id, revision, due, false);
+}
+
+export async function publishAdvancedReminder(id: string, due: Date) {
+  return publishScheduled(id, 1, due, true);
+}
+
+async function publishScheduled(id: string, revision: number, due: Date, reminder: boolean) {
   if (!liveSendingEnabled()) return { messageId: `test:${id}:${revision}` };
   const token = process.env.QSTASH_TOKEN;
   if (!token) throw new SchedulerError("scheduler_token_missing");
   let destination: string, base: URL;
-  try { destination = callbackUrl("/api/whatsapp/jobs"); }
+  try { destination = callbackUrl(reminder ? "/api/advanced/reminders/jobs" : "/api/whatsapp/jobs"); }
   catch { throw new SchedulerError("scheduler_callback_invalid"); }
   try {
     base = new URL(process.env.QSTASH_URL || "https://qstash.upstash.io");
@@ -49,7 +57,7 @@ export async function publishJob(id: string, revision: number, due: Date) {
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json",
       "Upstash-Not-Before": String(Math.ceil(due.getTime() / 1000)), "Upstash-Retries": "5",
       "Upstash-Deduplication-Id": `${id}-${revision}` },
-    body: JSON.stringify({ notificationId: id, revision }),
+    body: JSON.stringify(reminder ? { reminderId: id } : { notificationId: id, revision }),
   }); } catch { throw new SchedulerError("scheduler_network_failed"); }
   if (!response.ok) throw new SchedulerError(`scheduler_http_${response.status}`);
   const body = await response.json().catch(() => null);

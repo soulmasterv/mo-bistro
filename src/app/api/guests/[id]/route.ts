@@ -3,6 +3,9 @@ import { currentStaff } from "@/lib/staff-auth";
 import { setActivityActor } from "@/lib/staff-activity";
 import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { NextResponse } from "next/server";
+import {after} from 'next/server';
+import {advancedEnabled} from '@/lib/advanced/flags';
+import {dispatchReminders} from '@/lib/advanced/reminders';
 import db from "@/lib/db";
 import { z } from "zod";
 import { requireReceptionStaff, rejectCrossOrigin } from "@/lib/guest-api-security";
@@ -86,7 +89,10 @@ export async function PATCH(
       WHERE id = ${guestId} AND status=ANY(${allowed}::text[]) RETURNING id
     `;
     });
-    if (updated.length) return NextResponse.json({ success: true });
+    if (updated.length) {
+      if(advancedEnabled('reminders'))after(async()=>{try{await dispatchReminders();}catch{console.error('Advanced reminder dispatch deferred');}});
+      return NextResponse.json({ success: true });
+    }
     const existing = await sql`SELECT id FROM guests WHERE id = ${guestId}`;
     return NextResponse.json({ error: existing.length ? "Action not allowed for current status" : "Guest not found" },
       { status: existing.length ? 409 : 404 });

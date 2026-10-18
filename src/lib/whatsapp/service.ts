@@ -7,6 +7,8 @@ import { CONSENT_VERSION, whatsappEnabled, normalizePhone, subscriptionCode, has
 import { sendWindowNotification } from "@/lib/whatsapp/customer-window";
 import { publishJob } from "@/lib/whatsapp/transport";
 import { schedulerErrorCode } from "@/lib/whatsapp/scheduler-error";
+import {dispatchReminders,preNotifyBudget} from '@/lib/advanced/reminders';
+import {estimateAccepted} from '@/lib/advanced/estimates';
 type DeliveryBooking = Eligibility & { id: string; guest_id: number; name: string; phone: string;
   revision: number; attempts: number; tracking_token_hash: string; subscription_expires_at: Date; eta_snapshot_at?: string | null };
 
@@ -118,6 +120,7 @@ export async function dispatchOutbox() {
     const due = await sql`SELECT id,revision FROM whatsapp_notifications WHERE status='scheduled' AND due_at<=NOW() LIMIT 25`;
     for (const job of due) await deliverNotification(job.id, job.revision);
   }
+  await dispatchReminders();
 }
 
 export async function deliverNotification(id: string, revision: number): Promise<"done" | "retry"> {
@@ -165,6 +168,11 @@ export async function deliverNotification(id: string, revision: number): Promise
       await tx`UPDATE whatsapp_notifications SET status='skipped',last_error='consent_or_booking_ineligible',updated_at=NOW() WHERE id=${id}`;
       return "done";
     }
+    if(kind!=='review'&&booking.guest_status==='waiting'&&!await preNotifyBudget(tx,booking.guest_id,id)){
+      await tx`UPDATE whatsapp_notifications SET status='skipped',last_error='pre_notify_budget_exhausted',updated_at=NOW() WHERE id=${id}`;
+      await tx`INSERT INTO whatsapp_delivery_logs(notification_id,event_key,event,error_code) VALUES(${id},${'budget:'+id+':'+booking.attempts},'skipped','pre_notify_budget_exhausted') ON CONFLICT(event_key) DO NOTHING`;
+      return 'done';
+    }
     let result;
     try {
       result = await sendWindowNotification(tx,{ id,kind,guest_id:booking.guest_id },booking,
@@ -172,6 +180,7 @@ export async function deliverNotification(id: string, revision: number): Promise
     } catch { result = { state: "failed" as const,error: "notification_configuration_missing" }; }
     const retry = result.state === "pending" && booking.attempts < 6;
     const state = result.state === "pending" && !retry ? "failed" : result.state;
+    if(state==='sent'&&kind==='confirmation')await estimateAccepted(tx,id);
     await tx`UPDATE whatsapp_notifications SET status=${state},provider_message_id=${result.messageId ?? null},
       last_error=${result.error ?? null},publish_lease_until=NULL,updated_at=NOW() WHERE id=${id}`;
     await tx`INSERT INTO whatsapp_delivery_logs (notification_id,event_key,event,provider_message_id,error_code)

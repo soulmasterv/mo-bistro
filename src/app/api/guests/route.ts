@@ -9,6 +9,10 @@ import { hasGuestEtaColumn } from "@/lib/guest-eta-support";
 import { getPostgres } from "@/lib/postgres-db";
 import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { NextResponse } from "next/server";
+import {after} from 'next/server';
+import {advancedEnabled} from '@/lib/advanced/flags';
+import {availableFit} from '@/lib/advanced/tables';
+import {dispatchReminders} from '@/lib/advanced/reminders';
 import db from "@/lib/db";
 import { z } from "zod";
 import {
@@ -47,10 +51,13 @@ export async function GET() {
       ORDER BY created_at ASC, id ASC
     `;
     const required = await confirmationRequired();
+    const fits=advancedEnabled('tableOverride')?await availableFit(guests.map(g=>({id:Number(g.id),party_size:Number(g.party_size),seating_preference:String(g.seating_preference),status:String(g.status)}))):null;
+    if(advancedEnabled('reminders'))after(async()=>{try{await dispatchReminders();}catch{console.error('Advanced reminder dispatch deferred');}});
     return NextResponse.json(
       guests.map((guest) => ({
         ...guest,
         confirmation_required: required,
+        ...(fits?{fits_available:fits.has(guest.id)}:{}),
       })),
       { headers: { "Cache-Control": "no-store" } },
     );
@@ -100,6 +107,7 @@ export async function POST(request: Request) {
       const result = await createBookingPostgres(body.data, {
         source: "staff",
       });
+      if(!('error' in result)&&advancedEnabled('reminders'))after(async()=>{try{await dispatchReminders();}catch{console.error('Advanced reminder dispatch deferred');}});
       return "error" in result
         ? NextResponse.json(
             {
