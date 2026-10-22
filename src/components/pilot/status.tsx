@@ -39,7 +39,7 @@ export default function PilotStatus(){
   <header className="guest-brand"><UtensilsCrossed size={28}/><span>MO BISTRO · DISTRICT 5</span></header>
   <div className="guest-status-layout"><section className="guest-status-main">
    <h1>{status==='seated'?"You’re seated!":status==='left'?'Thank you for visiting':'Your table is worth the wait'}</h1>
-   <p className="guest-intro">{status==='called'?'Please make your way to reception.':status==='seated'?'Enjoy your visit.':'Follow your place in the queue here.'}</p>
+   <p className="guest-intro">{status==='called'?'Please make your way to reception.':status==='seated'?'Enjoy your visit.':status==='left'?'This booking is closed. Please speak with reception if you need help.':'Follow your place in the queue here.'}</p>
    {error&&<p role="alert" className="guest-small-note">{error}</p>}
    {updating&&<p role="status" className="guest-small-note">Updating…{party?' Showing your last known status.':''}</p>}
    {!party&&!error&&!updating&&<p role="status">Loading your booking…</p>}

@@ -21,6 +21,38 @@ body {
   font-family: var(--font-geist-sans), Arial, sans-serif;
   -webkit-text-size-adjust: 100%;
 }
+/* Pilot Reception owns the document canvas as well as its main surface. The
+   legacy guest cream canvas otherwise shows during scroll/viewport changes.
+   Keep the guest routes light and leave native document scrolling intact. */
+html:has([data-pilot-reception]) {
+  background: #101111;
+  color-scheme: dark;
+  scrollbar-color: #73746e #101111;
+}
+body:has([data-pilot-reception]) {
+  background: #101111;
+}
+[data-pilot-reception] {
+  flex: 1 0 auto;
+  width: 100%;
+  color-scheme: dark;
+  scrollbar-color: #73746e #101111;
+}
+html:has([data-pilot-reception])::-webkit-scrollbar,
+[data-pilot-reception] ::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+html:has([data-pilot-reception])::-webkit-scrollbar-track,
+[data-pilot-reception] ::-webkit-scrollbar-track {
+  background: #101111;
+}
+html:has([data-pilot-reception])::-webkit-scrollbar-thumb,
+[data-pilot-reception] ::-webkit-scrollbar-thumb {
+  background: #73746e;
+  border: 3px solid #101111;
+  border-radius: 8px;
+}
 main,
 section,
 form {

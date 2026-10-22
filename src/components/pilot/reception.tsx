@@ -35,7 +35,7 @@ export default function PilotReception({username}:{username:string}){
   try{const undo_token=value==='undo'?parties.find(p=>p.id===id)?.pending_exit_token:undefined;const r=await fetch(`/api/pilot/parties/${id}`,{method:'PATCH',keepalive:true,signal:AbortSignal.timeout(20000),headers:{'Content-Type':'application/json'},body:JSON.stringify({action:value,...(undo_token?{undo_token}:{}),...(reason?{reason}:{}),...(['phone_call','retry'].includes(value)?{event_id:crypto.randomUUID()}:{})})});const data=await r.json();if(!r.ok)throw Error(data.error||'Action failed.');await refresh(undefined,true);}catch(e){setError(e instanceof Error&&e.name==='TimeoutError'?'The action is taking longer than expected. The queue will refresh its result.':e instanceof Error?e.message:'Action failed.');}finally{pending.current.delete(id);setBusy([...pending.current]);}
  }
  const selected=parties.find(p=>p.id===openParty);
- return <main className={styles.page}><div className={styles.wrap}>
+ return <main className={styles.page} data-pilot-reception><div className={styles.wrap}>
   <header className={styles.header}><div><p className={styles.brand}>Mo Bistro - District 5</p><small>Reception · {username}</small></div>
    <details className={styles.menu} onKeyDown={event=>{if(event.key==='Escape'){event.currentTarget.open=false;event.currentTarget.querySelector('summary')?.focus();}}}>
     <summary aria-label="Reception menu" title="Reception menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></summary>
