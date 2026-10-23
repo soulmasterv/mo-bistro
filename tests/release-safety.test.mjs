@@ -5,7 +5,7 @@ import {createHmac} from 'node:crypto';
 import {load,requireDependency} from './handler-harness.mjs';
 const token='a'.repeat(64),secret='synthetic-session-secret-32-characters';
 const url='postgresql://fixture:synthetic-password@ep-still-wind-b4036sdr-pooler.eu-central-1.aws.neon.tech/mo_bistro_2?sslmode=require&channel_binding=require';
-const base={VERCEL_ENV:'preview',MO_BISTRO_DB:'postgres',MO_BISTRO_POSTGRES_URL:url,STAFF_SESSION_SECRET:secret,
+const base={VERCEL_ENV:'preview',MO_BISTRO_DB:'postgres',MO_BISTRO_POSTGRES_URL:url,STAFF_SESSION_SECRET:secret,RELEASE_SAFETY_EXPECTED_DB_ROLE:'fixture',
  VERCEL_GIT_COMMIT_SHA:'b'.repeat(40),VERCEL_DEPLOYMENT_ID:'dpl_Fixture',WHATSAPP_ENABLED:'false',WHATSAPP_MODE:'simulation',WHATSAPP_ALLOW_LIVE_SEND:'false'};
 const headers={origin:'https://bistro.test'};
 function fixture({env={},cookie=token,manager=true,identity={},failure,timeout=false}={}){
@@ -15,7 +15,7 @@ function fixture({env={},cookie=token,manager=true,identity={},failure,timeout=f
   if(failure)throw Error(failure);
   if(text.startsWith('SET LOCAL'))return [];
   if(text.includes('staff_sessions'))return manager?[{id:1}]:[];
-  return [{database:'mo_bistro_2',schema:'public',read_only:'on',...identity}];
+  return [{database:'mo_bistro_2',schema:'public',read_only:'on',current_role:'fixture',session_role:'fixture',rolsuper:false,rolcreatedb:false,rolcreaterole:false,rolreplication:false,rolbypassrls:false,elevated_membership:false,...identity}];
  };
  const client={begin:async(options,fn)=>{state.begins.push(options);return timeout?new Promise(()=>{}):fn(query);},end:async options=>{assert.equal(options.timeout,0);state.ends++;}};
  const mocks={postgres:options=>{state.clients.push(options);return client;},'next/headers':{cookies:async()=>{state.cookieReads++;return {get:()=>cookie==null?undefined:{value:cookie}};}}};
@@ -65,7 +65,7 @@ test('Only same-origin GET can inspect; HEAD and mutations never connect',async(
 
 test('Manager response is minimal; read-only, TLS, timeouts and connection closure are enforced',async()=>{
  const f=fixture();const r=await f.get();assert.equal(r.status,200);assert.match(r.headers.get('Cache-Control'),/private, no-store/);assert.equal(r.headers.get('Vary'),'Cookie');
- const data=await r.json();assert.deepEqual(data,{database:{endpoint:'ep-still-wind-b4036sdr',database:'mo_bistro_2',schema:'public',matches_expected:true},deployment:{commit:'b'.repeat(40),id:'dpl_Fixture'},messaging:{normal_sending_allowed:false,manual_preview_test_sending_allowed:false,window_sending_allowed:false,pending_job_delivery_live_allowed:false,all_reviewed_sending_paths_disabled:true}});
+ const data=await r.json();assert.deepEqual(data,{database:{endpoint:'ep-still-wind-b4036sdr',database:'mo_bistro_2',schema:'public',matches_expected:true,configured_role_matches_policy:true,current_user_matches_configured_role:true,session_user_matches_configured_role:true,direct_role_admin_flags_disabled:true,elevated_role_membership_disabled:true},deployment:{commit:'b'.repeat(40),id:'dpl_Fixture'},messaging:{normal_sending_allowed:false,manual_preview_test_sending_allowed:false,window_sending_allowed:false,pending_job_delivery_live_allowed:false,all_reviewed_sending_paths_disabled:true}});
  const serialized=JSON.stringify(data);for(const privateValue of [token,secret,'synthetic-password','fixture:',url])assert.ok(!serialized.includes(privateValue));
  assert.deepEqual(f.begins,['read only']);assert.equal(f.ends,1);assert.equal(f.queries.length,5);
  assert.deepEqual(f.queries.slice(0,3).map(q=>q.text),["SET LOCAL statement_timeout = '2s'","SET LOCAL lock_timeout = '500ms'","SET LOCAL idle_in_transaction_session_timeout = '3s'"]);
@@ -79,6 +79,44 @@ test('Mismatched runtime identity, driver errors and deadline fail closed withou
   const f=fixture(input);const r=await f.get();assert.equal(r.status,503);assert.deepEqual(await r.json(),{error:'Diagnostic unavailable'});assert.equal(f.ends,1);
  }
  const f=fixture({env:{VERCEL_GIT_COMMIT_SHA:secret,VERCEL_DEPLOYMENT_ID:url}});const data=await(await f.get()).json();assert.deepEqual(data.deployment,{commit:null,id:null});
+});
+
+test('Explicit operator role policy is required before connecting; privileged/default/mismatched roles are refused',async()=>{
+ for(const role of [undefined,'','mo_bistro_app','postgres','neondb_owner','neon_superuser','pg_monitor','fixture ','Fixture','fixture;SET ROLE postgres']){
+  const f=fixture({env:{RELEASE_SAFETY_EXPECTED_DB_ROLE:role}});
+  assert.equal((await f.get()).status,404);assert.equal(f.clients.length,0);assert.equal(f.cookieReads,0);
+ }
+ // A different non-administrative role is accepted only when explicitly approved
+ // AND it is the configured login, never merely because its name exists in Neon.
+ const f=fixture({env:{RELEASE_SAFETY_EXPECTED_DB_ROLE:'other_app',MO_BISTRO_POSTGRES_URL:url.replace('fixture:','other_app:')},identity:{current_role:'other_app',session_role:'other_app'}});
+ assert.equal((await f.get()).status,200);
+});
+
+test('Runtime current_user/session_user and all direct administrative flags must match policy',async()=>{
+ const cases=[{current_role:'other'},{session_role:'other'},{current_role:undefined},{session_role:undefined}];
+ for(const flag of ['rolsuper','rolcreatedb','rolcreaterole','rolreplication','rolbypassrls','elevated_membership'])for(const value of [true,undefined,null,'false'])cases.push({[flag]:value});
+ for(const identity of cases){const f=fixture({identity});const response=await f.get();assert.equal(response.status,503);assert.deepEqual(await response.json(),{error:'Diagnostic unavailable'});assert.equal(f.ends,1);}
+ const f=fixture();assert.equal((await f.get()).status,200);
+ assert.match(f.queries[4].text,/current_user AS current_role, session_user AS session_role/);
+ assert.match(f.queries[4].text,/FROM pg_catalog.pg_roles r WHERE r.rolname=current_user/);
+});
+
+test('Role identity SQL executes in isolated PostgreSQL and detects switched and elevated memberships',async()=>{
+ const f=fixture();await f.get();const identitySql=f.queries[4].text;
+ const {PGlite}=requireDependency('@electric-sql/pglite');const db=new PGlite();
+ try{
+  await db.exec('CREATE ROLE fixture LOGIN; CREATE ROLE other_app; CREATE ROLE elevated_group CREATEDB; GRANT other_app TO fixture; SET SESSION AUTHORIZATION fixture;');
+  const normal=(await db.query(identitySql)).rows[0];
+  assert.equal(normal.current_role,'fixture');assert.equal(normal.session_role,'fixture');
+  for(const key of ['rolsuper','rolcreatedb','rolcreaterole','rolreplication','rolbypassrls','elevated_membership'])assert.equal(normal[key],false,key);
+  await db.exec('SET ROLE other_app');
+  const switched=(await db.query(identitySql)).rows[0];assert.equal(switched.current_role,'other_app');assert.equal(switched.session_role,'fixture');
+ }finally{await db.close();}
+ const elevatedDb=new PGlite();
+ try{
+  await elevatedDb.exec('CREATE ROLE fixture LOGIN; CREATE ROLE elevated_group CREATEDB; GRANT elevated_group TO fixture; SET SESSION AUTHORIZATION fixture;');
+  assert.equal((await elevatedDb.query(identitySql)).rows[0].elevated_membership,true);
+ }finally{await elevatedDb.close();}
 });
 
 test('Messaging matrix matches actual normal and separate Preview-test policies without importing senders',()=>{
@@ -102,7 +140,7 @@ test('Authentication predicates run in a real isolated read-only engine; expired
    await db.exec('DELETE FROM staff_sessions;DELETE FROM staff_users;');await db.query('INSERT INTO staff_users VALUES(1,$1,$2)',[role,active]);await db.query('INSERT INTO staff_sessions VALUES(1,$1,$2)',[idHash,expires]);
    const factory=()=>({end:async()=>{},begin:async(options,fn)=>{assert.equal(options,'read only');return db.transaction(async tx=>{
     await tx.exec('SET TRANSACTION READ ONLY');
-    const sql=async(strings,...values)=>{let q='';strings.forEach((s,i)=>{q+=s;if(i<values.length)q+='$'+(i+1);});if(q.includes('current_database()')){assert.equal((await tx.query("SELECT current_setting('transaction_read_only') AS ro")).rows[0].ro,'on');return [{database:'mo_bistro_2',schema:'public',read_only:'on'}];}return(await tx.query(q,values)).rows;};
+    const sql=async(strings,...values)=>{let q='';strings.forEach((s,i)=>{q+=s;if(i<values.length)q+='$'+(i+1);});if(q.includes('current_database()')){assert.equal((await tx.query("SELECT current_setting('transaction_read_only') AS ro")).rows[0].ro,'on');return [{database:'mo_bistro_2',schema:'public',read_only:'on',current_role:'fixture',session_role:'fixture',rolsuper:false,rolcreatedb:false,rolcreaterole:false,rolreplication:false,rolbypassrls:false,elevated_membership:false}];}return(await tx.query(q,values)).rows;};
     return fn(sql);
    });}});
    const mod=load('src/lib/release-safety.ts',{postgres:factory},{process:{env:base},setTimeout,clearTimeout});
