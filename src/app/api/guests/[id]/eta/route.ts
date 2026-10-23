@@ -7,7 +7,6 @@ import { scheduleEtaUpdate, scheduleAlmostReady, dispatchOutbox } from "@/lib/wh
 import { liveSendingEnabled, whatsappEnabled } from "@/lib/whatsapp/policy";
 import { z } from "zod";
 import { getPostgres } from "@/lib/postgres-db";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { requireReceptionStaff, rejectCrossOrigin } from "@/lib/guest-api-security";
 
 export const runtime = "nodejs";
@@ -27,8 +26,6 @@ export async function PATCH(
   const badOrigin = rejectCrossOrigin(request);
   if (badOrigin) return badOrigin;
 
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
 
   if (process.env.MO_BISTRO_DB !== "postgres") {
     return NextResponse.json(

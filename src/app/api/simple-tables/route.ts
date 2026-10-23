@@ -2,7 +2,6 @@ import { WorkflowError } from "@/lib/workflow-error";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { currentStaff } from "@/lib/staff-auth";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import { getPostgres } from "@/lib/postgres-db";
 import { listSimpleTables, freeSimpleTable } from "@/lib/simple-table-postgres";
@@ -61,8 +60,6 @@ export async function POST(request: Request) {
     );
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
   if (process.env.MO_BISTRO_DB !== "postgres")
     return NextResponse.json(
       { error: "PostgreSQL required." },
@@ -93,8 +90,6 @@ export async function PUT(request: Request) {
     );
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
   if (process.env.MO_BISTRO_DB !== "postgres")
     return NextResponse.json(
       { error: "PostgreSQL required." },

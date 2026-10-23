@@ -3,7 +3,6 @@ import {advancedEnabled} from '@/lib/advanced/flags';
 import {getPostgres} from '@/lib/postgres-db';
 import {currentStaff} from '@/lib/staff-auth';
 import {rejectCrossOrigin} from '@/lib/guest-api-security';
-import {requireActiveLicense} from '@/lib/licensing/enforce';
 import {changeTable,TableConflict} from '@/lib/advanced/tables';
 const details=z.object({name:z.string().trim().min(1).max(40),seats:z.number().int().min(1).max(30),area:z.enum(['indoor','outdoor'])});
 const existing=z.object({id:z.number().int().positive(),revision:z.number().int().nonnegative()});
@@ -18,7 +17,6 @@ async function mutate(request:Request,method:'POST'|'PATCH'|'DELETE'){
  const actor=await currentStaff();
  if(actor?.role!=='manager')return Response.json({error:'Forbidden'},{status:403});
  const origin=rejectCrossOrigin(request);if(origin)return origin;
- const license=await requireActiveLicense();if(license)return license;
  const schema=method==='POST'?details.strict():method==='PATCH'?details.extend(existing.shape).strict():existing.strict();
  const parsed=schema.safeParse(await request.json().catch(()=>null));
  if(!parsed.success)return Response.json({error:'Check table details.'},{status:400});

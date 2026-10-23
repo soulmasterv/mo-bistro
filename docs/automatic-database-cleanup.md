@@ -16,7 +16,7 @@ Implemented locally; no database, scheduler or environment changes are made by t
 
 The scheduler route only supports POST. It requires `VERCEL_ENV=preview`, `MO_BISTRO_DB=postgres`, an independent private `DATABASE_CLEANUP_SECRET` of at least 32 characters, and an exact `Authorization: Bearer <secret>` header. Missing authentication never reaches SQL. The worker verifies `current_database() = 'mo_bistro_2'` before deleting; a differently named database aborts. This name check supplements environment isolation; verify the Neon endpoint/branch too before activation.
 
-Managers can enable/pause the policy under Management → Danger zone. Changing that preference requires manager authentication, same-origin validation, an active license and a custom confirmation. It does not itself delete anything. Enablement defaults to false when no setting exists. Scheduler-secret presence does **not** prove an actual schedule exists.
+Managers can enable/pause the policy under Management → Danger zone. Changing that preference requires manager authentication, same-origin validation and a custom confirmation. It does not itself delete anything. Enablement defaults to false when no setting exists. Scheduler-secret presence does **not** prove an actual schedule exists.
 
 One transaction acquires the existing seating and registration locks in their existing order. Maximum 500 candidate bookings and 1,000 rows per temporary table per run. Jobs are locked and rechecked to avoid deleting an in-flight delivery. Missing schema, FK errors or other SQL failures roll back the entire batch. Repeated successful calls are safe; no provider API is called. Last successful completion time and counts are saved without customer data.
 

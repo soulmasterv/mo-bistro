@@ -3,7 +3,6 @@ import { confirmationRequired } from "@/lib/confirmation-policy";
 import { isAllowedQROrigin } from "@/lib/qr-origin";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getSettingPostgres } from "@/lib/staff-auth-postgres";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { getSetting } from "@/lib/staff-auth";
 import { verifyQR } from "@/lib/rotating-qr";
 import { cookies } from "next/headers";
@@ -61,8 +60,6 @@ export async function POST(request: Request) {
   const limited = await checkRateLimit(request, "join", 20, 600);
   if (limited) return limited;
 
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
 
   try {
     const body = schema.safeParse(await request.json());

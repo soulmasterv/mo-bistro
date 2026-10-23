@@ -4,7 +4,6 @@ import { z } from "zod";
 import { currentStaff } from "@/lib/staff-auth";
 import { getPostgres } from "@/lib/postgres-db";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 
 export const runtime = "nodejs";
 
@@ -26,8 +25,6 @@ export async function GET() {
   if (staff?.role !== "manager") {
     return NextResponse.json({ error: "Manager access required." }, { status: 403 });
   }
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
   if (process.env.MO_BISTRO_DB !== "postgres") {
     return NextResponse.json({ error: "PostgreSQL required." }, { status: 503 });
   }
@@ -58,8 +55,6 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Manager access required." }, { status: 403 });
   }
 
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
 
   if (process.env.MO_BISTRO_DB !== "postgres") {
     return NextResponse.json({ error: "PostgreSQL required." }, { status: 503 });

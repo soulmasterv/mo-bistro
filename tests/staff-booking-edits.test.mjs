@@ -85,7 +85,7 @@ test('seating blocks detail edits but permits notes; closed bookings are protect
   }finally{await t.db.close();}
 });
 
-test('auth, cross-origin, license and strict validation protect private booking mutations',async()=>{
+test('auth, cross-origin and strict validation protect private booking mutations',async()=>{
   const t=await setup();try{
     for(const actor of [null,{id:2,role:'waiter'}]) {
       t.h.state.actor=actor;
@@ -93,7 +93,6 @@ test('auth, cross-origin, license and strict validation protect private booking 
     }
     t.h.state.actor={id:1,role:'manager'};
     assert.equal((await t.route.PATCH(request('PATCH',t.values,{origin:'https://evil.test'}),context(1))).status,403);
-    t.h.state.license=false;assert.equal((await t.patch(t.values)).status,403);t.h.state.license=true;
     for(const invalid of [{party_size:31},{party_size:1.5},{party_size:0},{name:'A'},{name:'Bad\0Name'},
       {seating_preference:'roof'},{notes:'x'.repeat(1001)},{notes:'bad\0note'},{phone:'01011111111'},
       {actor_id:2},{revision:-1},{status:'seated'}]) assert.equal((await t.patch({...t.values,...invalid})).status,400);
