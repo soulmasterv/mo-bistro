@@ -40,8 +40,9 @@ test('Pilot QA: expanded reception layout, dark scrolling and booking subtitles'
         });
       }}],
     });
-    const globalCss=fs.readdirSync('.next/static/chunks').filter(file=>file.endsWith('.css'))
-      .map(file=>fs.readFileSync(path.join('.next/static/chunks',file),'utf8')).join('\n');
+    const globalCss=fs.readdirSync('.next/static',{recursive:true}).filter(file=>file.endsWith('.css'))
+      .map(file=>fs.readFileSync(path.join('.next/static',file),'utf8')).join('\n');
+    assert.ok(globalCss.length>0,'Production CSS is required');
     const parties=Array.from({length:135},(_,i)=>({id:i+1,name:`Synthetic QA Guest ${i+1}`,
       phone:'01000000001',party_size:2,preference:i%2?'outdoor':'indoor',status:'waiting',
       joined_at:'2026-10-22T15:00:00Z',called_at:null,whatsapp_consent:false,message_status:null,

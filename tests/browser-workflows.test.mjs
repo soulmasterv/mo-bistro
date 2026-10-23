@@ -19,7 +19,12 @@ if (screenshots) fs.mkdirSync(screenshots, { recursive: true });
 // This exercises UI behavior; it is not a live authentication/Neon/Vercel test.
 test(
   "Desktop/mobile workspace navigation, login sizing, table controls and QR behavior",
-  { skip: !tools || !playwrightPath },
+  // This fixture renders the legacy full platform (Management/Waiter/Detailed
+  // tables and its green theme). Pilot intentionally exposes different routes
+  // and a neutral theme; its real UI fixture lives in pilot-ui.test.mjs.
+  { skip: fs.existsSync('src/lib/pilot/config.ts')
+    ? 'Legacy full-platform fixture is not a Pilot workflow; run pilot-ui.test.mjs'
+    : !tools || !playwrightPath },
   async () => {
     const esbuild = dependency(path.join(tools, "esbuild"));
     const { chromium } = dependency(playwrightPath);
@@ -97,12 +102,13 @@ test(
       ],
     });
     const css = fs
-      .readdirSync(".next/static/chunks")
+      .readdirSync(".next/static", { recursive: true })
       .filter((file) => file.endsWith(".css"))
       .map((file) =>
-        fs.readFileSync(path.join(".next/static/chunks", file), "utf8"),
+        fs.readFileSync(path.join(".next/static", file), "utf8"),
       )
       .join("\n");
+    assert.ok(css.length > 0, "Production CSS must exist for either supported compiler");
     const html = fs.readFileSync(".next/server/app/join.html", "utf8");
     const viewport = html.match(/<meta name="viewport"[^>]*>/)?.[0];
     assert.ok(viewport);
