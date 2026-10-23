@@ -609,6 +609,7 @@ test("Both Reception table views expose Clear Table only for occupied tables", (
       pools,
       null,
       "",
+      true, // availability has loaded
       null,
       "",
     ];
@@ -658,14 +659,19 @@ test("Reception queue badges and QR dialog contain accessible Mo Bistro copy", (
   ];
   const values = [
     guests,
+    true, // loaded waitlist
     null,
     "",
     "all",
     null,
     false,
-    true,
+    "", // tracking handoff
+    true, // QR dialog
+    null, // header portal
+    [], // next guest recommendations
     "https://bistro.test/join",
-    "",
+    "", // copied-link message
+    "", // name
     "",
     2,
     "any",

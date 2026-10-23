@@ -157,6 +157,11 @@ export default function SeatGuestModal({
             ))}
           </div>
         )}
+        {!loading && mode === "simple" && areas.length === 0 && (
+          <p role="status" className="mt-4 text-sm text-amber-200">
+            No compatible free area is available for this party. Ask a manager to arrange suitable seating before assignment. Combining tables is not supported here.
+          </p>
+        )}
         <div className="mt-5 space-y-2">
           {tables.map((table) => {
             const preferred =

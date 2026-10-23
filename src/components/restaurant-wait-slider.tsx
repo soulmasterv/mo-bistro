@@ -11,8 +11,8 @@ function formatWait(minutes: number): string {
 }
 
 export default function RestaurantWaitSlider() {
-  const [minutes, setMinutes] = useState(30);
-  const [saved, setSaved] = useState(30);
+  const [minutes, setMinutes] = useState<number | null>(null);
+  const [saved, setSaved] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -21,10 +21,11 @@ export default function RestaurantWaitSlider() {
       const response = await fetch("/api/wait-estimate", { cache: "no-store" });
       if (!response.ok) throw new Error();
       const data = await response.json();
-      if (typeof data.minutes === "number") {
+      if (Number.isSafeInteger(data.minutes) && data.minutes >= 15 && data.minutes <= 240) {
         setSaved(data.minutes);
         setMinutes(data.minutes);
-      }
+        setError("");
+      } else throw new Error("Invalid wait estimate");
     } catch {
       setError("Could not load the restaurant wait estimate.");
     }
@@ -36,6 +37,7 @@ export default function RestaurantWaitSlider() {
   }, [refresh]);
 
   async function save() {
+    if (minutes === null || busy) return;
     setBusy(true);
     setError("");
     try {
@@ -49,6 +51,7 @@ export default function RestaurantWaitSlider() {
         throw new Error(data.error || "Unable to save.");
       }
       setSaved(minutes);
+      window.dispatchEvent(new Event("mo-bistro-wait-changed"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save.");
     } finally {
@@ -66,7 +69,7 @@ export default function RestaurantWaitSlider() {
           </p>
         </div>
         <span className="text-2xl font-semibold text-[#C5A77B]">
-          {formatWait(minutes)}
+          {minutes === null ? error ? "Estimate unavailable" : "Loading estimate…" : formatWait(minutes)}
         </span>
       </div>
 
@@ -75,7 +78,8 @@ export default function RestaurantWaitSlider() {
         min={15}
         max={240}
         step={15}
-        value={minutes}
+        value={minutes ?? 15}
+        disabled={minutes === null || busy}
         onChange={event => setMinutes(Number(event.target.value))}
         aria-label="Restaurant estimated wait in minutes"
         className="mt-6 w-full accent-[#C5A77B]"
@@ -90,12 +94,13 @@ export default function RestaurantWaitSlider() {
         <button
           type="button"
           onClick={() => void save()}
-          disabled={busy || minutes === saved}
+          disabled={busy || minutes === null || minutes === saved}
           className="rounded-xl bg-[#C5A77B] px-5 py-2.5 text-sm font-semibold text-[#101820] disabled:opacity-40"
         >
-          {busy ? "Saving..." : minutes === saved ? "Saved" : "Save estimate"}
+          {busy ? "Saving..." : minutes === null ? "Estimate unavailable" : minutes === saved ? "Saved" : "Save estimate"}
         </button>
         {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+        {minutes === null && error && <button type="button" onClick={() => void refresh()}>Retry estimate</button>}
       </div>
     </section>
   );

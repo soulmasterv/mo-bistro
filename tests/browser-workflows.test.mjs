@@ -243,6 +243,13 @@ test(
             )?.[1] ?? "manager";
         let data = {};
         if (/^\/api\/guests\/\d+$/.test(url.pathname) && req.method === "PATCH") guestActions.push(body.action);
+        if (/^\/api\/guests\/\d+\/staff-details$/.test(url.pathname)) {
+          const id=Number(url.pathname.split('/')[3]);
+          const guest=guests.find(guest=>guest.id===id);
+          res.setHeader('content-type','application/json');
+          res.end(JSON.stringify({booking:{...guest,notes:'',revision:0},history:[]}));
+          return;
+        }
         if (url.pathname.startsWith("/api/whatsapp/guests/")) {
           res.setHeader("content-type", "application/json");
           res.end(

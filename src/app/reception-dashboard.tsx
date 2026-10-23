@@ -72,6 +72,7 @@ export default function Home() {
   const confirmAction = useConfirmation();
   const guestsController = useRef<AbortController | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
+  const [guestsLoaded, setGuestsLoaded] = useState(false);
   const [seatingGuest, setSeatingGuest] = useState<Guest | null>(null);
   const [search, setSearch] = useState("");
   const [queueFilter, setQueueFilter] = useState<
@@ -122,6 +123,8 @@ export default function Home() {
       const data = await response.json();
       if (!controller.signal.aborted) {
         setGuests(data);
+        setGuestsLoaded(true);
+        setError("");
         setQueueClock(Date.now());
       }
     } catch {
@@ -367,7 +370,7 @@ export default function Home() {
                 <span>{stat.label}</span>
                 <stat.icon size={18} />
               </div>
-              <strong>{stat.value.toString().padStart(2, "0")}</strong>
+              <strong>{guestsLoaded ? stat.value.toString().padStart(2, "0") : "—"}</strong>
               <p>{stat.caption}</p>
             </article>
           ))}
@@ -385,7 +388,7 @@ export default function Home() {
               <div>
                 <h2>
                   Waiting queue{" "}
-                  <span className="bistro-count">{active.length}</span>
+                  <span className="bistro-count">{guestsLoaded ? active.length : "—"}</span>
                 </h2>
               </div>
               <div className="bistro-tabs" aria-label="Queue status">
@@ -403,7 +406,7 @@ export default function Home() {
                     onClick={() => setQueueFilter(value)}
                   >
                     {label} (
-                    {value === "all"
+                    {!guestsLoaded ? "—" : value === "all"
                       ? active.length
                       : value === "waiting"
                         ? waiting
@@ -571,16 +574,17 @@ export default function Home() {
                   </article>
                 );
               })}
-              {filtered.length === 0 && (
+              {!guestsLoaded && <p role="status">{error ? "Waitlist unavailable. Please refresh." : "Loading waitlist…"}</p>}
+              {guestsLoaded && filtered.length === 0 && (
                 <div className="bistro-empty">
                   <Users size={30} />
-                  <h3>Queue is empty.</h3>
-                  <p>No active guests found. New arrivals will appear here.</p>
+                  <h3>{search || queueFilter !== "all" ? "No matching guests." : "Queue is empty."}</h3>
+                  <p>{search || queueFilter !== "all" ? "Change the search or filter to see other guests." : "New arrivals will appear here."}</p>
                 </div>
               )}
             </div>
             <footer className="bistro-panel-footer">
-              <span>{filtered.length} parties shown</span>
+              <span>{guestsLoaded ? `${filtered.length} parties shown` : "Loading parties…"}</span>
               <span>
                 <i className="bistro-dot" /> Refreshes every 5 seconds
               </span>

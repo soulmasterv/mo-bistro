@@ -61,7 +61,8 @@ export default function ReceptionServiceStrip() {
     const timer = window.setInterval(() => { if (document.visibilityState === "visible") void refresh(); }, 5000);
     const changed = () => void refresh(true);
     window.addEventListener("mo-bistro-tables-changed", changed);
-    return () => { controller?.abort(); window.clearTimeout(initial); window.clearInterval(timer); window.removeEventListener("mo-bistro-tables-changed", changed); };
+    window.addEventListener("mo-bistro-wait-changed", changed);
+    return () => { controller?.abort(); window.clearTimeout(initial); window.clearInterval(timer); window.removeEventListener("mo-bistro-tables-changed", changed); window.removeEventListener("mo-bistro-wait-changed", changed); };
   }, []);
   const eta = minutes === null ? "—" : minutes >= 60
     ? `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}m` : ""}` : `${minutes}m`;

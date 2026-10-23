@@ -43,10 +43,12 @@ export default function RestaurantWaitDisplay({ etaAt }: { etaAt?: string | null
     void refresh();
 
     const timer = window.setInterval(() => void refresh(), 15000);
+    window.addEventListener("mo-bistro-wait-changed", refresh);
 
     return () => {
       active = false;
       window.clearInterval(timer);
+      window.removeEventListener("mo-bistro-wait-changed", refresh);
     };
   }, [personal]);
 

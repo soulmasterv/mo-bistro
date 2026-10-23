@@ -30,6 +30,7 @@ export default function TableAvailability() {
     Partial<Record<"indoor" | "outdoor", string>>
   >({});
   const [error, setError] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async (force = false) => {
     if (loadController.current && !force) return;
@@ -56,6 +57,7 @@ export default function TableAvailability() {
       setMode(nextMode);
       setTables(nextMode === "detailed" ? data : []);
       setPools(nextMode === "simple" ? data.areas : []);
+      setLoaded(true);
       setError("");
     } catch (err) {
       if (!controller.signal.aborted) throw err;
@@ -223,7 +225,7 @@ export default function TableAvailability() {
         <div>
           <h2 className="text-xl font-semibold">Table availability</h2>
           <p className="mt-1 text-sm text-slate-400">
-            {free} free / {total} total
+            {loaded ? `${free} free / ${total} total` : "Availability pending"}
           </p>
         </div>
 
@@ -237,10 +239,11 @@ export default function TableAvailability() {
         </button>
       </div>
 
-      <p className="mb-4 text-xs text-slate-400">
-        {mode === "simple" ? "Simple view" : "Detailed view"}
+      {!loaded && !error && <p role="status">Loading table availability…</p>}
+      {loaded && <p className="mb-4 text-xs text-slate-400">
+        {mode === "simple" ? "Simple view · Aggregate area capacity; individual tables are not assigned." : "Detailed view · Named table inventory."}
         {" · "}Managed in Settings
-      </p>
+      </p>}
 
       {error && (
         <p role="alert" className="mb-4 text-sm text-red-300">
@@ -248,7 +251,7 @@ export default function TableAvailability() {
         </p>
       )}
 
-      {mode === "simple" ? (
+      {!loaded ? null : mode === "simple" ? (
         <div className="grid gap-4 sm:grid-cols-2">
           {(["indoor", "outdoor"] as const).map((area) => {
             const counts = summary(area);
@@ -334,7 +337,7 @@ export default function TableAvailability() {
           {notice}
         </p>
       )}
-      {total === 0 && (
+      {loaded && total === 0 && (
         <p className="mt-4 text-sm text-slate-400">
           No tables yet. A manager can add tables in Settings.
         </p>
