@@ -19,7 +19,7 @@
     "@upstash/qstash": "2.12.0",
     "better-sqlite3": "^12.11.1",
     "lucide-react": "^1.53.0",
-    "next": "16.4.0",
+    "next": "16.4.1",
     "postgres": "^3.4.9",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
@@ -37,7 +37,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.4.0",
+    "eslint-config-next": "16.4.1",
     "postcss": "^8.5.29",
     "tailwindcss": "^4.3.3",
     "typescript": "^5"
