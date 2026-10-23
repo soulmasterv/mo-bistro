@@ -6,7 +6,6 @@ import {
   assignSimpleTable,
 } from "@/lib/simple-table-postgres";
 import { databaseErrorCode, databaseFailure } from "@/lib/database-errors";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { NextResponse, after } from "next/server";
 import { whatsappEnabled } from "@/lib/whatsapp/policy";
 import { dispatchOutbox } from "@/lib/whatsapp/service";
@@ -91,8 +90,6 @@ export async function POST(request: Request) {
       { status: 403 },
     );
   }
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
 
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;

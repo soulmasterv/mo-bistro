@@ -4,7 +4,6 @@ import { currentStaff } from "@/lib/staff-auth";
 import { hashCredential } from "@/lib/staff-auth-utils";
 import { getPostgres } from "@/lib/postgres-db";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 
 export const runtime = "nodejs";
 
@@ -18,8 +17,6 @@ export async function PATCH(request: Request) {
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
 
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
 
   if (process.env.MO_BISTRO_DB !== "postgres") {
     return NextResponse.json(

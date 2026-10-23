@@ -1,5 +1,4 @@
 import { getPostgres } from "@/lib/postgres-db";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -36,8 +35,6 @@ export async function POST(request: Request) {
   if (staff?.role !== "manager") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
 
 
   const parsed = schema.safeParse(
@@ -93,8 +90,6 @@ export async function DELETE(request: Request) {
   if (staff?.role !== "manager") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
 
 
   const parsed = z.object({

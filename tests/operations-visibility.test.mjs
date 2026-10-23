@@ -50,7 +50,6 @@ test('migration-backed wait samples, staff attribution, pause enforcement and se
     const globals={process:{env:{MO_BISTRO_DB:'postgres',WHATSAPP_MODE:'test',WHATSAPP_ALLOW_LIVE_SEND:'false'}}};
     const route=load('src/app/api/management/operations/route.ts',{
       ...mocks,'@/lib/staff-auth':{currentStaff:async()=>({id:1,role:'manager'})},
-      '@/lib/licensing/enforce':{requireActiveLicense:async()=>null}
     },globals);
     assert.equal((await route.PATCH(request('PATCH',{paused:true,confirm:true}))).status,200);
     const creator=load('src/lib/booking-creation.ts',mocks);
@@ -102,7 +101,6 @@ test('operations endpoint rejects unauthorized users, cross-origin mutations and
   }
   const h=harness();assert.equal((await h.route('management/operations').PATCH(request('PATCH',{paused:true,confirm:true},{origin:'https://evil.test'}))).status,403);
   assert.equal(h.queries.length,0);
-  const inactive=harness({license:false});assert.equal((await inactive.route('management/operations').PATCH(request('PATCH',{paused:true,confirm:true}))).status,403);
 });
 
 test('missing operations migration reports unavailable sections without claiming historic activity',async()=>{

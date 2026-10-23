@@ -264,7 +264,7 @@ for (const area of ["indoor", "outdoor"]) {
   );
 }
 
-test("Area requests deny reception, cross-origin and inactive-license requests", async () => {
+test("Area requests deny reception and cross-origin requests", async () => {
   const h = harness({ actor: { id: 2, role: "reception" } });
   const route = h.route("waiter/area-requests");
   assert.equal(
@@ -278,11 +278,6 @@ test("Area requests deny reception, cross-origin and inactive-license requests",
         request("POST", { area: "indoor" }, { origin: "https://evil.test" }),
       )
     ).status,
-    403,
-  );
-  h.state.license = false;
-  assert.equal(
-    (await route.POST(request("POST", { area: "indoor" }))).status,
     403,
   );
   assert.equal(h.queries.length, 0);
@@ -706,8 +701,8 @@ test("Reception queue badges and QR dialog contain accessible Mo Bistro copy", (
   assert.ok(!markup.includes("Restaurant Concierge"));
 });
 
-test("License enforcement remains effective on staff account and shift mutations", async () => {
-  const h = harness({ license: false });
+test("Staff account and shift operations retain authentication after licensing removal", async () => {
+  const h = harness({ actor: null });
   for (const [file, method, body] of [
     ["management/staff-pin/users", "GET"],
     ["management/staff", "POST", {}],
@@ -715,11 +710,6 @@ test("License enforcement remains effective on staff account and shift mutations
     ["management/staff-pin", "PATCH", {}],
     ["management/staff-shifts", "GET"],
     ["management/staff-shifts", "PUT", {}],
-  ])
-    assert.equal(
-      (await h.route(file)[method](request(method, body))).status,
-      403,
-      file,
-    );
+  ]) assert.equal((await h.route(file)[method](request(method, body))).status, 403, file);
   assert.equal(h.queries.length, 0);
 });

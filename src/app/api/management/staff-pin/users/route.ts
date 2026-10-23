@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { currentStaff } from "@/lib/staff-auth";
 import { getPostgres } from "@/lib/postgres-db";
 import { databaseFailure, databaseErrorCode } from "@/lib/database-errors";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 
 export const runtime = "nodejs";
 
@@ -17,8 +16,6 @@ export async function GET() {
       );
     }
 
-    const licenseError = await requireActiveLicense();
-    if (licenseError) return licenseError;
 
     if (process.env.MO_BISTRO_DB !== "postgres") {
       return NextResponse.json(

@@ -1,7 +1,6 @@
 import { getPostgres } from "@/lib/postgres-db";
 import { currentStaff } from "@/lib/staff-auth";
 import { setActivityActor } from "@/lib/staff-activity";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { z } from "zod";
@@ -31,8 +30,6 @@ export async function PATCH(
   if (denied) return denied;
   const badOrigin = rejectCrossOrigin(request);
   if (badOrigin) return badOrigin;
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
 
 
   const { id } = await context.params;

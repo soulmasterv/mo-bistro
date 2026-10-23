@@ -1,6 +1,5 @@
 import { databaseErrorCode, databaseFailure } from "@/lib/database-errors";
 import { getPostgres } from "@/lib/postgres-db";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -29,8 +28,6 @@ export async function POST(request: Request) {
       { status: 403 }
     );
   }
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
 
 
   const parsed = createSchema.safeParse(
@@ -94,8 +91,6 @@ export async function PATCH(request: Request) {
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
 
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
 
   if (process.env.MO_BISTRO_DB !== "postgres") {
     return NextResponse.json({ error: "PostgreSQL required." }, { status: 503 });
