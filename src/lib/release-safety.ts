@@ -6,9 +6,19 @@ type Environment = Record<string, string | undefined>;
 export const RELEASE_SAFETY_ENDPOINT = "ep-still-wind-b4036sdr";
 const DATABASE = "mo_bistro_2";
 
+// Diagnostic-only operator attestation. No default: a role existing in Neon is
+// not evidence that it is approved for either deployed application.
+function approvedRole(env: Environment) {
+  const role = env.RELEASE_SAFETY_EXPECTED_DB_ROLE;
+  return role && /^[a-z][a-z0-9_]{0,62}$/.test(role) &&
+    !/^(?:postgres|neondb_owner|neon_superuser|pg_.*)$/.test(role) ? role : null;
+}
+
 // Accept only one endpoint. Never pass URL query options or PG* overrides to a client.
 export function approvedReleaseTarget(env: Environment) {
   if (env.VERCEL_ENV !== "preview" || env.MO_BISTRO_DB !== "postgres") return null;
+  const role = approvedRole(env);
+  if (!role) return null;
   try {
     const raw = env.MO_BISTRO_POSTGRES_URL;
     if (!raw || raw.trim() !== raw || /[\s\\]/.test(raw)) return null;
@@ -16,7 +26,7 @@ export function approvedReleaseTarget(env: Environment) {
     if (!["postgres:", "postgresql:"].includes(url.protocol) || url.hash ||
         !/^ep-still-wind-b4036sdr(?:-pooler)?\.(?:c-[0-9]+\.)?[a-z0-9-]+\.(?:aws|azure|gcp)\.neon\.tech$/.test(url.hostname) ||
         (url.port && url.port !== "5432") || url.pathname !== "/" + DATABASE ||
-        !url.username || !url.password) return null;
+        !url.username || !url.password || decodeURIComponent(url.username) !== role) return null;
     for (const [key, value] of url.searchParams) {
       if (!(key === "sslmode" && ["require", "verify-full"].includes(value)) &&
           !(key === "channel_binding" && value === "require")) return null;
@@ -65,11 +75,25 @@ export async function inspectReleaseSafety(target: NonNullable<ReturnType<typeof
             AND u.active=1 AND u.role='manager' LIMIT 1`;
         if (managers.length !== 1) return null;
         const [identity] = await tx`SELECT current_database() AS database, current_schema() AS schema,
-          current_setting('transaction_read_only') AS read_only`;
-        if (identity?.database !== DATABASE || identity?.schema !== "public" || identity?.read_only !== "on")
+          current_user AS current_role, session_user AS session_role,
+          current_setting('transaction_read_only') AS read_only,
+          r.rolsuper, r.rolcreatedb, r.rolcreaterole, r.rolreplication, r.rolbypassrls,
+          EXISTS (SELECT 1 FROM pg_catalog.pg_roles elevated
+            WHERE (elevated.rolsuper OR elevated.rolcreatedb OR elevated.rolcreaterole OR
+              elevated.rolreplication OR elevated.rolbypassrls OR elevated.rolname='neon_superuser')
+              AND pg_catalog.pg_has_role(current_user, elevated.oid, 'MEMBER')) AS elevated_membership
+          FROM pg_catalog.pg_roles r WHERE r.rolname=current_user`;
+        if (identity?.database !== DATABASE || identity?.schema !== "public" || identity?.read_only !== "on" ||
+            identity?.current_role !== target.username || identity?.session_role !== target.username ||
+            target.username !== approvedRole(env) ||
+            [identity.rolsuper, identity.rolcreatedb, identity.rolcreaterole,
+              identity.rolreplication, identity.rolbypassrls, identity.elevated_membership].some(value => value !== false))
           throw new Error("Identity mismatch");
         return {
-          database: { endpoint: RELEASE_SAFETY_ENDPOINT, database: DATABASE, schema: "public", matches_expected: true },
+          database: { endpoint: RELEASE_SAFETY_ENDPOINT, database: DATABASE, schema: "public", matches_expected: true,
+            configured_role_matches_policy: true, current_user_matches_configured_role: true,
+            session_user_matches_configured_role: true, direct_role_admin_flags_disabled: true,
+            elevated_role_membership_disabled: true },
           deployment: {
             commit: /^[a-f0-9]{40}$/.test(env.VERCEL_GIT_COMMIT_SHA ?? "") ? env.VERCEL_GIT_COMMIT_SHA : null,
             id: /^dpl_[a-zA-Z0-9]+$/.test(env.VERCEL_DEPLOYMENT_ID ?? "") ? env.VERCEL_DEPLOYMENT_ID : null,
