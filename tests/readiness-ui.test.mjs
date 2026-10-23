@@ -27,7 +27,8 @@ test('Advanced readiness: delayed loads, separate inventories, wait estimate and
  b.onLoad({filter:/.*/,namespace:'fixture'},a=>({loader:'tsx',resolveDir:root,contents:a.path==='next/link'?'import React from "react";export default function Link(p){return <a {...p}/>}':'export function useRouter(){return {push(){},replace(){},refresh(){}}}export function useSearchParams(){return new URLSearchParams(location.search)}export function usePathname(){return location.pathname}'}));
  b.onResolve({filter:/^@\//},a=>{const base=path.join(root,'src',a.path.slice(2));return {path:['.ts','.tsx'].map(e=>base+e).find(f=>fs.existsSync(f))};});
  }}]});
- const css=fs.readdirSync('.next/static/chunks').filter(f=>f.endsWith('.css')).map(f=>fs.readFileSync(path.join('.next/static/chunks',f),'utf8')).join('\n');
+ const css=fs.readdirSync('.next/static',{recursive:true}).filter(f=>f.endsWith('.css')).map(f=>fs.readFileSync(path.join('.next/static',f),'utf8')).join('\n');
+ assert.ok(css.length>0,'Production CSS is required');
  let mode='simple',delay=true,waitMinutes=45,waitUnavailable=false;
  const areas=[{area:'indoor',total_tables:12,occupied_tables:12,free_tables:0,max_party_size:4},{area:'outdoor',total_tables:12,occupied_tables:5,free_tables:7,max_party_size:4}];
  const server=http.createServer((req,res)=>{

@@ -97,12 +97,13 @@ test(
       ],
     });
     const css = fs
-      .readdirSync(".next/static/chunks")
+      .readdirSync(".next/static", { recursive: true })
       .filter((file) => file.endsWith(".css"))
       .map((file) =>
-        fs.readFileSync(path.join(".next/static/chunks", file), "utf8"),
+        fs.readFileSync(path.join(".next/static", file), "utf8"),
       )
       .join("\n");
+    assert.ok(css.length > 0, "Production CSS must exist for either supported compiler");
     const html = fs.readFileSync(".next/server/app/join.html", "utf8");
     const viewport = html.match(/<meta name="viewport"[^>]*>/)?.[0];
     assert.ok(viewport);
