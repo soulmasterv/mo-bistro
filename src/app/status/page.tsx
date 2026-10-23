@@ -22,6 +22,7 @@ type Tracking = {
   guest: {
     name: string;
     party_size: number;
+    seating_preference?: "indoor" | "outdoor" | "any";
     status: string;
     confirmed: boolean;
     created_at: string;
@@ -197,6 +198,10 @@ function StatusContent() {
                       <Users size={16} /> Party size
                     </dt>
                     <dd>{data.guest.party_size}</dd>
+                  </div>
+                  <div>
+                    <dt>Seating preference</dt>
+                    <dd>{data.guest.seating_preference === "indoor" ? "Indoor" : data.guest.seating_preference === "outdoor" ? "Outdoor" : "No preference"}</dd>
                   </div>
                   {active && (
                     <>

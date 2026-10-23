@@ -15,6 +15,7 @@ type Guest = {
   id: number;
   name: string;
   party_size: number;
+  seating_preference: "indoor" | "outdoor" | "any";
   status: string;
   confirmed: number;
   created_at: string;
@@ -23,7 +24,7 @@ type Guest = {
 
 function findGuest(token: string): Guest | undefined {
   return db.prepare(`
-    SELECT id, name, party_size, status, confirmed, created_at
+    SELECT id, name, party_size, seating_preference, status, confirmed, created_at
     FROM guests
     WHERE tracking_token_hash = ?
   `).get(hashTrackingToken(token)) as Guest | undefined;
@@ -53,10 +54,10 @@ export async function GET(request: Request) {
     const sql = getPostgres();
     const hasEta = await hasGuestEtaColumn();
     const guests = hasEta ? await sql<Guest[]>`
-      SELECT id, name, party_size, status, confirmed, created_at, eta_at
+      SELECT id, name, party_size, seating_preference, status, confirmed, created_at, eta_at
       FROM guests WHERE tracking_token_hash = ${hashTrackingToken(token)} LIMIT 1
     ` : await sql<Guest[]>`
-      SELECT id, name, party_size, status, confirmed, created_at, NULL AS eta_at
+      SELECT id, name, party_size, seating_preference, status, confirmed, created_at, NULL AS eta_at
       FROM guests WHERE tracking_token_hash = ${hashTrackingToken(token)} LIMIT 1
     `;
     const guest = guests[0];
@@ -70,6 +71,7 @@ export async function GET(request: Request) {
     return json({
       confirmation_required: requiresConfirmation,
       guest: { name: guest.name, party_size: guest.party_size,
+        seating_preference: guest.seating_preference,
         status: guest.status, confirmed: Boolean(guest.confirmed),
         created_at: guest.created_at,
         eta_at: ["waiting", "called"].includes(guest.status) ? guest.eta_at ?? null : null },
@@ -107,6 +109,7 @@ export async function GET(request: Request) {
     guest: {
       name: guest.name,
       party_size: guest.party_size,
+      seating_preference: guest.seating_preference,
       status: guest.status,
       confirmed: Boolean(guest.confirmed),
       created_at: guest.created_at,

@@ -69,7 +69,9 @@ export async function POST(request: Request) {
 
     if (!body.success) {
       return NextResponse.json(
-        { error: "Please check your registration details." },
+        { error: body.error.issues.find(issue => issue.path[0] === "phone")?.message
+            || body.error.issues.find(issue => issue.path[0] === "name")?.message
+            || "Please check your registration details." },
         { status: 400 },
       );
     }
