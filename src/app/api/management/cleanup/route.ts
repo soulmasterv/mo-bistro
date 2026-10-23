@@ -1,6 +1,5 @@
 import { currentStaff } from "@/lib/staff-auth";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { getPostgres } from "@/lib/postgres-db";
 import { cleanupAvailable, CLEANUP_ENABLED_KEY, CLEANUP_RESULT_KEY } from "@/lib/database-cleanup";
 
@@ -31,8 +30,6 @@ export async function PATCH(request: Request) {
   const origin = rejectCrossOrigin(request);
   if (origin) return origin;
   if (!cleanupAvailable()) return Response.json({ error: "Preview PostgreSQL only" }, { status: 403, headers });
-  const license = await requireActiveLicense();
-  if (license) return license;
   const body = await request.json().catch(() => null);
   if (!body || Object.keys(body).length !== 2 || typeof body.enabled !== "boolean" || body.confirm !== true)
     return Response.json({ error: "Explicit confirmation required" }, { status: 400, headers });

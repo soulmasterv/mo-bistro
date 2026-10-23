@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { currentStaff } from "@/lib/staff-auth";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import { databaseFailure, databaseErrorCode } from "@/lib/database-errors";
 import { WorkflowError } from "@/lib/workflow-error";
@@ -21,8 +20,6 @@ export async function POST(request: Request) {
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
 
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
 
   if (process.env.MO_BISTRO_DB !== "postgres") {
     return NextResponse.json({ error: "PostgreSQL required" }, { status: 503 });

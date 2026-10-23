@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { currentStaff } from "@/lib/staff-auth";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import { getPostgres } from "@/lib/postgres-db";
 import db from "@/lib/db";
@@ -72,8 +71,6 @@ export async function PATCH(request: Request) {
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
 
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
 
   const body = await request.json().catch(() => null);
 

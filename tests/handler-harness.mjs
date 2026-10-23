@@ -5,7 +5,7 @@ import ts from "typescript";
 import { createRequire } from "node:module";
 const requireDependency = createRequire(import.meta.url);
 
-// Execute the actual handlers with isolated auth/license/SQL boundaries. No DB URL
+// Execute the actual handlers with isolated auth/SQL boundaries. No DB URL
 // or real database client is loaded. These are regression tests, not live DB tests.
 function load(file, mocks = {}, globals = {}, cache = new Map()) {
   const filename = path.resolve(file);
@@ -67,7 +67,6 @@ function load(file, mocks = {}, globals = {}, cache = new Map()) {
 function harness(options = {}) {
   const state = {
     actor: { id: 1, role: "manager", username: "manager" },
-    license: true,
     ...options,
   };
   const queries = [];
@@ -88,12 +87,6 @@ function harness(options = {}) {
     "@/lib/staff-auth": auth,
     "@/lib/staff-auth-utils": { hashCredential: () => "test-hash" },
     "@/lib/postgres-db": { getPostgres: () => sql },
-    "@/lib/licensing/enforce": {
-      requireActiveLicense: async () =>
-        state.license
-          ? null
-          : Response.json({ error: "Subscription inactive" }, { status: 403 }),
-    },
     "@/lib/db": {},
     "@/lib/staff-auth-postgres": {
       getSettingPostgres: async () => state.approval ?? "false",

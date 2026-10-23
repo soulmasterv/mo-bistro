@@ -64,7 +64,6 @@ test('migration-backed cleanup removes only eligible history; preserves live dat
     assert.equal((await service(sql).runDatabaseCleanup()).skipped,true);
     const settingsRoute=load('src/app/api/management/cleanup/route.ts',{
       '@/lib/staff-auth':{currentStaff:async()=>({id:1,role:'manager'})},
-      '@/lib/licensing/enforce':{requireActiveLicense:async()=>null},
       '@/lib/postgres-db':{getPostgres:()=>sql},
     },{process:{env}});
     assert.equal((await (await settingsRoute.GET()).json()).enabled,false);
@@ -110,17 +109,15 @@ test('cleanup scheduler rejects Production, missing secret, bad authorization; n
   await assert.rejects(service(()=>{throw Error('No SQL');},{...env,VERCEL_ENV:'production'}).runDatabaseCleanup(),/restricted/);
 });
 
-test('cleanup preference requires manager, same origin, license and explicit confirmation',async()=>{
-  for(const [actor,body,origin,license,expected] of [
-    [null,{enabled:true,confirm:true},'https://bistro.test',true,401],
-    [{role:'reception'},{enabled:true,confirm:true},'https://bistro.test',true,403],
-    [{role:'manager'},{enabled:true,confirm:true},'https://evil.test',true,403],
-    [{role:'manager'},{enabled:true,confirm:true},'https://bistro.test',false,403],
-    [{role:'manager'},{enabled:true},'https://bistro.test',true,400],
-    [{role:'manager'},{enabled:true,confirm:true,days:1},'https://bistro.test',true,400]]) {
+test('cleanup preference requires manager, same origin and explicit confirmation',async()=>{
+  for(const [actor,body,origin,expected] of [
+    [null,{enabled:true,confirm:true},'https://bistro.test',401],
+    [{role:'reception'},{enabled:true,confirm:true},'https://bistro.test',403],
+    [{role:'manager'},{enabled:true,confirm:true},'https://evil.test',403],
+    [{role:'manager'},{enabled:true},'https://bistro.test',400],
+    [{role:'manager'},{enabled:true,confirm:true,days:1},'https://bistro.test',400]]) {
     const route=load('src/app/api/management/cleanup/route.ts',{
       '@/lib/staff-auth':{currentStaff:async()=>actor},
-      '@/lib/licensing/enforce':{requireActiveLicense:async()=>license?null:Response.json({}, {status:403})},
       '@/lib/postgres-db':{getPostgres:()=>{throw Error('No SQL allowed');}},
     },{process:{env}});
     assert.equal((await route.PATCH(request('PATCH',body,{origin}))).status,expected);

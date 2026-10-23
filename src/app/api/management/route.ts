@@ -1,7 +1,6 @@
 import { confirmationRequired } from "@/lib/confirmation-policy";
 import { getPostgres } from "@/lib/postgres-db";
 import { getSettingPostgres, initStaffPostgres } from "@/lib/staff-auth-postgres";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -78,8 +77,6 @@ export async function PATCH(request: Request) {
       { error: "Forbidden" }, { status: 403 }
     );
   }
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
 
 
   try {
