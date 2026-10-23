@@ -7,7 +7,6 @@ import {
 } from "@/lib/guest-tracking";
 import { hasGuestEtaColumn } from "@/lib/guest-eta-support";
 import { getPostgres } from "@/lib/postgres-db";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { NextResponse } from "next/server";
 import {after} from 'next/server';
 import {advancedEnabled} from '@/lib/advanced/flags';
@@ -88,8 +87,6 @@ export async function POST(request: Request) {
   if (denied) return denied;
   const badOrigin = rejectCrossOrigin(request);
   if (badOrigin) return badOrigin;
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
 
   try {
     const body = GuestSchema.safeParse(await request.json());

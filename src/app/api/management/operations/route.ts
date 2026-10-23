@@ -1,6 +1,5 @@
 import { currentStaff } from "@/lib/staff-auth";
 import { getPostgres } from "@/lib/postgres-db";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import { setActivityActor } from "@/lib/staff-activity";
 import { callbackUrl, liveSendingEnabled, whatsappEnabled } from "@/lib/whatsapp/policy";
@@ -113,8 +112,6 @@ export async function PATCH(request: Request) {
   if (!staff) return Response.json({ error: "Manager access required" }, { status: 403, headers });
   const origin = rejectCrossOrigin(request);
   if (origin) return origin;
-  const license = await requireActiveLicense();
-  if (license) return license;
   if (process.env.MO_BISTRO_DB !== "postgres") return Response.json({ error: "PostgreSQL required" }, { status: 503, headers });
   const body = await request.json().catch(() => null);
   if (!body || Object.keys(body).length !== 2 || typeof body.paused !== "boolean" || body.confirm !== true)

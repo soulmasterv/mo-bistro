@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getPostgres } from "@/lib/postgres-db";
 import db from "@/lib/db";
 import { currentStaff } from "@/lib/staff-auth";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { setupSeating } from "@/lib/seating-v3";
 
 export const dynamic = "force-dynamic";
@@ -60,8 +59,6 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
   }
 
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
 
   const body = await request.json().catch(() => null);
   if (!validMinutes(body?.minutes)) {

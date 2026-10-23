@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { currentStaff } from "@/lib/staff-auth";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import { getPostgres } from "@/lib/postgres-db";
 import { recordBulkActivity, setActivityActor } from "@/lib/staff-activity";
@@ -13,8 +12,6 @@ export async function POST(request: Request) {
   if (staff.role !== "manager") return Response.json({ error: "Manager access required" }, { status: 403, headers });
   const origin = rejectCrossOrigin(request);
   if (origin) return origin;
-  const license = await requireActiveLicense();
-  if (license) return license;
   const body = await request.json().catch(() => null);
   if (!body || Object.keys(body).length !== 2 || body.confirm !== true ||
       !["free_tables", "cancel_queue"].includes(body.action)) {

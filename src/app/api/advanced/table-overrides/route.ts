@@ -3,7 +3,6 @@ import {advancedEnabled} from '@/lib/advanced/flags';
 import {getPostgres} from '@/lib/postgres-db';
 import {currentStaff} from '@/lib/staff-auth';
 import {rejectCrossOrigin} from '@/lib/guest-api-security';
-import {requireActiveLicense} from '@/lib/licensing/enforce';
 import {setTableOverride,TableConflict} from '@/lib/advanced/tables';
 export async function GET(){
  if(!advancedEnabled('tableOverride'))return Response.json({error:'Disabled'},{status:404});
@@ -18,7 +17,6 @@ export async function PUT(request:Request){
  const actor=await currentStaff();
  if(!actor||!['manager','reception'].includes(actor.role))return Response.json({error:'Forbidden'},{status:403});
  const origin=rejectCrossOrigin(request);if(origin)return origin;
- const license=await requireActiveLicense();if(license)return license;
  const parsed=schema.safeParse(await request.json().catch(()=>null));
  if(!parsed.success)return Response.json({error:'Enter a whole count from 0 to 500.'},{status:400});
  try{return Response.json(await setTableOverride(actor,parsed.data.area,parsed.data.available_count,parsed.data.revision));}

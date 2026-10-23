@@ -1,0 +1,662 @@
+.env.example:5: LICENSE_ADMIN_KEY_SHA256=YOUR_PRODUCTION_OWNER_KEY_HASH
+.env.example:6: LICENSE_ENFORCEMENT=true
+README.md:17: The cloud feature set uses `MO_BISTRO_DB=postgres`, `MO_BISTRO_POSTGRES_URL` pointing to the selected isolated database, and `STAFF_SESSION_SECRET` of at least 32 characters. Licensing also needs its schema and configuration; `LICENSE_ENFORCEMENT=false` only bypasses enforcement in development, not Preview/Production.
+README.md:36: Provision the initial manager through a reviewed administrative procedure using the existing salted credential format. No default password/account is created by this guide. Establish the restaurant's approved license before testing protected mutations.
+README.md:57: Public and staff PostgreSQL creation share the capacity lock. Walk-ins remain staff-confirmed, receive a one-time private tracking-link/QR handoff, and start without WhatsApp permissions. Staff cannot set customer opt-ins. Guest subscriptions still require an actual verified incoming WhatsApp reply. A token lost after the creation response cannot be recovered from its database hash; do not expose a token through guest listing or public lookup.
+README.md:65: Keep the current operational record available while validating a release. On database/network failure, stop retrying uncertain seat/release actions blindly, switch to the agreed paper process, record times/actions, and reconcile occupancy before resuming the app. License failure remains enforced; no automatic fail-open/grace bypass is introduced. A service-night shadow test, device/load tests and license-expiry policy still require operational review.
+docs/automatic-database-cleanup.md:19: Managers can enable/pause the policy under Management → Danger zone. Changing that preference requires manager authentication, same-origin validation, an active license and a custom confirmation. It does not itself delete anything. Enablement defaults to false when no setting exists. Scheduler-secret presence does **not** prove an actual schedule exists.
+docs/bug-followup-20261012.md:17: | Unable to load staff accounts | Fallback implemented; deployed error unresolved | Listing survives absent pin_hash; authentication and backend errors are tested. Other schema/connectivity/license causes have not been ruled out live. |
+docs/feedback-20261014.md:15: - Guest details refresh WhatsApp subscription status while open and on window focus. Guest tracking checks status when returning from WhatsApp and offers a manual Check subscription status button. Opening WhatsApp never activates consent.
+docs/feedback-20261014.md:28: **Subscription after a sent reply:** the guest UI already polled every ten seconds; stale staff details were a separate issue. A missing `whatsapp_customer_windows` table can still reject signed webhook processing before subscriptions are recorded. Also, while isolated Preview testing is enabled, messages from `WHATSAPP_TEST_RECIPIENT` intentionally go to `whatsapp_preview_inbound` and bypass customer consent processing. This behavior remains unchanged. Verify signature, correct business number, booking-specific reply, matching sender, expiry, processing outcome and persisted consent before declaring the live issue resolved. Do not infer opt-in from a generic inbound message or a successful webhook response.
+docs/feedback-20261014.md:37: - Browser assertions cover natural wheel scrolling of a long queue, queue clearance above mobile controls, next-guest badge, removed Settings button, dialog flows, long content and subscription transition after status refresh.
+docs/guest-green-review-and-eta-20261015.md:1: # Guest palette, bundled review subscription and ETA messages
+docs/guest-green-review-and-eta-20261015.md:6: - The separate review checkbox is removed. The WhatsApp subscription card clearly describes booking updates **and one review request 60 minutes after seating** before the customer opens WhatsApp. Its booking-specific command now ends in `REVIEWS`.
+docs/isolated-postgres-concurrency-plan.md:5: The executable is `tests/isolated-postgres-concurrency.test.mjs`. It runs actual production booking/seating helpers and queue/Management handlers against the postgres driver, while authentication/license/provider boundaries are synthetic. Provider sending and consent writes are stubbed off. It is a database locking test, not a real login/WhatsApp-delivery test.
+docs/isolated-postgres-concurrency-plan.md:44: Synthetic fixture inserts follow migration completion. Returned actor/table IDs are used, and the migration-created Indoor/Outdoor pools are updated rather than inserted again. No real customer data or live license/credentials are copied. Authentication and license boundaries remain synthetic; this does not prove live sign-in/license enforcement.
+docs/license-grace-preview-rollout.md:3: Prepared only. No Preview/Production migration, environment edit, license action or message send was performed for this change.
+docs/license-grace-preview-rollout.md:10: - Starting grace requires a currently active, unexpired license. An explicit owner-issued grace grants the full 24 hours even if normal billing expiry occurs within them. After that, expired billing requires renewal; Reactivate does not add subscription time.
+docs/license-grace-preview-rollout.md:12: - License changes and their audit entry commit together. A monotonically increasing revision prevents old confirmations from becoming valid again after suspend/reactivate cycles.
+docs/license-grace-preview-rollout.md:22: SELECT to_regclass('public.restaurant_license') AS license_table,
+docs/license-grace-preview-rollout.md:23:        to_regclass('public.license_audit_log') AS audit_table;
+docs/license-grace-preview-rollout.md:27:   AND table_name IN ('restaurant_license','license_audit_log')
+docs/license-grace-preview-rollout.md:29: SELECT id,status,plan,expires_at FROM public.restaurant_license;
+docs/license-grace-preview-rollout.md:32:  ('public.restaurant_license'::regclass,'public.license_audit_log'::regclass);
+docs/license-grace-preview-rollout.md:35: Expected base schema is `migrations/002_licensing.sql`. The new names `restaurant_license.suspension_due_at`, `restaurant_license.license_revision`, and `license_audit_log.details` must all be absent. If any are already present, or the base schema differs, **stop and reconcile**; do not blindly rerun or drop anything. Keep an operator-controlled schema/data backup before authorized DDL.
+docs/license-grace-preview-rollout.md:40: 2. Separately approve/apply `migrations/20261016_license_grace.sql` to the verified Preview database. It only adds three columns, runs in a transaction and times out if locks cannot be acquired. No rows are deleted and no existing license status/expiry changes.
+docs/license-grace-preview-rollout.md:42: 4. Update the four changed panel files from `integrations/subscription-control` into `/home/local/subscription-control` (mapped as `Y:\subscription-control`): `app.js`, `license-control-client.mjs`, `public/index.html`, `public/panel.js`. Back up these files first. Preserve `.env`, Cloudflare auth and dependency files. Restart only its existing PM2 process after approval.
+docs/license-grace-preview-rollout.md:43: 5. Sign in and Check connection. The setup response must have `ready:true` and `graceReady:true`. Confirm the correct Preview identity. Do not test license-changing controls against real data without approval.
+docs/license-grace-preview-rollout.md:46: SELECT id,status,plan,expires_at,suspension_due_at,license_revision
+docs/license-grace-preview-rollout.md:47: FROM public.restaurant_license;
+docs/license-grace-preview-rollout.md:49: FROM public.restaurant_license; -- zero immediately after this migration
+docs/license-grace-preview-rollout.md:53:  ((table_name='restaurant_license' AND column_name IN ('suspension_due_at','license_revision'))
+docs/license-grace-preview-rollout.md:54:   OR (table_name='license_audit_log' AND column_name='details'));
+docs/license-grace-preview-rollout.md:55: SELECT has_table_privilege(current_user,'public.restaurant_license','SELECT') AS can_read_license,
+docs/license-grace-preview-rollout.md:56:        has_table_privilege(current_user,'public.restaurant_license','UPDATE') AS can_update_license,
+docs/license-grace-preview-rollout.md:57:        has_table_privilege(current_user,'public.license_audit_log','INSERT') AS can_audit;
+docs/license-grace-preview-rollout.md:68: The existing “Cancel all waiting bookings” action correctly refuses a suspended license before any booking SQL. Synthetic testing verifies it becomes available when active. Seated bookings are intentionally preserved.
+docs/license-grace-preview-rollout.md:74: Planned sender: `Labbing <no-reply@labbing.space>`, reply-to `subscribtion@labbing.space`. Those addresses do not yet exist. Cloudflare Email Sending must be enabled for the sending domain, with approved plan/billing and DNS authentication. Preserve Zoho receiving MX records when onboarding a sender; any receiving/routing change requires a separate review. The recipient/contact list, reminder timing, provider credential and authorized test recipient must be configured privately before testing. Desired notices: grace started, reminder, service paused and access restored. License enforcement must not depend on email-provider availability.
+docs/management-actions-20261014.md:20: The endpoint enforces manager authentication, same-origin requests, active license,
+docs/migration-backed-harness-readiness.md:13: - Authentication/license/provider boundaries remain synthetic; no WhatsApp integration is activated by the harness.
+docs/migration-backed-harness-readiness.md:43: Fresh-install compatibility and concurrency against real PostgreSQL are pending this run. Representative upgrade testing, live authentication/license checks, provider delivery and sustained load/outage tests remain separate requirements.
+docs/mo-bistro-final-revision-20261012.md:31: - Staff mutations and both PostgreSQL login flows share same-origin/protocol checks; cross-site Fetch Metadata is rejected even when Origin is absent. Existing account lockout, license checks, cookie security and session revocation remain intact.
+docs/mo-bistro-fix-report-20261012.md:11: - Area requests retain waiter/manager access, cross-origin and license checks, occupied-area verification and per-staff duplicate prevention. A unique partial area/staff index backs the application lock and conflict handling. Schema failures identify the repair migration. Fresh migration ordering is corrected: the area migration previously sorted before the table creation migration.
+docs/mo-bistro-fix-report-20261012.md:43: - UNAVAILABLE: live PostgreSQL integration, actual SQL constraints/migration execution, real session/login tests and concurrent transaction enforcement. Regression tests execute actual handlers with mocked SQL/auth/license boundaries; they verify control flow and emitted queries, not a live database.
+docs/operations-visibility.md:12: - All new insights and mutations are manager-only and no-store. Mutations enforce origin, license, payload and confirmation checks. Activity is limited to 100 newest events, WhatsApp jobs to 50 newest, with internal scrolling on small screens.
+docs/operations-visibility.md:20: The health panel reads configuration **booleans only**, schema availability, job state, verified subscription/window state for the matching configured business phone and latest safe delivery events. Unknown free-text provider/database errors are replaced with a generic safe explanation, never returned verbatim. It shows missing scheduler/Meta/association configuration and the distinction between provider acceptance, delivery, simulation and unknown acceptance. Configuration presence does not prove credentials are valid or a scheduler is working.
+docs/preview-subscription-interception-20261014.md:1: # Preview test-recipient subscription repair
+docs/preview-subscription-interception-20261014.md:7: cannot establish booking subscription. The reported deployed booking was not
+docs/preview-subscription-interception-20261014.md:11: isolated, but parsed subscription and text opt-out commands now reach the existing
+docs/preview-subscription-interception-20261014.md:24: booking's subscription command again from the booking's registered phone to the
+docs/reference-web-ui-20261013.md:7: - WhatsApp subscription uses natural copy and the exact UNSUBSCRIBE/STOP opt-out sentence. Subscription still requires a received verified reply. Already-subscribed guests see enabled status; review preference is collapsed by default and remains editable while relevant. Before subscription it is shown as a separate preference. No new subscribe CTA appears for seated guests.
+docs/reference-web-ui-20261013.md:18: - src/components/whatsapp-subscription.tsx: friendly copy, enabled/review states, seated CTA suppression.
+docs/reference-web-ui-20261013.md:21: - src/lib/whatsapp/service.ts: review preference relevance exposed before subscription; existing consent/subscribe/security behavior preserved.
+docs/resume-staff-booking-20261016.md:15: - `24e8d169eebbdad845d4e138f19e2cc4db52dfcd`: private staff notes, name/party-size/preference editing, audit history, revision conflicts, role/origin/license guards and synthetic tests.
+docs/resume-staff-booking-20261016.md:69: - Unrelated staff-announcement work remains unstaged/untracked in the working tree: subscription-control files, globals/header, announcement API/component/library/migration/tests, `.env.example` and license harness. Preserve it and do not sweep it into this feature's commits.
+docs/single-subscription-and-alignment-20261014.md:7: existing signed-webhook checks must accept it before subscription activates.
+docs/single-subscription-and-alignment-20261014.md:24: permission, the post-booking subscription CTA, independent review consent and
+docs/stabilization-handoff.md:13: - Walk-ins receive a private token at creation and receptionist QR/copy handoff; no token is exposed in queue listing. Existing guest-side subscription/review consent remains guest-controlled.
+docs/stabilization-handoff.md:25: - No OTP provider, off-shift lockout, license grace bypass, international-phone expansion, analytics or wait prediction is introduced.
+docs/stabilization-readiness-20261013.md:35: | C3: guest-controlled consent | Existing subscription/review preference controls and verified inbound opt-in retained; staff cannot grant consent. Post-booking initial-confirmation-consent editing is not implemented; decide its relevance before adding it. Legacy guest recovery/backfill remains deferred. |
+docs/stabilization-readiness-20261013.md:42: | D4: outage/license policy | License enforcement retained; signed grace policy is an owner decision, not implemented. Controlled database outage/recovery still unverified. |
+docs/staff-booking-edits.md:32: Migration-backed synthetic PostgreSQL tests cover private notes, staff actor/history, missing setup, stale saves, unchanged saves, seated/closed restrictions, validation/auth/origin/license checks, cleanup cascades and audit rollback. They do not prove real multi-session PostgreSQL concurrency. The UI fixture uses the actual React sheet and CSS with synthetic fetch responses: desktop/mobile editing, immediate busy state, save/history, draft preservation and explicit conflict recovery were exercised. The temporary fixture route was removed before release.
+docs/today-checklist-20261016.md:3: - [x] Automatic booking subscription acknowledgement delivered (#89).
+docs/whatsapp-automatic-preview-readiness-20261014.md:13:   test-recipient messages are intercepted before booking subscription processing.
+docs/whatsapp-automatic-preview-readiness-20261014.md:19:   subscription command themselves for continuing updates.
+docs/whatsapp-automatic-preview-readiness-20261014.md:20: - Confirmation needs its saved permission; Almost Ready needs subscription and a
+docs/whatsapp-automatic-preview-readiness-20261014.md:21:   personal ETA (scheduled ten minutes before it); review needs subscription,
+docs/whatsapp-customer-window.md:23:    - WHATSAPP_BUSINESS_NUMBER and WHATSAPP_ASSOCIATION_SECRET (existing subscription configuration)
+docs/whatsapp-customer-window.md:32: 6. An actual signed incoming message must establish a fresh window; an HTTP 200 alone is not proof. Eligible booking consent/subscription is required independently. Activating the existing dispatcher may process existing eligible jobs; this task did not run it.
+docs/whatsapp-eta-preview-repair-20261016.md:7: Inside a verified open customer window, Almost Ready now has default text identifying the booking, describing the approximate ten-minute estimate and asking the guest to await reception confirmation. Configured text still overrides this default. Closed windows still require the appropriate approved template. Subscription, STOP, booking eligibility, Preview recipient restrictions and duplicate-send protections remain unchanged. No environment variable changes are necessary for this default.
+docs/whatsapp-notifications.md:13: and permits one review request **only after** subscription. Existing recorded
+docs/whatsapp-notifications.md:21: and opening the `wa.me` link never subscribe the guest. Subscription activates only
+docs/whatsapp-notifications.md:29: subscription message can re-enable the selected booking; feedback must be given
+docs/whatsapp-notifications.md:30: again. Messages older than a STOP are ignored for subscription. A subscribe reply
+docs/whatsapp-notifications.md:43:   text/version/time, hashed code/expiry and actual subscription/revocation.
+docs/whatsapp-notifications.md:83: booking-owned subscription state. No real tokens or numbers are stored in tests.
+docs/whatsapp-notifications.md:134:   table clearing. Requires actual subscription and separate feedback permission.
+docs/whatsapp-notifications.md:136:   permission-change time. Permission/subscription received after the original
+docs/whatsapp-subscription-acknowledgement.md:1: # Booking acknowledgement after WhatsApp subscription
+docs/whatsapp-subscription-acknowledgement.md:10: The code is generated per booking from its existing secret subscription token. The webhook requires the Meta signature, matching business number, booking phone, unexpired association and matching short code. Five invalid short-code attempts for a phone/booking within one hour block further short-code attempts during that window. Existing full-code messages remain supported. The new friendly subscription preserves the currently disclosed bundled review choice; old commands preserve legacy review choices.
+docs/whatsapp-subscription-acknowledgement.md:12: On the first valid subscription while the booking is waiting/called, the existing confirmation outbox entry is queued with confirmation permission. Repeated webhook delivery or repeated subscription messages do not create another acknowledgement or rearm completed/uncertain sends. A legacy booking that already received its initial confirmation does not receive a second confirmation. STOP before delivery suppresses the pending acknowledgement. No schema migration is introduced.
+docs/whatsapp-subscription-acknowledgement.md:32: Changing the live flags applies to existing eligible jobs too, not exclusively this acknowledgement. Inspect pending/scheduled jobs before activation; never automatically rearm simulated, sent or unknown jobs. Development shares the Preview variables/database, and its subscriptions are received by the canonical Preview webhook, so both deployments must contain the compatible parser. Keep Production unchanged.
+docs/whatsapp-subscription-acknowledgement.md:45: After controlled Preview activation, real booking 88 successfully subscribed and queued its acknowledgement, but publication stopped at `pending`, attempts 0, `publish_failed`, without a scheduler or provider message ID. This establishes subscription/queueing only, not delivery.
+integrations/subscription-control/README.md:1: # Subscription Control → Mo Bistro Preview
+integrations/subscription-control/README.md:3: The original `Y:\subscription-control\server.js` displayed the license directly from its own database connection. Its management actions were placeholders. This integration uses the Mo Bistro owner API for both reads and writes, so the displayed license and the affected license share the same database target.
+integrations/subscription-control/README.md:9: - The browser never receives `LICENSE_ADMIN_TOKEN`. The server uses the existing 64-character owner token.
+integrations/subscription-control/README.md:11: - Activate creates a monthly license; Renew adds one calendar month from the later of now or the existing expiry; Suspend blocks access; Reactivate removes suspension without extending an unexpired license. An expired suspended license needs renewal.
+integrations/subscription-control/README.md:17: Copy only `server.js`, `app.js`, `license-control-client.mjs` and the three files in `public/` into the existing panel folder. Back up the original `server.js` first. Preserve `.env`, `cloudflare-auth.js`, `package.json`, `package-lock.json` and `node_modules`. Existing dependencies are sufficient. The package file here supplies the module boundary for local testing and is not an instruction to replace the server package.
+integrations/subscription-control/README.md:19: The six source files were installed into `Y:\subscription-control` during this task. Their hashes were verified, and the protected files were checked unchanged. The previous server file has a timestamped `server.js.before-license-wiring-*.bak` backup. No process was restarted.
+integrations/subscription-control/README.md:24: 2. Verify the existing panel `LICENSE_ADMIN_TOKEN` hashes to Preview's `LICENSE_ADMIN_KEY_SHA256`. Compare privately; never paste either value into logs or commits. No values were changed or verified against deployed secrets in this task.
+integrations/subscription-control/README.md:25: 3. Preview's license reader uses `MO_BISTRO_POSTGRES_URL` (required when `MO_BISTRO_DB=postgres`), otherwise the existing `DATABASE_URL` fallback. `LICENSE_ADMIN_DATABASE_URL` must identify the same host/endpoint, port and database. Separate restricted reader/writer credentials are supported; pooled/unpooled URLs for the same Neon endpoint are accepted. Ambiguous connection-routing query parameters are rejected.
+integrations/subscription-control/README.md:26: 4. Existing `migrations/002_licensing.sql` defines `public.restaurant_license` and `public.license_audit_log`. Immediate actions remain compatible with that schema. **24-hour notices require the separately reviewed `20261016_license_grace.sql` migration**; see [the ordered rollout and read-only checks](../../docs/license-grace-preview-rollout.md). Do not rerun migrations blindly. The writer needs SELECT/INSERT/UPDATE on the license, SELECT/INSERT on the audit table and USAGE on its sequence. The reader needs SELECT on the license.
+integrations/subscription-control/README.md:28: 6. Sign in through Cloudflare Access and select **Check connection**. This only reads setup/status. Confirm readiness and Preview identity. Setup failures keep mutations disabled. Testing Activate/Renew/Suspend/Reactivate changes the actual Preview license and requires explicit approval.
+integrations/subscription-control/README.md:39: These are local tests. The browser fixture stubs Cloudflare authentication; it does not verify the deployed Access policy. Embedded SQL tests do not establish real multi-session PostgreSQL concurrency. No live license was changed, remote database queried, environment edited, message sent, service restarted or deployment performed.
+integrations/subscription-control/README.md:41: Run the offline API tests with `node --test tests/license-control.test.mjs`. The optional browser test accepts `--panel-deps <existing-panel-node_modules> --playwright <playwright-package-directory> --screenshots <output-directory>`; it creates only local synthetic fixtures.
+integrations/subscription-control/app.js:6: const PANEL_ORIGIN='https://subscribtion.labbing.space';
+integrations/subscription-control/app.js:7: const VERSION=/^"license-[a-f0-9]{64}"$/;
+integrations/subscription-control/app.js:28:   app.get('/health',(_req,res)=>res.json({status:'ok',service:'subscription-control'}));
+integrations/subscription-control/app.js:31:   app.get('/api/license',async(req,res)=>{
+integrations/subscription-control/app.js:32:     if(!client) return res.status(503).json({error:'Private license API connection is not configured.'});
+integrations/subscription-control/app.js:34:     catch {res.status(503).json({error:'License connection unavailable. Check the Preview deployment and private owner-key configuration.'});}
+integrations/subscription-control/app.js:36:   app.get('/api/license/audit',async(_req,res)=>{
+integrations/subscription-control/app.js:37:     if(!client) return res.status(503).json({error:'Private license API connection is not configured.'});
+integrations/subscription-control/app.js:38:     try {res.json(await client.audit());} catch {res.status(503).json({error:'License audit unavailable.'});}
+integrations/subscription-control/app.js:40:   app.post('/api/license/action',rateLimit({windowMs:60000,limit:8,standardHeaders:'draft-8',legacyHeaders:false,keyGenerator:req=>req.adminEmail}),async(req,res)=>{
+integrations/subscription-control/app.js:45:       return res.status(400).json({error:'A supported action, current license version and explicit confirmation are required.'});
+integrations/subscription-control/app.js:46:     if(!client) return res.status(503).json({error:'Private license API connection is not configured.'});
+integrations/subscription-control/app.js:50:       res.status(stale?412:503).json({error:stale?'License changed. Refresh and confirm again.':error.uncertain
+integrations/subscription-control/app.js:51:         ?'Action result unknown. Check current license status before deciding what to do. Do not automatically retry.'
+integrations/subscription-control/app.js:52:         :'License action was not confirmed. Check connection and current status before trying again.',uncertain:!!error.uncertain});
+integrations/subscription-control/license-control-client.mjs:3: export class LicenseControlError extends Error {
+integrations/subscription-control/license-control-client.mjs:4:   constructor(message,status=503,uncertain=false) {super(message);this.name='LicenseControlError';this.status=status;this.uncertain=uncertain;}
+integrations/subscription-control/license-control-client.mjs:6: export function createLicenseControlClient({baseUrl,adminKey,fetchImpl=fetch}) {
+integrations/subscription-control/license-control-client.mjs:7:   if(typeof window!=='undefined') throw Error('License control is server-only');
+integrations/subscription-control/license-control-client.mjs:18:       throw new LicenseControlError(method==='POST'?'License action result unknown. Read setup again before deciding what to do; do not automatically retry.':'License setup unavailable.',503,method==='POST');
+integrations/subscription-control/license-control-client.mjs:21:     try {data=await response.json();} catch {throw new LicenseControlError('License response is invalid; verify the target and do not retry an action automatically.',503,method==='POST');}
+integrations/subscription-control/license-control-client.mjs:22:     if(response.status===412) throw new LicenseControlError('License changed. Refresh the panel and confirm the action again.',412);
+integrations/subscription-control/license-control-client.mjs:23:     if(!response.ok) throw new LicenseControlError(`License ${method==='POST'?'action':'setup'} unavailable (HTTP ${response.status}). No automatic retry.`,response.status,method==='POST'&&response.status>=500);
+integrations/subscription-control/license-control-client.mjs:28:     inspect:()=>call('/api/license/admin/setup'),
+integrations/subscription-control/license-control-client.mjs:29:     audit:()=>call('/api/license/admin/audit'),
+integrations/subscription-control/license-control-client.mjs:33:       if(!['activate','renew','suspend','suspend-notice'].includes(action)) throw Error('Unsupported license action');
+integrations/subscription-control/license-control-client.mjs:34:       if(!/^"license-[a-f0-9]{64}"$/.test(version??'')) throw Error('Refresh license setup and confirm its version first');
+integrations/subscription-control/license-control-client.mjs:35:       return call('/api/license/admin/'+action,'POST',version);
+integrations/subscription-control/package.json:2:   "name": "subscription-control",
+integrations/subscription-control/public/panel.js:7:   const license=snapshot?.license;
+integrations/subscription-control/public/panel.js:8:   byId('plan').textContent=license?.plan??'Unknown';
+integrations/subscription-control/public/panel.js:9:   byId('status').textContent=license?.status==='grace'?'24-hour notice':license?.status??'Unavailable';
+integrations/subscription-control/public/panel.js:10:   byId('expiry').textContent=date(license?.expires_at);
+integrations/subscription-control/public/panel.js:12:   byId('activate').disabled=!ready || license?.status!=='unconfigured';
+integrations/subscription-control/public/panel.js:13:   byId('renew').disabled=!ready || !license || license.status==='unconfigured';
+integrations/subscription-control/public/panel.js:14:   byId('suspend').disabled=!ready || !['active','grace','expired'].includes(license?.status);
+integrations/subscription-control/public/panel.js:15:   byId('suspend-notice').disabled=!ready || !snapshot?.graceReady || license?.status!=='active';
+integrations/subscription-control/public/panel.js:16:   byId('grace-message').textContent=license?.suspension_due_at?`Service pause deadline: ${date(license.suspension_due_at)} (Cairo).`
+integrations/subscription-control/public/panel.js:17:     :snapshot?.ready&&!snapshot.graceReady?'24-hour notice requires the reviewed license grace migration.':'';
+integrations/subscription-control/public/panel.js:18:   byId('reactivate').disabled=!ready || !['suspended','grace'].includes(license?.status) || new Date(license.expires_at).getTime()<=Date.now();
+integrations/subscription-control/public/panel.js:31:     snapshot=await json('/api/license');render();
+integrations/subscription-control/public/panel.js:32:     say(snapshot.ready?'Connected to Mo Bistro Preview. Review the current license before choosing an action.':'Connection needs setup. Verify the Preview deployment, matching database targets, license tables and administrator permissions.');
+integrations/subscription-control/public/panel.js:34:   } catch {say('License connection unavailable. Check connection before choosing an action.');return false;}
+integrations/subscription-control/public/panel.js:49:     ?'This adds one month to the later of today or the current expiry. It changes the Preview license only.'
+integrations/subscription-control/public/panel.js:50:     :pendingAction.action==='suspend'?'Protected restaurant actions in Preview will stop until the license is reactivated or renewed.'
+integrations/subscription-control/public/panel.js:52:     :'This creates the first monthly Preview license.';
+integrations/subscription-control/public/panel.js:72:     const result=await json('/api/license/action',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':pendingAction.csrfToken},
+integrations/subscription-control/public/panel.js:74:     if(result.success!==true) throw Error('Result unknown. Check current license status before another action.');
+integrations/subscription-control/public/panel.js:75:     const refreshed=await load();say(refreshed?'License action completed. Current status refreshed.':'Action completed, but status could not be refreshed. Check connection before another action.');
+integrations/subscription-control/public/panel.js:76:   } catch(error) {snapshot=null;render();say(error.message||'Result unavailable. Check current license status; do not automatically retry.');}
+integrations/subscription-control/public/panel.js:83:     const data=await json('/api/license/audit');const list=byId('audit-list');list.replaceChildren();
+integrations/subscription-control/public/panel.js:85:     if(!entries.length) list.textContent='No license changes recorded yet.';
+integrations/subscription-control/public/panel.js:92:   } catch {say('Audit history unavailable. No license change was made.');}
+integrations/subscription-control/server.js:5: import {createLicenseControlClient} from './license-control-client.mjs';
+integrations/subscription-control/server.js:9:   client=createLicenseControlClient({baseUrl:'https://preview.mo-bistro.labbing.space',adminKey:process.env.LICENSE_ADMIN_TOKEN});
+integrations/subscription-control/server.js:10: } catch {console.error('License API configuration is incomplete; mutations remain unavailable.');}
+integrations/subscription-control/server.js:12: app.listen(5065,'127.0.0.1',()=>console.log('Subscription Control listening on 127.0.0.1:5065 (Mo Bistro Preview only)'));
+migrations/002_licensing.sql:1: CREATE TABLE IF NOT EXISTS restaurant_license (
+migrations/002_licensing.sql:11: CREATE TABLE IF NOT EXISTS license_audit_log (
+migrations/20261012_whatsapp_notifications.sql:11:   subscription_token_hash TEXT NOT NULL,
+migrations/20261012_whatsapp_notifications.sql:12:   subscription_expires_at TIMESTAMPTZ NOT NULL,
+migrations/20261016_license_grace.sql:2: -- No existing license is reactivated and no existing suspension gains grace.
+migrations/20261016_license_grace.sql:6: ALTER TABLE public.restaurant_license
+migrations/20261016_license_grace.sql:8:   ADD COLUMN license_revision BIGINT NOT NULL DEFAULT 0 CHECK (license_revision >= 0);
+migrations/20261016_license_grace.sql:9: ALTER TABLE public.license_audit_log ADD COLUMN details JSONB NOT NULL DEFAULT '{}';
+src/app/api/advanced/table-overrides/route.ts:6: import {requireActiveLicense} from '@/lib/licensing/enforce';
+src/app/api/advanced/table-overrides/route.ts:21:  const license=await requireActiveLicense();if(license)return license;
+src/app/api/advanced/tables/route.ts:6: import {requireActiveLicense} from '@/lib/licensing/enforce';
+src/app/api/advanced/tables/route.ts:21:  const license=await requireActiveLicense();if(license)return license;
+src/app/api/guests/[id]/eta/route.ts:10: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/guests/[id]/eta/route.ts:30:   const licenseError = await requireActiveLicense();
+src/app/api/guests/[id]/eta/route.ts:31:   if (licenseError) return licenseError;
+src/app/api/guests/[id]/route.ts:4: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/guests/[id]/route.ts:37:   const licenseError = await requireActiveLicense();
+src/app/api/guests/[id]/route.ts:38:   if (licenseError) return licenseError;
+src/app/api/guests/[id]/staff-details/route.ts:5: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/guests/[id]/staff-details/route.ts:60:   const license = await requireActiveLicense();
+src/app/api/guests/[id]/staff-details/route.ts:61:   if (license) return license;
+src/app/api/guests/route.ts:10: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/guests/route.ts:91:   const licenseError = await requireActiveLicense();
+src/app/api/guests/route.ts:92:   if (licenseError) return licenseError;
+src/app/api/join/route.ts:6: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/join/route.ts:64:   const licenseError = await requireActiveLicense();
+src/app/api/join/route.ts:65:   if (licenseError) return licenseError;
+src/app/api/license/admin/[action]/route.ts:4:   licenseAdminDb,
+src/app/api/license/admin/[action]/route.ts:5:   licenseDb,
+src/app/api/license/admin/[action]/route.ts:6:   licenseStatus,
+src/app/api/license/admin/[action]/route.ts:7:   licenseTargetsMatch,
+src/app/api/license/admin/[action]/route.ts:8:   licenseVersion,
+src/app/api/license/admin/[action]/route.ts:40:   if (!version || !/^"license-[a-f0-9]{64}"$/.test(version))
+src/app/api/license/admin/[action]/route.ts:41:     return reply({ error: "Read the current license setup and confirm its version before changing it" }, 428);
+src/app/api/license/admin/[action]/route.ts:44:     const sql = licenseAdminDb();
+src/app/api/license/admin/[action]/route.ts:49:         (SELECT COUNT(*)=2 FROM information_schema.columns WHERE table_schema='public' AND table_name='restaurant_license'
+src/app/api/license/admin/[action]/route.ts:50:           AND column_name IN ('suspension_due_at','license_revision')) AND
+src/app/api/license/admin/[action]/route.ts:51:         EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='license_audit_log'
+src/app/api/license/admin/[action]/route.ts:54:         return { error: "24-hour notices require the reviewed license grace migration" };
+src/app/api/license/admin/[action]/route.ts:59:           to_jsonb(l)->>'license_revision' AS license_revision
+src/app/api/license/admin/[action]/route.ts:60:         FROM public.restaurant_license l
+src/app/api/license/admin/[action]/route.ts:64:       if (licenseVersion(previous[0]) !== version) return { error: "License changed; refresh and confirm again", stale:true };
+src/app/api/license/admin/[action]/route.ts:69:       if (action === "activate" && previous.length && !previous[0].not_expired) return { error:"Expired license must be renewed" };
+src/app/api/license/admin/[action]/route.ts:72:         return { error: "License not configured" };
+src/app/api/license/admin/[action]/route.ts:77:         return { error:"A notice can only start on an active license without an existing suspension deadline" };
+src/app/api/license/admin/[action]/route.ts:81:         await tx`UPDATE public.restaurant_license SET suspension_due_at=NOW()+INTERVAL '24 hours',
+src/app/api/license/admin/[action]/route.ts:82:           license_revision=license_revision+1,updated_at=NOW() WHERE id=1`;
+src/app/api/license/admin/[action]/route.ts:85:         if (schema?.grace_schema) await tx`UPDATE public.restaurant_license SET status='active',suspension_due_at=NULL,
+src/app/api/license/admin/[action]/route.ts:86:           license_revision=license_revision+1,updated_at=NOW() WHERE id=1`;
+src/app/api/license/admin/[action]/route.ts:87:         else await tx`UPDATE public.restaurant_license SET status='active',updated_at=NOW() WHERE id=1`;
+src/app/api/license/admin/[action]/route.ts:90:           INSERT INTO public.restaurant_license
+src/app/api/license/admin/[action]/route.ts:97:           UPDATE public.restaurant_license
+src/app/api/license/admin/[action]/route.ts:104:         if (schema?.grace_schema) await tx`UPDATE public.restaurant_license SET suspension_due_at=NULL,
+src/app/api/license/admin/[action]/route.ts:105:           license_revision=license_revision+1 WHERE id=1`;
+src/app/api/license/admin/[action]/route.ts:108:           UPDATE public.restaurant_license
+src/app/api/license/admin/[action]/route.ts:113:         if (schema?.grace_schema) await tx`UPDATE public.restaurant_license SET suspension_due_at=NULL,
+src/app/api/license/admin/[action]/route.ts:114:           license_revision=license_revision+1 WHERE id=1`;
+src/app/api/license/admin/[action]/route.ts:120:           to_jsonb(l)->>'license_revision' AS license_revision
+src/app/api/license/admin/[action]/route.ts:121:         FROM public.restaurant_license l
+src/app/api/license/admin/[action]/route.ts:126:       if (schema?.grace_schema) await tx`INSERT INTO public.license_audit_log
+src/app/api/license/admin/[action]/route.ts:132:         INSERT INTO public.license_audit_log
+src/app/api/license/admin/[action]/route.ts:150:         version: licenseVersion(after[0]),
+src/app/api/license/admin/[action]/route.ts:158:     return reply({ error: "License operation failed" }, 503);
+src/app/api/license/admin/[action]/route.ts:170:     if (!licenseTargetsMatch()) return reply({ready:false,problem:"database_target_mismatch_or_missing_configuration"},200);
+src/app/api/license/admin/[action]/route.ts:172:       const read = licenseDb(), write = licenseAdminDb();
+src/app/api/license/admin/[action]/route.ts:173:       const [reader] = await read`SELECT to_regclass('public.restaurant_license') IS NOT NULL AS license_table`;
+src/app/api/license/admin/[action]/route.ts:174:       const [writer] = await write`SELECT to_regclass('public.restaurant_license') IS NOT NULL AS license_table,
+src/app/api/license/admin/[action]/route.ts:175:         to_regclass('public.license_audit_log') IS NOT NULL AS audit_table,
+src/app/api/license/admin/[action]/route.ts:176:         CASE WHEN to_regclass('public.restaurant_license') IS NULL THEN FALSE ELSE
+src/app/api/license/admin/[action]/route.ts:177:           has_table_privilege(current_user,'public.restaurant_license','SELECT') AND
+src/app/api/license/admin/[action]/route.ts:178:           has_table_privilege(current_user,'public.restaurant_license','INSERT') AND
+src/app/api/license/admin/[action]/route.ts:179:           has_table_privilege(current_user,'public.restaurant_license','UPDATE') END AS can_change_license,
+src/app/api/license/admin/[action]/route.ts:180:         CASE WHEN to_regclass('public.license_audit_log') IS NULL THEN FALSE ELSE
+src/app/api/license/admin/[action]/route.ts:181:           has_table_privilege(current_user,'public.license_audit_log','SELECT') AND
+src/app/api/license/admin/[action]/route.ts:182:           has_table_privilege(current_user,'public.license_audit_log','INSERT') AND
+src/app/api/license/admin/[action]/route.ts:183:           has_sequence_privilege(current_user,pg_get_serial_sequence('public.license_audit_log','id'),'USAGE') END AS can_write_audit`;
+src/app/api/license/admin/[action]/route.ts:184:       const license = reader?.license_table ? await licenseStatus() : null;
+src/app/api/license/admin/[action]/route.ts:186:         (SELECT COUNT(*)=2 FROM information_schema.columns WHERE table_schema='public' AND table_name='restaurant_license'
+src/app/api/license/admin/[action]/route.ts:187:           AND column_name IN ('suspension_due_at','license_revision')) AND
+src/app/api/license/admin/[action]/route.ts:188:         EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='license_audit_log'
+src/app/api/license/admin/[action]/route.ts:190:       return reply({ ready:!!(reader?.license_table && writer?.license_table && writer?.audit_table && writer?.can_change_license && writer?.can_write_audit),
+src/app/api/license/admin/[action]/route.ts:191:         databaseTargetMatches:true, readerReady:!!reader?.license_table,
+src/app/api/license/admin/[action]/route.ts:192:         writerReady:!!(writer?.license_table && writer?.audit_table && writer?.can_change_license && writer?.can_write_audit),
+src/app/api/license/admin/[action]/route.ts:193:         graceReady:!!grace?.available, license, version:license ? licenseVersion(license) : null },200,license ? licenseVersion(license) : undefined);
+src/app/api/license/admin/[action]/route.ts:194:     } catch { return reply({ready:false,problem:"license_database_or_schema_unavailable"},503); }
+src/app/api/license/admin/[action]/route.ts:202:     const sql = licenseAdminDb();
+src/app/api/license/admin/[action]/route.ts:206:       FROM public.license_audit_log
+src/app/api/license/status/route.ts:5:   licenseStatus,
+src/app/api/license/status/route.ts:6:   licenseVersion,
+src/app/api/license/status/route.ts:21:     const license = await licenseStatus();
+src/app/api/license/status/route.ts:23:     return NextResponse.json(license, {
+src/app/api/license/status/route.ts:24:       status: license.licensed ? 200 : 403,
+src/app/api/license/status/route.ts:25:       headers: { "Cache-Control": "no-store", ETag:licenseVersion(license) },
+src/app/api/license/status/route.ts:29:       { error: "License service unavailable" },
+src/app/api/management/cleanup/route.ts:3: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/management/cleanup/route.ts:34:   const license = await requireActiveLicense();
+src/app/api/management/cleanup/route.ts:35:   if (license) return license;
+src/app/api/management/danger-zone/route.ts:3: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/management/danger-zone/route.ts:16:   const license = await requireActiveLicense();
+src/app/api/management/danger-zone/route.ts:17:   if (license) return license;
+src/app/api/management/demo/route.ts:3: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/management/demo/route.ts:15:   const licenseError = await requireActiveLicense();
+src/app/api/management/demo/route.ts:16:   if (licenseError) return licenseError;
+src/app/api/management/operations/route.ts:3: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/management/operations/route.ts:45:     confirmation_subscription_copy_missing: "Confirmation is missing the required subscription instructions",
+src/app/api/management/operations/route.ts:116:   const license = await requireActiveLicense();
+src/app/api/management/operations/route.ts:117:   if (license) return license;
+src/app/api/management/route.ts:4: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/management/route.ts:81:   const licenseError = await requireActiveLicense();
+src/app/api/management/route.ts:82:   if (licenseError) return licenseError;
+src/app/api/management/seating-settings/route.ts:2: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/management/seating-settings/route.ts:35:   const licenseError = await requireActiveLicense();
+src/app/api/management/seating-settings/route.ts:36:   if (licenseError) return licenseError;
+src/app/api/management/staff-pin/route.ts:7: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/management/staff-pin/route.ts:21:   const licenseError = await requireActiveLicense();
+src/app/api/management/staff-pin/route.ts:22:   if (licenseError) return licenseError;
+src/app/api/management/staff-pin/users/route.ts:5: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/management/staff-pin/users/route.ts:20:     const licenseError = await requireActiveLicense();
+src/app/api/management/staff-pin/users/route.ts:21:     if (licenseError) return licenseError;
+src/app/api/management/staff-shifts/route.ts:7: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/management/staff-shifts/route.ts:29:   const licenseError = await requireActiveLicense();
+src/app/api/management/staff-shifts/route.ts:30:   if (licenseError) return licenseError;
+src/app/api/management/staff-shifts/route.ts:61:   const licenseError = await requireActiveLicense();
+src/app/api/management/staff-shifts/route.ts:62:   if (licenseError) return licenseError;
+src/app/api/management/staff/route.ts:3: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/management/staff/route.ts:32:   const licenseError = await requireActiveLicense();
+src/app/api/management/staff/route.ts:33:   if (licenseError) return licenseError;
+src/app/api/management/staff/route.ts:97:   const licenseError = await requireActiveLicense();
+src/app/api/management/staff/route.ts:98:   if (licenseError) return licenseError;
+src/app/api/management/tables/route.ts:2: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/management/tables/route.ts:41:   const licenseError = await requireActiveLicense();
+src/app/api/management/tables/route.ts:42:   if (licenseError) return licenseError;
+src/app/api/management/tables/route.ts:102:   const licenseError = await requireActiveLicense();
+src/app/api/management/tables/route.ts:103:   if (licenseError) return licenseError;
+src/app/api/reception/table-requests/[id]/route.ts:3: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/reception/table-requests/[id]/route.ts:29:   const licenseError = await requireActiveLicense();
+src/app/api/reception/table-requests/[id]/route.ts:30:   if (licenseError) return licenseError;
+src/app/api/seating/route.ts:9: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/seating/route.ts:94:   const licenseError = await requireActiveLicense();
+src/app/api/seating/route.ts:95:   if (licenseError) return licenseError;
+src/app/api/simple-tables/route.ts:5: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/simple-tables/route.ts:64:   const licenseError = await requireActiveLicense();
+src/app/api/simple-tables/route.ts:65:   if (licenseError) return licenseError;
+src/app/api/simple-tables/route.ts:96:   const licenseError = await requireActiveLicense();
+src/app/api/simple-tables/route.ts:97:   if (licenseError) return licenseError;
+src/app/api/table-view-mode/route.ts:3: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/table-view-mode/route.ts:75:   const licenseError = await requireActiveLicense();
+src/app/api/table-view-mode/route.ts:76:   if (licenseError) return licenseError;
+src/app/api/tables/route.ts:3: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/tables/route.ts:35:   const licenseError = await requireActiveLicense();
+src/app/api/tables/route.ts:36:   if (licenseError) return licenseError;
+src/app/api/wait-estimate/route.ts:5: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/wait-estimate/route.ts:63:   const licenseError = await requireActiveLicense();
+src/app/api/wait-estimate/route.ts:64:   if (licenseError) return licenseError;
+src/app/api/waiter/area-requests/route.ts:3: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/waiter/area-requests/route.ts:24:   const licenseError = await requireActiveLicense();
+src/app/api/waiter/area-requests/route.ts:25:   if (licenseError) return licenseError;
+src/app/api/waiter/tables/[id]/free/route.ts:4: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/waiter/tables/[id]/free/route.ts:19:   const licenseError = await requireActiveLicense();
+src/app/api/waiter/tables/[id]/free/route.ts:20:   if (licenseError) return licenseError;
+src/app/api/waiter/tables/[id]/request-ready/route.ts:3: import { requireActiveLicense } from "@/lib/licensing/enforce";
+src/app/api/waiter/tables/[id]/request-ready/route.ts:25:   const licenseError = await requireActiveLicense();
+src/app/api/waiter/tables/[id]/request-ready/route.ts:26:   if (licenseError) return licenseError;
+src/app/api/whatsapp/subscription/route.ts:4: import { subscriptionState, scheduleReview, dispatchOutbox } from "@/lib/whatsapp/service";
+src/app/api/whatsapp/subscription/route.ts:11:   const limited=await checkRateLimit(request,"whatsapp-subscription",20,60); if(limited)return limited;
+src/app/api/whatsapp/subscription/route.ts:14:   try { return Response.json(await subscriptionState(token),{headers:{"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}}); }
+src/app/api/whatsapp/subscription/route.ts:15:   catch {return Response.json({error:"Subscription unavailable"},{status:503});}
+src/app/api/whatsapp/subscription/route.ts:17: // Records optional feedback permission, never subscription. Clicking a link is not opt-in.
+src/app/globals.css:2661: .guest-subscription-refresh { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:44px; padding:10px 14px; border:1px solid #d8cbb8; border-radius:10px; background:#f7f2e9; color:#5d4930; font-size:13px; font-weight:600; cursor:pointer; }
+src/app/globals.css:2662: .guest-subscription-refresh:hover:not(:disabled) { background:#eee5d7; }
+src/app/globals.css:2663: .guest-subscription-refresh:focus-visible { outline:2px solid #91672f; outline-offset:3px; }
+src/app/globals.css:2664: .guest-subscription-refresh:disabled { opacity:.55; cursor:wait; }
+src/app/globals.css:2927: /* Custom staff subscription notice; showModal makes the workspace inert. */
+src/app/globals.css:2928: .staff-license-notice {
+src/app/globals.css:2941: .staff-license-notice[open] { display: grid; gap: 1rem; }
+src/app/globals.css:2942: .staff-license-notice::backdrop { background: rgb(0 0 0 / 85%); }
+src/app/globals.css:2943: .staff-license-notice { padding: 0; text-align: center; width: min(28rem,calc(100vw - 2rem)); }
+src/app/globals.css:2944: .staff-license-notice[open] { display: block; }
+src/app/globals.css:2945: .license-signature { display:flex;justify-content:center;align-items:center;gap:10px;padding:23px;background:#30291f;border-bottom:1px solid #655134;color:#e5c184;font-size:12px;letter-spacing:3px; }
+src/app/globals.css:2946: .license-notice-content { padding:29px; }
+src/app/globals.css:2947: .license-notice-content h1 { font-size:25px;font-weight:600;line-height:1.25;letter-spacing:-.5px;margin:0 0 15px; }
+src/app/globals.css:2948: .license-notice-content p { font-size:14px;line-height:1.65;color:#c2c0b7; }
+src/app/globals.css:2949: .license-return { margin-top:18px; }
+src/app/globals.css:2950: .license-actions { display:flex;justify-content:center;gap:10px;margin-top:26px; }
+src/app/globals.css:2951: .license-actions .bistro-button-gold { background:#e5c184;border-color:#e5c184;color:#241d13;font-family:inherit;font-size:13px;font-weight:500; }
+src/app/globals.css:2952: .license-preserved { display:flex;justify-content:center;align-items:center;gap:7px;border-top:1px solid #3b3b35;padding-top:18px;margin-top:24px; }
+src/app/globals.css:2953: .license-notice-content .license-preserved { font-size:12px; }
+src/app/globals.css:2954: .license-preserved svg { flex-shrink:0;color:#e5c184; }
+src/app/globals.css:2955: .staff-license-notice.license-grace { width:min(33rem,calc(100vw - 2rem));background:#141514;border-color:#393a34; }
+src/app/globals.css:2956: .license-grace-icon { display:flex;justify-content:center;align-items:center;width:50px;height:50px;margin:30px auto 0;border-radius:50%;background:#30291e;color:#e5c184; }
+src/app/globals.css:2957: .license-notice-content .license-eyebrow { font-size:11px;letter-spacing:1.7px;color:#e5c184;margin-bottom:14px; }
+src/app/globals.css:2958: .license-grace h1 { font-size:30px; }
+src/app/globals.css:2959: .license-deadline { display:grid;gap:6px;background:#30291e;border-radius:9px;padding:15px;margin:24px auto 0;color:#f1ce94; }
+src/app/globals.css:2960: .license-deadline span { font-size:12px;line-height:1.5; }
+src/app/globals.css:2961: .license-deadline strong { font-size:21px;font-variant-numeric:tabular-nums; }
+src/app/globals.css:2962: .staff-license-banner { display:flex;align-items:center;justify-content:space-between;gap:15px;padding:13px 24px;background:#30291e;border-bottom:1px solid #6a5433;color:#f1ce94; }
+src/app/globals.css:2963: .staff-license-banner strong { font-size:14px; }
+src/app/globals.css:2964: .staff-license-banner span { display:block;font-size:12px;line-height:1.5;margin-top:4px;color:#dac7a7; }
+src/app/globals.css:2965: @media(max-width:600px) { .license-notice-content { padding:23px; } .license-grace h1 { font-size:27px; } .staff-license-banner { align-items:flex-start;padding:12px 16px;flex-wrap:wrap; } }
+src/app/status/page.tsx:4: import WhatsappSubscription from "@/components/whatsapp-subscription";
+src/app/status/page.tsx:305:               <WhatsappSubscription token={token} allowSubscribe={active} />
+src/components/guest-detail-sheet.tsx:230:               updates require a guest subscription reply.
+src/components/management-operations.tsx:77:           {data.whatsapp.jobs.length===0 ? <p>No notification jobs to display. Check subscription and a personal booking ETA first.</p> : data.whatsapp.jobs.map((job,i)=><div className="operations-entry" key={`${job.guest_id}-${job.kind}-${i}`}>
+src/components/staff-license-guard.tsx:6: export default function StaffLicenseGuard(){
+src/components/staff-license-guard.tsx:18:     const response=await fetch("/api/license/status",{cache:"no-store",credentials:"same-origin",signal:current.signal});
+src/components/staff-license-guard.tsx:22:     const state:State=response.ok&&data.licensed===true&&data.status==="active"?"active":response.ok&&data.licensed===true&&validGrace?"grace":response.status===403&&["suspended","expired","unconfigured"].includes(data.status)?data.status:"unavailable";
+src/components/staff-license-guard.tsx:37:  // Protected mutations still check the license on the server during this initial request.
+src/components/staff-license-guard.tsx:43:  const title=grace?"Your service will pause":state==="suspended"?"Subscription suspended":state==="expired"?"Subscription expired":state==="unconfigured"?"Subscription not configured":state==="checking"?"Checking subscription…":"Subscription check unavailable";
+src/components/staff-license-guard.tsx:45:   {grace&&!noticeOpen&&<div className="staff-license-banner" role="status"><div><strong>Service pauses in {countdown}</strong><span>Contact the account owner. Normal operations remain available until the deadline.</span></div><button type="button" className="bistro-button" onClick={()=>{setAcknowledged(null);try{sessionStorage.removeItem("mo-bistro-grace-notice");}catch{/* Keep the notice open without storage. */}}}>View notice</button></div>}
+src/components/staff-license-guard.tsx:46:   <dialog ref={dialog} data-license-state={state} className={`staff-license-notice ${grace?"license-grace":"license-blocked"}`} aria-labelledby="staff-license-title" aria-describedby="staff-license-description" onCancel={event=>event.preventDefault()}>
+src/components/staff-license-guard.tsx:47:    {grace?<div className="license-grace-icon"><Clock3 size={23} aria-hidden="true"/></div>:<div className="license-signature"><UtensilsCrossed size={22} aria-hidden="true"/><span>MO BISTRO</span></div>}
+src/components/staff-license-guard.tsx:48:    <div className="license-notice-content">
+src/components/staff-license-guard.tsx:49:     {grace&&<p className="license-eyebrow">24-HOUR GRACE PERIOD</p>}
+src/components/staff-license-guard.tsx:50:     <h1 id="staff-license-title">{title}</h1>
+src/components/staff-license-guard.tsx:51:     <p id="staff-license-description">{grace?"You can keep working for now. Please contact the account owner to restore the subscription before the deadline.":state==="checking"?"Please wait while we verify access.":state==="unavailable"?"We cannot verify your subscription right now. We’ll check again automatically.":"Please contact the account owner to restore your subscription."}</p>
+src/components/staff-license-guard.tsx:52:     {grace&&<div className="license-deadline"><span>Service pauses in</span><strong>{countdown}</strong><span>{new Date(snapshot.due!).toLocaleString("en-GB",{timeZone:"Africa/Cairo",dateStyle:"medium",timeStyle:"short"})} · Cairo time</span></div>}
+src/components/staff-license-guard.tsx:53:     {!grace&&state!=="checking"&&<p className="license-return">This workspace will reopen automatically once access is restored.</p>}
+src/components/staff-license-guard.tsx:54:     {state!=="checking"&&<div className="license-actions">{grace?<button type="button" className="bistro-button bistro-button-gold" onClick={continueWorking}>Continue working</button>:<button type="button" className="bistro-button bistro-button-gold" disabled={signingOut} onClick={()=>void signOut()}>{signingOut?"Signing out…":"Sign out"}</button>}</div>}
+src/components/staff-license-guard.tsx:55:     <p className="license-preserved"><ShieldCheck size={15} aria-hidden="true"/>Your bookings, tables and history are preserved.</p>
+src/components/whatsapp-preview-test.tsx:127:           {automatic.isolatedTestEnabled && <p>Isolated test mode is active. A test message does not subscribe a booking. Send the booking’s own subscription message to enable its updates; automatic delivery remains disabled.</p>}
+src/components/whatsapp-subscription.tsx:4: type Subscription = {
+src/components/whatsapp-subscription.tsx:11: export default function WhatsappSubscription({
+src/components/whatsapp-subscription.tsx:18:   const [subscription, setSubscription] = useState<Subscription>({
+src/components/whatsapp-subscription.tsx:27:       `/api/whatsapp/subscription?token=${encodeURIComponent(token)}`,
+src/components/whatsapp-subscription.tsx:32:     setSubscription(await response.json());
+src/components/whatsapp-subscription.tsx:50:   if (!subscription.available || (!subscription.subscribed && !allowSubscribe))
+src/components/whatsapp-subscription.tsx:58:         {subscription.subscribed
+src/components/whatsapp-subscription.tsx:62:       {subscription.subscribed ? (
+src/components/whatsapp-subscription.tsx:71:       {!subscription.subscribed && allowSubscribe && subscription.url && (
+src/components/whatsapp-subscription.tsx:73:           href={subscription.url}
+src/components/whatsapp-subscription.tsx:82:       {!subscription.subscribed && awaitingReply && <p role="status" className="guest-small-note">Waiting for WhatsApp confirmation. Your subscription activates after we receive your booking-specific reply.</p>}
+src/components/whatsapp-subscription.tsx:83:       {!subscription.subscribed && (
+src/components/whatsapp-subscription.tsx:86:           className="guest-subscription-refresh"
+src/components/whatsapp-subscription.tsx:97:               setError(err instanceof Error ? err.message : "Could not check your subscription.");
+src/components/whatsapp-subscription.tsx:105:           {checking ? "Checking subscription…" : "Check subscription status"}
+src/components/whatsapp-subscription.tsx:108:       {subscription.subscribed && subscription.feedbackConsent && (
+src/components/whatsapp-subscription.tsx:112:         {!subscription.subscribed && (
+src/components/workspace-header.tsx:8: import StaffLicenseGuard from "@/components/staff-license-guard";
+src/components/workspace-header.tsx:90:       <StaffLicenseGuard />
+src/lib/licensing/core.ts:7: const licenseReadUrl = () => process.env.MO_BISTRO_DB === "postgres"
+src/lib/licensing/core.ts:10: export function licenseTargetsMatch() {
+src/lib/licensing/core.ts:12:     const read = new URL(licenseReadUrl() || "");
+src/lib/licensing/core.ts:13:     const write = new URL(process.env.LICENSE_ADMIN_DATABASE_URL || "");
+src/lib/licensing/core.ts:24: type LicenseVersionRow = { status?: string; raw_status?: string; plan?: string | null; expires_at?: Date | string | null;
+src/lib/licensing/core.ts:25:   suspension_due_at?: Date | string | null; license_revision?: string | number | null };
+src/lib/licensing/core.ts:26: export function licenseVersion(row?: LicenseVersionRow) {
+src/lib/licensing/core.ts:30:     license_revision: String(row?.license_revision ?? 0) };
+src/lib/licensing/core.ts:31:   return `"license-${createHash("sha256").update(JSON.stringify(canonical)).digest("hex")}"`;
+src/lib/licensing/core.ts:34: export function licenseDb() {
+src/lib/licensing/core.ts:35:   const url = licenseReadUrl();
+src/lib/licensing/core.ts:50: export function licenseAdminDb() {
+src/lib/licensing/core.ts:51:   const url = process.env.LICENSE_ADMIN_DATABASE_URL;
+src/lib/licensing/core.ts:54:     throw new Error("LICENSE_ADMIN_DATABASE_URL is not configured");
+src/lib/licensing/core.ts:56:   if (!licenseTargetsMatch()) throw new Error("License read/write database targets do not match");
+src/lib/licensing/core.ts:68:   const expected = process.env.LICENSE_ADMIN_KEY_SHA256;
+src/lib/licensing/core.ts:91: export async function licenseStatus() {
+src/lib/licensing/core.ts:92:   const sql = licenseDb();
+src/lib/licensing/core.ts:97:       to_jsonb(l)->>'license_revision' AS license_revision
+src/lib/licensing/core.ts:98:     FROM public.restaurant_license l
+src/lib/licensing/core.ts:104:       licensed: false,
+src/lib/licensing/core.ts:109:       license_revision: "0",
+src/lib/licensing/core.ts:125:     licensed: status === "active" || status === "grace",
+src/lib/licensing/core.ts:131:     license_revision: row.license_revision ?? "0",
+src/lib/licensing/enforce.ts:3: import { licenseStatus } from "@/lib/licensing/core";
+src/lib/licensing/enforce.ts:5: export async function requireActiveLicense() {
+src/lib/licensing/enforce.ts:8:     process.env.LICENSE_ENFORCEMENT === "false"
+src/lib/licensing/enforce.ts:14:     const license = await licenseStatus();
+src/lib/licensing/enforce.ts:16:     if (license.licensed) return null;
+src/lib/licensing/enforce.ts:20:         error: "Subscription inactive",
+src/lib/licensing/enforce.ts:21:         license_status: license.status,
+src/lib/licensing/enforce.ts:30:       { error: "License verification unavailable" },
+src/lib/whatsapp/customer-window.ts:97:         error: "confirmation_subscription_copy_missing",
+src/lib/whatsapp/customer-window.ts:107:       // Temporary reply button: no URL, review submission or subscription action.
+src/lib/whatsapp/policy.ts:21: export function subscriptionCode(guestId: number, trackingHash: string) {
+src/lib/whatsapp/policy.ts:27: export function shortSubscriptionCode(code: string) {
+src/lib/whatsapp/policy.ts:32: export function subscriptionMessage(guestId: number, code: string) {
+src/lib/whatsapp/policy.ts:33:   return `I'd like to receive updates about booking ${guestId}.\nCode: ${shortSubscriptionCode(code)}`;
+src/lib/whatsapp/policy.ts:44: export function parseSubscription(message: string) {
+src/lib/whatsapp/service.ts:5: import { CONSENT_VERSION, whatsappEnabled, normalizePhone, subscriptionCode, hashCode,
+src/lib/whatsapp/service.ts:6:   eligible, dueTime, subscriptionMessage, type NotificationKind, type Eligibility } from "@/lib/whatsapp/policy";
+src/lib/whatsapp/service.ts:13:   revision: number; attempts: number; tracking_token_hash: string; subscription_expires_at: Date; eta_snapshot_at?: string | null };
+src/lib/whatsapp/service.ts:19:   const code = subscriptionCode(guestId, trackingHash);
+src/lib/whatsapp/service.ts:21:     consent_version,subscription_token_hash,subscription_expires_at)
+src/lib/whatsapp/service.ts:143:       c.subscription_token_hash,c.subscription_expires_at,g.name,g.status AS guest_status,
+src/lib/whatsapp/service.ts:167:         (kind === "confirmation" && new Date(booking.subscription_expires_at).getTime() < Date.now())) {
+src/lib/whatsapp/service.ts:179:         subscriptionCode(booking.guest_id,booking.tracking_token_hash));
+src/lib/whatsapp/service.ts:193: export async function subscriptionState(trackingToken: string) {
+src/lib/whatsapp/service.ts:204:     (subscribed || new Date(booking.subscription_expires_at).getTime() > Date.now()) &&
+src/lib/whatsapp/service.ts:206:   const code = available && !subscribed ? subscriptionCode(booking.guest_id,booking.tracking_token_hash) : null;
+src/lib/whatsapp/service.ts:210:     url: available && !subscribed ? `https://wa.me/${number}?text=${encodeURIComponent(subscriptionMessage(booking.guest_id,code!))}` : null };
+src/lib/whatsapp/webhook.ts:5: import { hashCode, isStop, normalizePhone, parseSubscription, safeEqual, shortSubscriptionCode, subscriptionCode } from "@/lib/whatsapp/policy";
+src/lib/whatsapp/webhook.ts:34:       const subscription = parseSubscription(text);
+src/lib/whatsapp/webhook.ts:38:       if (previewInbound && !stopped && !subscription) continue;
+src/lib/whatsapp/webhook.ts:55:         if (!subscription) return;
+src/lib/whatsapp/webhook.ts:57:           JOIN guests g ON g.id=c.guest_id WHERE c.guest_id=${subscription.guestId} AND c.phone=${phone}
+src/lib/whatsapp/webhook.ts:58:             AND c.subscription_expires_at>NOW()
+src/lib/whatsapp/webhook.ts:61:         if (subscription.short) {
+src/lib/whatsapp/webhook.ts:63:             WHERE phone=${phone} AND guest_id=${booking.guest_id} AND action='invalid_subscription_code'
+src/lib/whatsapp/webhook.ts:66:           const fullCode = subscriptionCode(booking.guest_id, booking.tracking_token_hash);
+src/lib/whatsapp/webhook.ts:67:           if (!safeEqual(hashCode(fullCode),booking.subscription_token_hash) ||
+src/lib/whatsapp/webhook.ts:68:               !safeEqual(shortSubscriptionCode(fullCode),subscription.code)) {
+src/lib/whatsapp/webhook.ts:69:             await tx`UPDATE whatsapp_inbound_events SET guest_id=${booking.guest_id},action='invalid_subscription_code'
+src/lib/whatsapp/webhook.ts:73:         } else if (!safeEqual(hashCode(subscription.code),booking.subscription_token_hash)) return;
+src/lib/whatsapp/webhook.ts:87:         if (message.type === "text" && subscription.reviews) await tx`UPDATE whatsapp_booking_consents
+src/lib/whatsapp/webhook.ts:91:         // One acknowledgement per booking; retries/resubscriptions cannot rearm a completed send.
+tests/advanced-preview.test.mjs:73:  await sql`INSERT INTO whatsapp_booking_consents(guest_id,phone,confirmation_consent,consent_version,subscription_token_hash,subscription_expires_at,subscribed_at)
+tests/advanced-preview.test.mjs:190:   '@/lib/licensing/enforce':{requireActiveLicense:async()=>null},
+tests/browser-workflows.test.mjs:115:     let subscriptionSubscribed = true;
+tests/browser-workflows.test.mjs:283:           case "/api/whatsapp/subscription":
+tests/browser-workflows.test.mjs:285:             else data = {available:true,subscribed:subscriptionSubscribed,feedbackConsent,feedbackEditable,url:"https://wa.me/201000000000?text=SUBSCRIBE"};
+tests/browser-workflows.test.mjs:311:           case "/api/license/status":
+tests/browser-workflows.test.mjs:312:             data = { licensed: true, status: "active" };
+tests/browser-workflows.test.mjs:1293:         subscriptionSubscribed=subscribed;feedbackEditable=true;feedbackConsent=false;
+tests/browser-workflows.test.mjs:1337:           subscriptionSubscribed=true;
+tests/browser-workflows.test.mjs:1338:           await guestPage.getByRole("button",{name:"Check subscription status",exact:true}).click();
+tests/browser-workflows.test.mjs:1348:         subscriptionSubscribed=false; await guestPage.reload();
+tests/browser-workflows.test.mjs:1351:         subscriptionSubscribed=true;
+tests/browser-workflows.test.mjs:1352:         await guestPage.getByRole("button",{name:"Check subscription status",exact:true}).click();
+tests/browser-workflows.test.mjs:1355:         subscriptionSubscribed=true; feedbackEditable=true;
+tests/browser-workflows.test.mjs:1382:           trackingStatus=status; subscriptionSubscribed=true;
+tests/browser-workflows.test.mjs:1409:         subscriptionSubscribed=false;trackingStatus="seated";await guest.reload();
+tests/database-cleanup.test.mjs:41:       INSERT INTO whatsapp_booking_consents(guest_id,phone,consent_version,subscription_token_hash,subscription_expires_at)
+tests/database-cleanup.test.mjs:67:       '@/lib/licensing/enforce':{requireActiveLicense:async()=>null},
+tests/database-cleanup.test.mjs:113: test('cleanup preference requires manager, same origin, license and explicit confirmation',async()=>{
+tests/database-cleanup.test.mjs:114:   for(const [actor,body,origin,license,expected] of [
+tests/database-cleanup.test.mjs:123:       '@/lib/licensing/enforce':{requireActiveLicense:async()=>license?null:Response.json({}, {status:403})},
+tests/handler-harness.mjs:8: // Execute the actual handlers with isolated auth/license/SQL boundaries. No DB URL
+tests/handler-harness.mjs:70:     license: true,
+tests/handler-harness.mjs:92:       requireActiveLicense: async () =>
+tests/handler-harness.mjs:93:         state.license
+tests/handler-harness.mjs:95:           : Response.json({ error: "Subscription inactive" }, { status: 403 }),
+tests/isolated-postgres-concurrency.test.mjs:24:   const target=validateTarget(config,[process.env.MO_BISTRO_POSTGRES_URL,process.env.DATABASE_URL,process.env.LICENSE_ADMIN_DATABASE_URL]);
+tests/license-control-harness.mjs:6: export async function licenseHarness({grace=true}={}) {
+tests/license-control-harness.mjs:9:   if(grace) await db.exec(fs.readFileSync('migrations/20261016_license_grace.sql','utf8'));
+tests/license-control-harness.mjs:23:     LICENSE_ADMIN_DATABASE_URL:'postgresql://writer:synthetic@ep-test-pooler.example.neon.tech/mo_bistro_2',
+tests/license-control-harness.mjs:24:     LICENSE_ADMIN_KEY_SHA256:createHash('sha256').update(TEST_KEY).digest('hex')};
+tests/license-control-harness.mjs:28:   const admin=load('src/app/api/license/admin/[action]/route.ts',mocks,globals,cache);
+tests/license-control-harness.mjs:29:   const status=load('src/app/api/license/status/route.ts',mocks,globals,cache);
+tests/license-control-harness.mjs:34:     if(new URL(url).pathname==='/api/license/status') return status.GET(request);
+tests/license-control.test.mjs:3: import {licenseHarness,TEST_KEY} from './license-control-harness.mjs';
+tests/license-control.test.mjs:4: import {createLicenseControlClient} from '../integrations/subscription-control/license-control-client.mjs';
+tests/license-control.test.mjs:7:   const h=await licenseHarness();
+tests/license-control.test.mjs:8:   const client=createLicenseControlClient({baseUrl:'https://preview.mo-bistro.labbing.space',adminKey:TEST_KEY,fetchImpl:h.backendFetch});
+tests/license-control.test.mjs:12:     const expiry=setup.license.expires_at;
+tests/license-control.test.mjs:14:     assert.equal(setup.license.status,'grace');assert.equal(setup.license.licensed,true);
+tests/license-control.test.mjs:15:     assert.ok(Math.abs(Date.parse(setup.license.suspension_due_at)-Date.parse(setup.license.server_now)-86400000)<2000);
+tests/license-control.test.mjs:16:     const due=setup.license.suspension_due_at;
+tests/license-control.test.mjs:17:     assert.equal(await h.enforce.requireActiveLicense(),null);
+tests/license-control.test.mjs:20:     assert.equal((await client.inspect()).license.suspension_due_at,due);
+tests/license-control.test.mjs:22:     await h.db.exec("UPDATE restaurant_license SET expires_at=NOW()-INTERVAL '1 second'");
+tests/license-control.test.mjs:23:     assert.equal(await h.enforce.requireActiveLicense(),null);
+tests/license-control.test.mjs:24:     await h.db.exec("UPDATE restaurant_license SET suspension_due_at=NOW()-INTERVAL '1 millisecond'");
+tests/license-control.test.mjs:25:     assert.equal((await h.enforce.requireActiveLicense()).status,403);
+tests/license-control.test.mjs:26:     setup=await client.inspect();assert.equal(setup.license.status,'suspended');
+tests/license-control.test.mjs:30:     assert.equal(setup.license.status,'active');assert.equal(setup.license.suspension_due_at,null);
+tests/license-control.test.mjs:32:     const beforeImmediate=setup.license.expires_at;
+tests/license-control.test.mjs:34:     assert.equal(setup.license.status,'suspended');assert.equal(setup.license.suspension_due_at,null);
+tests/license-control.test.mjs:35:     assert.equal((await h.enforce.requireActiveLicense()).status,403);
+tests/license-control.test.mjs:37:     assert.equal(setup.license.expires_at,beforeImmediate);assert.notEqual(setup.version,activeVersion);
+tests/license-control.test.mjs:45:   const h=await licenseHarness({grace:false});
+tests/license-control.test.mjs:46:   const client=createLicenseControlClient({baseUrl:'https://preview.mo-bistro.labbing.space',adminKey:TEST_KEY,fetchImpl:h.backendFetch});
+tests/license-control.test.mjs:51:     await client.act('suspend',setup.version);assert.equal((await client.inspect()).license.status,'suspended');
+tests/license-control.test.mjs:56:   const h=await licenseHarness();
+tests/license-control.test.mjs:58:     const client=createLicenseControlClient({baseUrl:'https://preview.mo-bistro.labbing.space',adminKey:TEST_KEY,fetchImpl:h.backendFetch});
+tests/license-control.test.mjs:59:     let setup=await client.inspect();assert.equal(setup.ready,true);assert.equal(setup.license.status,'unconfigured');
+tests/license-control.test.mjs:62:     setup=await client.inspect();assert.equal(setup.license.licensed,true);
+tests/license-control.test.mjs:63:     const initialExpiry=new Date(setup.license.expires_at).getTime();
+tests/license-control.test.mjs:66:     const renewed=await client.inspect();assert.ok(new Date(renewed.license.expires_at).getTime()>initialExpiry+27*86400000);
+tests/license-control.test.mjs:68:     assert.equal((await client.inspect()).license.expires_at,renewed.license.expires_at);
+tests/license-control.test.mjs:70:     setup=await client.inspect();assert.equal(setup.license.status,'suspended');assert.equal(setup.license.licensed,false);
+tests/license-control.test.mjs:71:     assert.equal((await h.enforce.requireActiveLicense()).status,403);
+tests/license-control.test.mjs:72:     assert.equal((await h.status.GET(new Request('https://bistro.test/api/license/status',{headers:{Authorization:`Bearer ${TEST_KEY}`}}))).status,403);
+tests/license-control.test.mjs:74:     setup=await client.inspect();assert.equal(setup.license.licensed,true);assert.equal(setup.license.expires_at,renewed.license.expires_at);
+tests/license-control.test.mjs:75:     assert.equal(await h.enforce.requireActiveLicense(),null);
+tests/license-control.test.mjs:76:     await h.db.exec("UPDATE restaurant_license SET expires_at=NOW()-INTERVAL '1 day',status='suspended'");
+tests/license-control.test.mjs:79:     assert.equal(setup.license.licensed,true);assert.ok(new Date(setup.license.expires_at).getTime()>Date.now()+27*86400000);
+tests/license-control.test.mjs:82:     const beforeFailure=setup.license.expires_at;
+tests/license-control.test.mjs:83:     await h.db.exec(`CREATE FUNCTION reject_synthetic_license_audit() RETURNS trigger LANGUAGE plpgsql AS $$
+tests/license-control.test.mjs:85:       CREATE TRIGGER reject_synthetic_license_audit BEFORE INSERT ON license_audit_log
+tests/license-control.test.mjs:86:       FOR EACH ROW EXECUTE FUNCTION reject_synthetic_license_audit();`);
+tests/license-control.test.mjs:88:     assert.equal((await client.inspect()).license.expires_at,beforeFailure);
+tests/license-control.test.mjs:93: test('owner auth, no-browser writes and explicit version preconditions fail before license writes',async()=>{
+tests/license-control.test.mjs:94:   const h=await licenseHarness();
+tests/license-control.test.mjs:96:     const endpoint='https://bistro.test/api/license/admin/renew';
+tests/license-control.test.mjs:99:       [{Authorization:`Bearer ${TEST_KEY}`,Origin:'https://subscribtion.labbing.space'},403],
+tests/license-control.test.mjs:107:     const original=h.env.LICENSE_ADMIN_DATABASE_URL;
+tests/license-control.test.mjs:109:       h.env.LICENSE_ADMIN_DATABASE_URL=other;assert.equal(h.core.licenseTargetsMatch(),false);
+tests/license-control.test.mjs:110:       assert.throws(()=>h.core.licenseAdminDb(),/do not match/);
+tests/license-control.test.mjs:112:     h.env.LICENSE_ADMIN_DATABASE_URL=original;assert.equal(h.core.licenseTargetsMatch(),true);
+tests/license-control.test.mjs:118:     assert.throws(()=>createLicenseControlClient({baseUrl,adminKey:TEST_KEY}),/approved/);
+tests/license-control.test.mjs:120:   const client=createLicenseControlClient({baseUrl:'https://preview.mo-bistro.labbing.space',adminKey:TEST_KEY,fetchImpl:async()=>{calls++;throw Error('synthetic private failure');}});
+tests/license-control.test.mjs:121:   await assert.rejects(client.act('renew','"license-'+'a'.repeat(64)+'"'),error=>error.uncertain===true && !error.message.includes(TEST_KEY));
+tests/license-panel-browser.test.mjs:8: import {licenseHarness,TEST_KEY} from './license-control-harness.mjs';
+tests/license-panel-browser.test.mjs:9: import {createLicenseControlClient} from '../integrations/subscription-control/license-control-client.mjs';
+tests/license-panel-browser.test.mjs:14: test('real panel routes and custom confirmations wire to real license handlers on synthetic embedded PostgreSQL',
+tests/license-panel-browser.test.mjs:23:   try {({createApp}=await import('../integrations/subscription-control/app.js'));} finally {hooks.deregister();}
+tests/license-panel-browser.test.mjs:24:   const h=await licenseHarness();
+tests/license-panel-browser.test.mjs:25:   const client=createLicenseControlClient({baseUrl:'https://preview.mo-bistro.labbing.space',adminKey:TEST_KEY,fetchImpl:h.backendFetch});
+tests/license-panel-browser.test.mjs:27:   const app=createApp({publicDir:path.resolve('integrations/subscription-control/public'),
+tests/license-panel-browser.test.mjs:35:     if(req.headers.origin===origin) req.headers.origin='https://subscribtion.labbing.space';
+tests/license-panel-browser.test.mjs:43:     assert.equal((await fetch(origin+'/api/license')).status,401);
+tests/license-panel-browser.test.mjs:44:     const first=await fetch(origin+'/api/license',{headers:ownerHeaders});
+tests/license-panel-browser.test.mjs:47:     for(const extra of [{Origin:'https://evil.test','X-CSRF-Token':state.csrfToken},{Origin:'https://subscribtion.labbing.space'}]) {
+tests/license-panel-browser.test.mjs:48:       assert.equal((await fetch(origin+'/api/license/action',{method:'POST',headers:{...ownerHeaders,...extra,'x-synthetic-probe':'security','Content-Type':'application/json'},body:JSON.stringify({action:'activate',version:state.version,confirm:true})})).status,403);
+tests/license-panel-browser.test.mjs:67:     await page.getByText('License action completed. Current status refreshed.',{exact:true}).waitFor();
+tests/license-panel-browser.test.mjs:69:     const renewed=await client.inspect();assert.notEqual(renewed.license.expires_at,prior.license.expires_at);
+tests/license-panel-browser.test.mjs:71:     const freshCsrf=await (await fetch(origin+'/api/license',{headers:ownerHeaders})).json();
+tests/license-panel-browser.test.mjs:72:     const stale=await fetch(origin+'/api/license/action',{method:'POST',headers:{...ownerHeaders,Origin:'https://subscribtion.labbing.space','Content-Type':'application/json','X-CSRF-Token':freshCsrf.csrfToken},
+tests/license-panel-browser.test.mjs:74:     assert.equal(stale.status,412);assert.equal((await client.inspect()).license.expires_at,renewed.license.expires_at);
+tests/license-panel-browser.test.mjs:77:     assert.equal((await h.enforce.requireActiveLicense()).status,403);
+tests/license-panel-browser.test.mjs:80:     assert.equal((await client.inspect()).license.expires_at,renewed.license.expires_at);
+tests/license-panel-browser.test.mjs:85:     assert.equal(await h.enforce.requireActiveLicense(),null);
+tests/license-panel-browser.test.mjs:89:     assert.equal((await client.inspect()).license.expires_at,renewed.license.expires_at);
+tests/license-panel-browser.test.mjs:96:       if(screenshots) await page.screenshot({path:path.join(screenshots,`license-panel-${width}.png`),fullPage:true});
+tests/management-danger-zone.test.mjs:4: import {licenseHarness} from './license-control-harness.mjs';
+tests/management-danger-zone.test.mjs:7:   const license=await licenseHarness();
+tests/management-danger-zone.test.mjs:9:     await license.db.exec("INSERT INTO restaurant_license(id,status,plan,expires_at) VALUES(1,'suspended','monthly',NOW()+INTERVAL '1 month')");
+tests/management-danger-zone.test.mjs:11:     h.mocks['@/lib/licensing/enforce']=license.enforce;
+tests/management-danger-zone.test.mjs:13:     assert.equal(denied.status,403);assert.equal((await denied.json()).license_status,'suspended');
+tests/management-danger-zone.test.mjs:15:     await license.db.exec("UPDATE restaurant_license SET status='active' WHERE id=1");
+tests/management-danger-zone.test.mjs:18:   } finally {await license.close();}
+tests/management-danger-zone.test.mjs:21: test('bulk actions reject anonymous/non-manager, cross-origin, inactive license and malformed requests before SQL',async()=>{
+tests/management-danger-zone.test.mjs:34:   const inactive=harness({license:false});
+tests/operations-visibility.test.mjs:53:       '@/lib/licensing/enforce':{requireActiveLicense:async()=>null}
+tests/operations-visibility.test.mjs:61:     await db.exec(`INSERT INTO whatsapp_booking_consents(guest_id,phone,consent_version,subscription_token_hash,subscription_expires_at,subscribed_at)
+tests/operations-visibility.test.mjs:105:   const inactive=harness({license:false});assert.equal((await inactive.route('management/operations').PATCH(request('PATCH',{paused:true,confirm:true}))).status,403);
+tests/regressions.test.mjs:267: test("Area requests deny reception, cross-origin and inactive-license requests", async () => {
+tests/regressions.test.mjs:283:   h.state.license = false;
+tests/regressions.test.mjs:715: test("License enforcement remains effective on staff account and shift mutations", async () => {
+tests/regressions.test.mjs:716:   const h = harness({ license: false });
+tests/staff-booking-edits.test.mjs:88: test('auth, cross-origin, license and strict validation protect private booking mutations',async()=>{
+tests/staff-booking-edits.test.mjs:96:     t.h.state.license=false;assert.equal((await t.patch(t.values)).status,403);t.h.state.license=true;
+tests/staff-license-browser.test.mjs:16:   const temp=fs.mkdtempSync(path.join(os.tmpdir(),'bistro-license-ui-'));
+tests/staff-license-browser.test.mjs:17:   const component=ts.transpileModule(fs.readFileSync('src/components/staff-license-guard.tsx','utf8'),{
+tests/staff-license-browser.test.mjs:32:     if(req.url==='/api/license/status'){
+tests/staff-license-browser.test.mjs:36:       const licensed=['active','grace'].includes(state);
+tests/staff-license-browser.test.mjs:37:       res.setHeader('Content-Type','application/json');res.statusCode=fail?503:licensed?200:403;
+tests/staff-license-browser.test.mjs:38:       return res.end(JSON.stringify(fail?{error:'unavailable'}:{licensed,status:state,server_now:new Date().toISOString(),suspension_due_at:state==='grace'?new Date(due).toISOString():null}));
+tests/staff-license-browser.test.mjs:53:     const initialCheck=page.waitForRequest(request=>request.url().endsWith('/api/license/status'));
+tests/staff-license-browser.test.mjs:58:     const initialResponse=page.waitForResponse(response=>response.url().endsWith('/api/license/status'));
+tests/staff-license-browser.test.mjs:60:     await page.waitForFunction(()=>document.querySelector('dialog').dataset.licenseState==='active');
+tests/staff-license-browser.test.mjs:63:     const refreshCheck=page.waitForRequest(request=>request.url().endsWith('/api/license/status'));
+tests/staff-license-browser.test.mjs:67:     const refreshResponse=page.waitForResponse(response=>response.url().endsWith('/api/license/status'));
+tests/staff-license-browser.test.mjs:69:     await page.waitForFunction(()=>document.querySelector('dialog').dataset.licenseState==='active');
+tests/staff-license-browser.test.mjs:71:     await page.getByRole('heading',{name:'Subscription suspended',exact:true}).waitFor();
+tests/staff-license-browser.test.mjs:79:     if(screenshots){fs.mkdirSync(screenshots,{recursive:true});await page.screenshot({path:path.join(screenshots,'subscription-suspended-mobile.png')});}
+tests/staff-license-browser.test.mjs:83:     await page.getByRole('heading',{name:'Subscription expired',exact:true}).waitFor();
+tests/staff-license-browser.test.mjs:85:     await page.getByRole('heading',{name:'Subscription check unavailable',exact:true}).waitFor();
+tests/staff-license-browser.test.mjs:97:     if(screenshots)await page.screenshot({path:path.join(screenshots,'subscription-grace-mobile.png')});
+tests/staff-license-browser.test.mjs:100:     await page.getByRole('heading',{name:'Subscription suspended',exact:true}).waitFor({timeout:5000});
+tests/staff-license-browser.test.mjs:104:     assert.equal((await page.evaluate(()=>window.openedNotices)).includes('Checking subscription…'),false);
+tests/whatsapp-customer-window.test.mjs:7:  const booking={id:"notification-id",kind:"almost_ready",guest_id:1,revision:1,attempts:1,phone:"201000000000",name:"Guest",confirmation_consent:true,feedback_consent:true,subscribed_at:new Date(),unsubscribed_at:null,opted_out_at:null,guest_status:"waiting",eta_at:new Date(Date.now()+5*60000),seated_at:null,subscription_expires_at:new Date(Date.now()+86400000),tracking_token_hash:"hash",...options.booking};
+tests/whatsapp-guest-status.test.mjs:49: test("STOP overrides subscription and missing integration performs no SQL", async () => {
+tests/whatsapp.test.mjs:119:           return { requireActiveLicense: async () => null };
+tests/whatsapp.test.mjs:168:     code: policy.subscriptionCode(guest.id, hash),
+tests/whatsapp.test.mjs:250:     const state = await service.subscriptionState(b.token);
+tests/whatsapp.test.mjs:254:     await service.subscriptionState(b.token);
+tests/whatsapp.test.mjs:287:   "subscription activates only on received matching text, not link access",
+tests/whatsapp.test.mjs:290:     assert.equal((await service.subscriptionState(b.token)).subscribed, false);
+tests/whatsapp.test.mjs:292:     assert.equal((await service.subscriptionState(b.token)).subscribed, true);
+tests/whatsapp.test.mjs:316:     assert.equal((await service.subscriptionState(b.token)).subscribed, false);
+tests/whatsapp.test.mjs:335:     assert.equal((await service.subscriptionState(b.token)).subscribed, false);
+tests/whatsapp.test.mjs:345:     assert.equal((await service.subscriptionState(b.token)).subscribed, true);
+tests/whatsapp.test.mjs:348: check("expired subscription code fails closed", async () => {
+tests/whatsapp.test.mjs:351:     "UPDATE whatsapp_booking_consents SET subscription_expires_at=NOW()-INTERVAL '1 second'",
+tests/whatsapp.test.mjs:354:   assert.equal((await service.subscriptionState(b.token)).subscribed, false);
+tests/whatsapp.test.mjs:360:   assert.equal((await service.subscriptionState(b.token)).subscribed, false);
+tests/whatsapp.test.mjs:392:   "STOP applies across all sender bookings and stale subscription replay cannot reactivate",
+tests/whatsapp.test.mjs:401:     assert.equal((await service.subscriptionState(a.token)).subscribed, false);
+tests/whatsapp.test.mjs:402:     assert.equal((await service.subscriptionState(b.token)).subscribed, false);
+tests/whatsapp.test.mjs:410:     assert.equal((await service.subscriptionState(a.token)).subscribed, false);
+tests/whatsapp.test.mjs:425:     assert.equal((await service.subscriptionState(b.token)).subscribed, false);
+tests/whatsapp.test.mjs:427:       (await service.subscriptionState(b.token)).feedbackConsent,
+tests/whatsapp.test.mjs:570:     assert.equal((await service.subscriptionState(b.token)).subscribed, false);
+tests/whatsapp.test.mjs:583:     assert.equal((await service.subscriptionState(b.token)).subscribed, true);
+tests/whatsapp.test.mjs:733:     const route = load("src/app/api/whatsapp/subscription/route.ts");
+tests/whatsapp.test.mjs:735:       new Request("https://bistro.test/api/whatsapp/subscription", {
+tests/whatsapp.test.mjs:749:     const state = await service.subscriptionState(b.token);
+tests/whatsapp.test.mjs:912:   "late subscription/feedback never creates a new review after the 60-minute window",
+tests/whatsapp.test.mjs:964:   assert.equal((await service.subscriptionState(b.token)).subscribed,false);
+tests/whatsapp.test.mjs:968:   assert.equal((await service.subscriptionState(b.token)).subscribed,true);
+tests/whatsapp.test.mjs:975: check('isolated Preview subscription still rejects unsigned, wrong-business, forged-code, wrong-phone and expired commands',async()=>isolatedConsentCase(async()=>{
+tests/whatsapp.test.mjs:981:   await sql`UPDATE whatsapp_booking_consents SET subscription_expires_at=NOW()-INTERVAL '1 minute' WHERE guest_id=${b.id}`;
+tests/whatsapp.test.mjs:983:   assert.equal((await service.subscriptionState(b.token)).subscribed,false);
+tests/whatsapp.test.mjs:992:     assert.equal((await service.subscriptionState(b.token)).subscribed,true);
+tests/whatsapp.test.mjs:994:     assert.equal((await service.subscriptionState(b.token)).subscribed,false);
+tests/whatsapp.test.mjs:995:     assert.equal((await service.subscriptionState(b.token)).feedbackConsent,false);
+tests/whatsapp.test.mjs:1009:     assert.equal((await service.subscriptionState(b.token)).subscribed,true);
+tests/whatsapp.test.mjs:1011:     assert.equal((await service.subscriptionState(b.token)).subscribed,false);
+tests/whatsapp.test.mjs:1016:   assert.equal((await service.subscriptionState(b.token)).feedbackEditable,true);
+tests/whatsapp.test.mjs:1018:   assert.equal((await service.subscriptionState(b.token)).feedbackEditable,true);
+tests/whatsapp.test.mjs:1019:   await sql`UPDATE whatsapp_booking_consents SET subscription_expires_at=NOW()-INTERVAL '1 hour' WHERE guest_id=${b.id}`;
+tests/whatsapp.test.mjs:1020:   assert.equal((await service.subscriptionState(b.token)).available,true);
+tests/whatsapp.test.mjs:1022:   assert.equal((await service.subscriptionState(b.token)).feedbackEditable,false);
+tests/whatsapp.test.mjs:1025:   assert.equal((await service.subscriptionState(b.token)).feedbackEditable,false);
+tests/whatsapp.test.mjs:1028: test("friendly subscription verifies its sender and queues one acknowledgement without exposing the long token",async()=>{
+tests/whatsapp.test.mjs:1030:   const state=await service.subscriptionState(b.token);
+tests/whatsapp.test.mjs:1037:     assert.equal((await service.subscriptionState(b.token)).subscribed,false);
+tests/whatsapp.test.mjs:1040:   const message=inbound(b,'friendly-subscription',{text:{body:text}});
+tests/whatsapp.test.mjs:1047:   await webhook.processMetaWebhook(envelope({...message,id:'friendly-subscription-again'}));
+tests/whatsapp.test.mjs:1059:   const text=new URL((await service.subscriptionState(b.token)).url).searchParams.get('text');
+tests/whatsapp.test.mjs:1062:   assert.equal((await service.subscriptionState(other.token)).subscribed,false);
+tests/whatsapp.test.mjs:1065:   assert.equal((await service.subscriptionState(b.token)).subscribed,false);
+tests/whatsapp.test.mjs:1067:   await sql`UPDATE whatsapp_booking_consents SET subscription_expires_at=NOW()-INTERVAL '1 second' WHERE guest_id=${b.id}`;
+tests/whatsapp.test.mjs:1070:   await sql`UPDATE whatsapp_booking_consents SET subscription_expires_at=NOW()+INTERVAL '1 day' WHERE guest_id=${b.id}`;
+tests/whatsapp.test.mjs:1078: test("bundled review consent requires a received subscription command; legacy choices are preserved",async()=>{
+tests/whatsapp.test.mjs:1080:   const before=await service.subscriptionState(b.token);
+tests/whatsapp.test.mjs:1084:   assert.equal((await service.subscriptionState(b.token)).feedbackConsent,false);
+tests/whatsapp.test.mjs:1086:   assert.equal((await service.subscriptionState(b.token)).feedbackConsent,true);
+tests/whatsapp.test.mjs:1093:   assert.equal((await service.subscriptionState(legacy.token)).feedbackConsent,false);
+tests/whatsapp.test.mjs:1118:   await service.dispatchOutbox(); // Complete the separate subscription acknowledgement.

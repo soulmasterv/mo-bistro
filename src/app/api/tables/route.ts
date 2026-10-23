@@ -1,6 +1,5 @@
 import { getPostgres } from "@/lib/postgres-db";
 import { setActivityActor } from "@/lib/staff-activity";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { currentStaff } from "@/lib/staff-auth";
@@ -32,8 +31,6 @@ export async function PATCH(request: Request) {
   if (!staff || !["manager", "reception"].includes(staff.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
 
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;

@@ -187,7 +187,6 @@ test('new endpoints are disabled by default, role-gated, origin-checked and call
  const mocks={
   '@/lib/postgres-db':{getPostgres:()=>{sqlCalls++;throw Error('Should not reach DB');}},
   '@/lib/staff-auth':{currentStaff:async()=>actor},
-  '@/lib/licensing/enforce':{requireActiveLicense:async()=>null},
   '@/lib/whatsapp/transport':{verifyQstash:async()=>false},
  };
  const tables=load('src/app/api/advanced/tables/route.ts',mocks,{process:{env}});

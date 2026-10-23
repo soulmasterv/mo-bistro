@@ -14,7 +14,7 @@ Migration-backed QA harness preparation and current test evidence: `docs/migrati
 
 Install dependencies from the lockfile with `npm ci`. Use `npm run dev` for the application, `npm run build` for compilation and TypeScript validation, and `npm run lint` for lint. See `.env.example` for variable names; do not commit `.env` files or real credentials.
 
-The cloud feature set uses `MO_BISTRO_DB=postgres`, `MO_BISTRO_POSTGRES_URL` pointing to the selected isolated database, and `STAFF_SESSION_SECRET` of at least 32 characters. Licensing also needs its schema and configuration; `LICENSE_ENFORCEMENT=false` only bypasses enforcement in development, not Preview/Production.
+The cloud feature set uses `MO_BISTRO_DB=postgres`, `MO_BISTRO_POSTGRES_URL` pointing to the selected isolated database, and `STAFF_SESSION_SECRET` of at least 32 characters.
 
 PostgreSQL public endpoint rate limiting trusts Vercel's `x-vercel-forwarded-for` header. An arbitrary local/reverse-proxy setup cannot spoof an untrusted header as a replacement; missing trusted-edge evidence returns 503 on those endpoints. The Meta webhook does not use that IP limiter.
 
@@ -33,7 +33,7 @@ The following is the proposed schema sequence for an EMPTY, approved isolated da
 5. `migrations/20261012_simple_inventory.sql` (named/area requests and anonymous inventory)
 6. `migrations/20261013_core_support.sql` (QR permits, request limits and integration-independent seating time)
 
-Provision the initial manager through a reviewed administrative procedure using the existing salted credential format. No default password/account is created by this guide. Establish the restaurant's approved license before testing protected mutations.
+Provision the initial manager through a reviewed administrative procedure using the existing salted credential format. No default password/account is created by this guide.
 
 Optional WhatsApp requires `20261012_whatsapp_notifications.sql`; this migration is NOT safely rerunnable when its tables already exist. Isolated Preview testing additionally uses `20261012_whatsapp_preview_test.sql`. Window-aware notifications use `20261013_whatsapp_customer_windows.sql`. Existing schema must be checked before any of these are executed.
 
@@ -62,7 +62,7 @@ Demo generation and diagnostic pages are allowed only in explicit development/Pr
 
 ## Service fallback
 
-Keep the current operational record available while validating a release. On database/network failure, stop retrying uncertain seat/release actions blindly, switch to the agreed paper process, record times/actions, and reconcile occupancy before resuming the app. License failure remains enforced; no automatic fail-open/grace bypass is introduced. A service-night shadow test, device/load tests and license-expiry policy still require operational review.
+Keep the current operational record available while validating a release. On database/network failure, stop retrying uncertain seat/release actions blindly, switch to the agreed paper process, record times/actions, and reconcile occupancy before resuming the app. A service-night shadow test and device/load tests still require operational review.
 
 ## WhatsApp
 

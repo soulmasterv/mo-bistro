@@ -1,7 +1,6 @@
 import { WorkflowError } from "@/lib/workflow-error";
 import { databaseFailure } from "@/lib/database-errors";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { NextResponse } from "next/server";
 import { currentStaff } from "@/lib/staff-auth";
 import { releaseTable } from "@/lib/seating-v3";
@@ -16,8 +15,6 @@ export async function POST(
   if (!["manager","reception"].includes(staff.role)) {
     return NextResponse.json({ error: "Reception access required" }, { status: 403 });
   }
-  const licenseError = await requireActiveLicense();
-  if (licenseError) return licenseError;
 
 
   const originError = rejectCrossOrigin(request);

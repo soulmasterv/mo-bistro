@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { currentStaff } from "@/lib/staff-auth";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
-import { requireActiveLicense } from "@/lib/licensing/enforce";
 import { getPostgres } from "@/lib/postgres-db";
 import { setActivityActor } from "@/lib/staff-activity";
 
@@ -57,8 +56,6 @@ export async function PATCH(request: Request, context: Context) {
   if (auth.denied) return auth.denied;
   const origin = rejectCrossOrigin(request);
   if (origin) return origin;
-  const license = await requireActiveLicense();
-  if (license) return license;
   let payload: unknown;
   try { payload = await request.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }

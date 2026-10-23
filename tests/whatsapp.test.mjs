@@ -115,8 +115,6 @@ function load(file) {
         if (id === "@/lib/rotating-qr") return { verifyQR: () => true };
         if (id === "@/lib/guest-eta-support")
           return { hasGuestEtaColumn: async () => true };
-        if (id === "@/lib/licensing/enforce")
-          return { requireActiveLicense: async () => null };
         if (id === "next/headers")
           return { cookies: async () => ({ get: () => undefined }) };
         if (id === "next/server")
