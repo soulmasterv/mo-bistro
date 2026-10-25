@@ -53,7 +53,6 @@ test('Failures stay Waiting; definite rejection retries once, unknown acceptance
   await sender.deliverPilotCall(job);assert.equal(sends,1,'old callback cannot send again');
   await sender.deliverPilotCall(retryId);assert.equal(sends,2);
   assert.equal((await store.transition(party.id,'retry',undefined,'11111111-1111-4111-8111-111111111113')).status,409);
-  assert.equal((await store.transition(party.id,'guest_informed')).status,409);
   const callId='11111111-1111-4111-8111-111111111114';
   await store.transition(party.id,'phone_call',undefined,callId);await store.transition(party.id,'phone_call',undefined,callId);
   let row=(await db.query('SELECT * FROM pilot_parties')).rows[0];assert.equal(row.phone_call_taps,1);assert.equal(row.status,'waiting');
@@ -62,6 +61,22 @@ test('Failures stay Waiting; definite rejection retries once, unknown acceptance
   await sender.deliverPilotCall(retryId);assert.equal(sends,2);
   const exported=(await store.exportRows())[0];assert.equal(exported.notification_attempts,2);assert.equal(exported.notification_outcomes,'failed | unknown');
  }finally{await db.close();}
+});
+test('Reception can seat a waiting party or confirm an in-person conversation without a phone tap or message',async()=>{
+ const {db,store}=await setup();try{
+  const first=await store.createParty({...input,whatsapp_consent:false},'walk_in');
+  assert.ok((await store.transition(first.id,'seated')).success);
+  let row=(await db.query('SELECT * FROM pilot_parties WHERE id=$1',[first.id])).rows[0];
+  assert.equal(row.status,'seated');assert.equal(row.called_at,null);assert.equal(row.phone_call_taps,0);
+  const second=await store.createParty({...input,whatsapp_consent:false},'walk_in');
+  assert.ok((await store.transition(second.id,'guest_informed')).success);
+  row=(await db.query('SELECT * FROM pilot_parties WHERE id=$1',[second.id])).rows[0];
+  assert.equal(row.status,'called');assert.equal(row.informed_via,'staff_confirmed');assert.equal(row.phone_call_taps,0);
+  assert.equal((await db.query('SELECT count(*)::integer AS n FROM pilot_ready_messages')).rows[0].n,0);
+  const pending=await store.transition(second.id,'remove','guest_cancelled');assert.ok(pending.undo_token);
+  assert.equal((await store.transition(second.id,'seated')).status,409);
+  assert.equal((await store.transition(second.id,'guest_informed')).status,409);
+ }finally{await db.close()}
 });
 test('All four reasons work from either active state; duplicates remain stored but do not enter measurement CSV',async()=>{
  const {db,store}=await setup();try{

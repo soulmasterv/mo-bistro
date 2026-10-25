@@ -28,13 +28,16 @@ const wait=(p:Party,now:number)=>Math.max(0,Math.floor((observedPartyTime(p,now)
 const waitStyle=(minutes:number)=>minutes>=30?styles.waitRed:minutes>=15?styles.waitAmber:'';
 
 function Primary({party,busy,onAction}:{party:Party;busy:boolean;onAction:ActionHandler}){
- const action=party.status==='called'?'seated':party.message_status?'retry':'notify';
+ const action=party.message_status?'retry':'notify';
  const sending=['pending','scheduled','sending'].includes(party.message_status||'');
  const unsafe=party.status==='waiting'&&party.message_status==='unknown';
- const label=action==='seated'?'Seat guest':sending?'Sending…':unsafe?'Send unconfirmed':action==='retry'?'Retry':'Notify';
- return <button className={styles.button} disabled={busy||!!party.pending_exit_kind||(party.status==='waiting'&&(sending||unsafe))} onClick={()=>onAction(party.id,action)} aria-label={`${label} ${party.name}`}>
+ const label=sending?'Sending…':unsafe?'Send unconfirmed':action==='retry'?'Retry':'Notify';
+ return <button className={styles.secondary} disabled={busy||!!party.pending_exit_kind||(party.status==='waiting'&&(sending||unsafe))} onClick={()=>onAction(party.id,action)} aria-label={`${label} ${party.name}`}>
   {busy?'Saving…':label}<ArrowUpRight size={15}/>
  </button>;
+}
+function Seat({party,busy,onAction}:{party:Party;busy:boolean;onAction:ActionHandler}){
+ return <button className={styles.button} disabled={busy||!!party.pending_exit_kind} onClick={()=>onAction(party.id,'seated')} aria-label={`Seat guest ${party.name}`}>{busy?'Saving…':'Seat guest'}<ArrowUpRight size={15}/></button>;
 }
 function Undo({party,now,busy,onAction}:{party:Party;now:number;busy:boolean;onAction:ActionHandler}){
  if(!party.pending_exit_kind)return null;
@@ -44,7 +47,7 @@ function Undo({party,now,busy,onAction}:{party:Party;now:number;busy:boolean;onA
  </div>;
 }
 export function PilotQueue({parties,now,busy,onAction,onOpen}:{parties:Party[];now:number;busy:number[];onAction:ActionHandler;onOpen:(id:number)=>void}){
- return <div className={styles.tableWrap}><table className={styles.queueTable} aria-label="Reception queue">
+ return <div className={styles.tableWrap} role="region" aria-label="Scrollable reception queue" tabIndex={0}><table className={styles.queueTable} aria-label="Reception queue">
   <thead><tr><th># · Guest</th><th>Party size</th><th>Preference</th><th>Wait time</th><th>Status</th><th>Actions</th></tr></thead>
   <tbody>{parties.map((p,index)=>{const disabled=busy.includes(p.id)||!!p.pending_exit_kind;const minutes=wait(p,now);return <tr key={p.id} className={index===0?styles.nextRow:''}>
    <td className={styles.guestCell}><span className={styles.rowNumber}>{String(index+1).padStart(2,'0')}</span><div><div className={styles.guestName}><button onClick={()=>onOpen(p.id)}>{p.name}</button>{index===0&&<span className={styles.nextTag}>Next</span>}</div><a className={styles.rowPhone} href={'tel:'+p.phone} onClick={e=>{if(disabled)e.preventDefault();else onAction(p.id,'phone_call');}}>{p.phone}</a></div></td>
@@ -54,7 +57,8 @@ export function PilotQueue({parties,now,busy,onAction,onOpen}:{parties:Party[];n
    <td data-label="Status"><div className={styles.statusCell}><span className={`${styles.pill} ${p.status==='called'?styles.pillNotified:''}`}>{p.called_at?`${p.informed_via==='staff_confirmed'?'Informed':'Notified'} ${time(p.called_at)}`:'Waiting'}</span>{p.message_status&&<small title={messageLabel(p)} className={messageFailed(p)?styles.failed:styles.hint}>{messageLabel(p,true)}</small>}</div></td>
    <td className={styles.rowActions}><div className={styles.actions} aria-busy={busy.includes(p.id)}>
     <a href={'tel:'+p.phone} aria-label={`Call ${p.name}`} className={`${styles.secondary} ${needsPhone(p)?styles.callProminent:''}`} aria-disabled={disabled} onClick={e=>{if(disabled)e.preventDefault();else onAction(p.id,'phone_call');}}><Phone size={15}/>Call</a>
-    <Primary party={p} busy={busy.includes(p.id)} onAction={onAction}/>
+    <Seat party={p} busy={busy.includes(p.id)} onAction={onAction}/>
+    {p.status==='waiting'&&<Primary party={p} busy={busy.includes(p.id)} onAction={onAction}/>}
     <button className={styles.secondary} aria-label={`Guest details for ${p.name}`} onClick={()=>onOpen(p.id)}><MoreHorizontal size={18}/></button>
    </div><Undo party={p} now={now} busy={busy.includes(p.id)} onAction={onAction}/></td>
   </tr>;})}</tbody>
@@ -75,10 +79,11 @@ export function PilotDrawer({party,now,busy,onAction,onClose}:{party:Party;now:n
   </dl>
   {needsPhone(party)&&<p className={styles.callNotice}>{failureDetail(party)||'No WhatsApp subscription. Call this guest directly.'}</p>}
   <div className={styles.drawerControls} aria-busy={busy}>
-   <Primary party={party} busy={busy} onAction={onAction}/>
+   <Seat party={party} busy={busy} onAction={onAction}/>
+   {party.status==='waiting'&&<Primary party={party} busy={busy} onAction={onAction}/>}
    <div className={styles.two}><a href={'tel:'+party.phone} aria-disabled={disabled} onClick={e=>{if(disabled)e.preventDefault();else onAction(party.id,'phone_call');}} className={`${styles.secondary} ${needsPhone(party)?styles.callProminent:''}`}><Phone size={17}/>Call guest</a>
     <a className={styles.secondary} href={whatsapp(party)} target="_blank" rel="noreferrer" aria-disabled={disabled} onClick={e=>{if(disabled)e.preventDefault();}}><MessageCircle size={17}/>Open WhatsApp</a></div>
-   {party.status==='waiting'&&needsPhone(party)&&<><button className={styles.secondary} disabled={disabled||!party.phone_call_taps} onClick={()=>onAction(party.id,'guest_informed')}>Guest informed</button><small className={styles.hint}>Call first. Confirm only after speaking to the guest. A call tap alone does not notify them.</small></>}
+   {party.status==='waiting'&&needsPhone(party)&&<><button className={styles.secondary} disabled={disabled} onClick={()=>onAction(party.id,'guest_informed')}>Guest informed</button><small className={styles.hint}>Confirm only after speaking to the guest in person or by phone. Seating does not require a call or message.</small></>}
    {!party.whatsapp_consent&&<small className={styles.hint}>Guest script: “Scan your status link, then send the prepared WhatsApp message to get your table-ready text.”</small>}
   </div>
   <div className={styles.drawerDanger}><Undo party={party} now={now} busy={busy} onAction={onAction}/>

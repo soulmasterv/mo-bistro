@@ -64,7 +64,7 @@ export async function transition(id:number,action:PilotAction,reason?:z.infer<ty
   } else if(normalized==='guest_informed'){
    if(party.status==='called')return {success:true};
    const fallback=!party.whatsapp_consent_at||['failed','unknown','skipped','simulated'].includes(latest?.status)||(latest?.status==='pending'&&latest.last_error==='scheduler_unavailable');
-   if(!fallback||!party.phone_call_taps)return {error:'Call the guest first, then confirm only after speaking to them.',status:409};
+   if(!fallback)return {error:'Confirm only after speaking to the guest; a message is already being processed.',status:409};
    await tx`UPDATE public.pilot_parties SET status='called',called_at=clock_timestamp(),informed_via='staff_confirmed' WHERE id=${id}`;
    await tx`UPDATE public.pilot_ready_messages SET status='skipped',last_error='staff_informed',updated_at=clock_timestamp() WHERE party_id=${id} AND status IN ('pending','scheduled')`;
   } else if(normalized==='notify'||normalized==='retry') {

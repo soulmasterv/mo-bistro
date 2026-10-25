@@ -51,8 +51,17 @@ test('Pilot QA: expanded reception layout, dark scrolling and booking subtitles'
     let status='waiting';
     const mutations=[];
     const server=http.createServer((req,res)=>{
-      if(req.method!=='GET') {mutations.push(req.url);res.writeHead(405);res.end();return;}
-      if(req.url==='/api/pilot/queue') {res.setHeader('Content-Type','application/json');res.end(JSON.stringify(parties));}
+      if(req.method==='PATCH'&&/^\/api\/pilot\/parties\/\d+$/.test(req.url)) {
+        let body='';req.on('data',chunk=>body+=chunk);req.on('end',()=>{
+          const action=JSON.parse(body).action;mutations.push(action);
+          const p=parties.find(p=>p.id===Number(req.url.split('/').at(-1)));
+          if(!p||!['seated','guest_informed'].includes(action)){res.writeHead(400);res.end('{}');return;}
+          p.status=action==='seated'?'seated':'called';if(action==='guest_informed'){p.called_at=new Date().toISOString();p.informed_via='staff_confirmed';}
+          res.setHeader('Content-Type','application/json');res.end('{"success":true}');
+        });return;
+      }
+      if(req.method!=='GET') {mutations.push('UNEXPECTED');res.writeHead(405);res.end();return;}
+      if(req.url==='/api/pilot/queue') {res.setHeader('Content-Type','application/json');res.end(JSON.stringify(parties.filter(p=>p.status!=='seated')));}
       else if(req.url.startsWith('/api/pilot/status?')) {res.setHeader('Content-Type','application/json');res.end(JSON.stringify({id:1,status,position:1,whatsapp_consent:false,whatsapp_reply_observed:false}));}
       else if(req.url==='/app.js') {res.setHeader('Content-Type','text/javascript');res.end(fs.readFileSync(path.join(temp,'app.js')));}
       else if(req.url==='/app.css') {res.setHeader('Content-Type','text/css');res.end(globalCss+'\n'+fs.readFileSync(path.join(temp,'app.css'),'utf8'));}
@@ -100,9 +109,20 @@ test('Pilot QA: expanded reception layout, dark scrolling and booking subtitles'
             assert.ok(metrics.headerTop>=16&&metrics.headerTop<=24,'Header stays at normal page padding');
             assert.ok(metrics.width<=viewport.width+1&&metrics.innerWidth<=viewport.width+1,'No horizontal expansion');
             await page.getByRole('button',{name:'Synthetic QA Guest 135',exact:true}).scrollIntoViewIfNeeded();
-            assert.ok(await page.evaluate(()=>window.scrollY)>0,'Document still scrolls to the populated queue tail');
-            await page.mouse.wheel(0,-100000);
-            await page.waitForFunction(()=>window.scrollY===0);
+            assert.equal(await page.evaluate(()=>window.scrollY),0,'The page stays fixed while the queue scrolls');
+            const scroller=page.getByRole('region',{name:'Scrollable reception queue'});
+            assert.ok(await scroller.evaluate(el=>el.scrollTop)>0,'Queue tail is reached with internal scrolling');
+            await scroller.evaluate(el=>el.scrollTop=0);
+            if(expanded&&viewport.width>650){
+              const panels=await page.locator('details').evaluateAll(els=>els.filter(el=>['Add walk-in','QR join'].includes(el.querySelector('summary')?.textContent)).map(el=>el.getBoundingClientRect().height));
+              assert.ok(Math.abs(panels[0]-panels[1])<2,'Entry panels have balanced heights');
+              if(viewport.width>=966&&viewport.height>=700){
+                const submit=await page.getByRole('button',{name:'Add walk-in',exact:true}).boundingBox();
+                const qr=await page.getByRole('link',{name:'Open join page',exact:true}).boundingBox();
+                const bottom=await page.locator('details').filter({has:page.locator('summary').filter({hasText:'QR join'})}).evaluate(el=>el.parentElement.getBoundingClientRect().bottom);
+                assert.ok(submit.y+submit.height<=bottom+1&&qr.y+qr.height<=bottom+1,'Desktop entry actions are visible without scrolling the tools');
+              }
+            }
             if(expanded) assert.equal(await page.getByLabel('Name',{exact:true}).inputValue(),'Preserved walk-in draft');
           }
           await page.screenshot({path:path.join(temp,`reception-${viewport.width}.png`)});
@@ -111,6 +131,20 @@ test('Pilot QA: expanded reception layout, dark scrolling and booking subtitles'
           assert.equal(await page.locator('[data-pilot-reception]').evaluate(el=>el.getBoundingClientRect().top),0);
         });
       }
+      await t.test('Waiting and failed-message guests can be seated directly and informed in person',async()=>{
+        await page.setViewportSize({width:1280,height:720});parties[0].message_status='failed';parties[0].message_error='whatsapp_disabled';
+        await page.goto(origin);
+        await page.getByRole('button',{name:'Seat guest Synthetic QA Guest 1',exact:true}).click();
+        await page.getByRole('button',{name:'Synthetic QA Guest 1',exact:true}).waitFor({state:'detached'});
+        await page.getByRole('button',{name:'Synthetic QA Guest 2',exact:true}).click();
+        const drawer=page.getByRole('dialog');
+        assert.equal(await drawer.getByRole('button',{name:'Guest informed',exact:true}).isEnabled(),true);
+        assert.equal(await drawer.getByRole('button',{name:'Seat guest Synthetic QA Guest 2',exact:true}).isEnabled(),true);
+        await drawer.getByRole('button',{name:'Guest informed',exact:true}).click();
+        await drawer.getByRole('button',{name:'Guest informed',exact:true}).waitFor({state:'detached'});
+        await drawer.getByRole('button',{name:'Seat guest Synthetic QA Guest 2',exact:true}).click();
+        await drawer.waitFor({state:'detached'});
+      });
       await t.test('Guest wording and reception theme do not leak between routes',async()=>{
         for(const [next,subtitle] of [
           ['waiting','Follow your place in the queue here.'],
@@ -130,7 +164,7 @@ test('Pilot QA: expanded reception layout, dark scrolling and booking subtitles'
           }
         }
       });
-      assert.deepEqual(mutations,[],'No action or WhatsApp mutation was sent');
+      assert.deepEqual(mutations,['seated','guest_informed','seated'],'Only intended actions hit the local fixture; no notify/call/WhatsApp action');
       assert.deepEqual(errors,[]);
       console.log(`Pilot UI screenshots: ${temp}`);
     } finally {
