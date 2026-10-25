@@ -85,7 +85,6 @@ test('Pilot QA: expanded reception layout, dark scrolling and booking subtitles'
           for(const expanded of [false,true]) {
             if(expanded) {
               await page.getByText('Add walk-in',{exact:true}).first().click();
-              await page.getByText('QR join',{exact:true}).click();
               await page.getByLabel('Name',{exact:true}).fill('Preserved walk-in draft');
             }
             await page.evaluate(()=>window.scrollTo(0,0));
@@ -113,16 +112,19 @@ test('Pilot QA: expanded reception layout, dark scrolling and booking subtitles'
             const scroller=page.getByRole('region',{name:'Scrollable reception queue'});
             assert.ok(await scroller.evaluate(el=>el.scrollTop)>0,'Queue tail is reached with internal scrolling');
             await scroller.evaluate(el=>el.scrollTop=0);
-            if(expanded&&viewport.width>650){
-              const panels=await page.locator('details').evaluateAll(els=>els.filter(el=>['Add walk-in','QR join'].includes(el.querySelector('summary')?.textContent)).map(el=>el.getBoundingClientRect().height));
-              assert.ok(Math.abs(panels[0]-panels[1])<2,'Entry panels have balanced heights');
-              if(viewport.width>=966&&viewport.height>=700){
-                const submit=await page.getByRole('button',{name:'Add walk-in',exact:true}).boundingBox();
-                const qr=await page.getByRole('link',{name:'Open join page',exact:true}).boundingBox();
-                const bottom=await page.locator('details').filter({has:page.locator('summary').filter({hasText:'QR join'})}).evaluate(el=>el.parentElement.getBoundingClientRect().bottom);
-                assert.ok(submit.y+submit.height<=bottom+1&&qr.y+qr.height<=bottom+1,'Desktop entry actions are visible without scrolling the tools');
-              }
-            }
+            const trigger=page.getByRole('button',{name:'QR join',exact:true});
+            await trigger.click();const qrDialog=page.getByRole('dialog',{name:'Join the waitlist'});
+            await qrDialog.waitFor();
+            const qrMetrics=await qrDialog.evaluate(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,background:getComputedStyle(el).backgroundColor,modal:el.matches(':modal'),focusInside:el.contains(document.activeElement)};});
+            assert.equal(qrMetrics.x,0);assert.equal(qrMetrics.y,0);
+            assert.equal(qrMetrics.width,viewport.width);assert.equal(qrMetrics.height,viewport.height);
+            assert.equal(qrMetrics.background,'rgb(16, 17, 17)','Opaque screen covers all guest details');
+            assert.equal(qrMetrics.modal,true,'Background staff controls are inert');assert.equal(qrMetrics.focusInside,true);
+            if(expanded&&[390,1280].includes(viewport.width))await page.screenshot({path:path.join(temp,`qr-overlay-${viewport.width}.png`)});
+            for(let key=0;key<4;key++){await page.keyboard.press('Tab');assert.equal(await qrDialog.evaluate(el=>el.contains(document.activeElement)),true);}
+            await qrDialog.getByRole('button',{name:'Close QR code'}).click();await qrDialog.waitFor({state:'detached'});
+            assert.equal(await trigger.evaluate(el=>el===document.activeElement),true,'Focus returns to QR opener');
+            await trigger.click();await page.keyboard.press('Escape');await qrDialog.waitFor({state:'detached'});
             if(expanded) assert.equal(await page.getByLabel('Name',{exact:true}).inputValue(),'Preserved walk-in draft');
           }
           await page.screenshot({path:path.join(temp,`reception-${viewport.width}.png`)});

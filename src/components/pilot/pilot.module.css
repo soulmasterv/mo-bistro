@@ -33,7 +33,7 @@
 .form :is(input,select) { box-sizing:border-box; width:100%; min-height:46px; padding:11px; border:1px solid var(--line); background:#101111; color:var(--ink); border-radius:8px; font:inherit; font-size:16px; }
 .form :is(input,select):focus-visible { outline:2px solid #e6c58a; outline-offset:2px; }
 .two { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
-.entryTools { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); align-items:stretch; gap:14px; margin:20px 0; }
+.entryTools { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; margin:20px 0; }
 .entryTools>.panel { min-width:0; margin:0; }
 .form label { min-width:0; }
 .form .consent { display:flex; align-items:flex-start; gap:10px; line-height:1.6; }
@@ -58,8 +58,14 @@
 .receptionPage .title { margin:12px 0; }
 .receptionPage .notice { flex-shrink:0; max-height:12dvh; overflow:auto; margin:8px 0; }
 .receptionPage .wrap>section { flex-shrink:0; max-height:25dvh; overflow:auto; margin:8px 0; }
-.qrPanel .qr { justify-content:center; align-content:center; flex-direction:column; min-height:230px; }
-.qrPanel .qr svg { width:180px; height:180px; max-width:100%; box-sizing:content-box; }
+.joinScreen { position:fixed; inset:0; width:100%; max-width:none; height:100dvh; max-height:none; margin:0; padding:24px; box-sizing:border-box; border:0; overflow:auto; background:#101111; color:#f4f0e7; font-family:Arial,sans-serif; }
+.joinScreen[open] { display:grid; place-items:center; }
+.joinScreen::backdrop { background:#101111; }
+.joinCard { display:flex; flex-direction:column; align-items:center; gap:20px; width:100%; max-width:460px; text-align:center; margin:auto; }
+.joinCard h2 { font-size:28px; margin:0; }
+.joinCard p { margin:0; line-height:1.6; color:#b6b6b2; }
+.joinCard svg { width:min(280px,100%); height:auto; flex-shrink:0; background:white; border-radius:8px; }
+.joinCard>button { align-self:flex-end; }
 .queueTable { width:100%; border-collapse:collapse; font-size:13px; }
 .queueTable th { position:sticky; top:0; z-index:1; background:#202222; color:#c5c3bc; font-size:11px; font-weight:500; text-align:left; padding:16px; white-space:nowrap; }
 .queueTable td { padding:14px 16px; border-top:1px solid var(--line); vertical-align:middle; }
