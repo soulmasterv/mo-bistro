@@ -134,6 +134,10 @@ test('Pilot QA: expanded reception layout, dark scrolling and booking subtitles'
       await t.test('Waiting and failed-message guests can be seated directly and informed in person',async()=>{
         await page.setViewportSize({width:1280,height:720});parties[0].message_status='failed';parties[0].message_error='whatsapp_disabled';
         await page.goto(origin);
+        const firstRow=page.getByRole('row').filter({has:page.getByRole('button',{name:'Synthetic QA Guest 1',exact:true})});
+        assert.deepEqual(await firstRow.locator('td').last().locator('a,button').allTextContents(),['Call','Seat','']);
+        const actionTops=await firstRow.locator('td').last().locator('a,button').evaluateAll(els=>els.map(el=>el.getBoundingClientRect().top));
+        assert.ok(Math.max(...actionTops)-Math.min(...actionTops)<2,'Call, Seat and details remain on one line');
         await page.getByRole('button',{name:'Seat guest Synthetic QA Guest 1',exact:true}).click();
         await page.getByRole('button',{name:'Synthetic QA Guest 1',exact:true}).waitFor({state:'detached'});
         await page.getByRole('button',{name:'Synthetic QA Guest 2',exact:true}).click();

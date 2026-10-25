@@ -36,8 +36,8 @@ function Primary({party,busy,onAction}:{party:Party;busy:boolean;onAction:Action
   {busy?'Saving…':label}<ArrowUpRight size={15}/>
  </button>;
 }
-function Seat({party,busy,onAction}:{party:Party;busy:boolean;onAction:ActionHandler}){
- return <button className={styles.button} disabled={busy||!!party.pending_exit_kind} onClick={()=>onAction(party.id,'seated')} aria-label={`Seat guest ${party.name}`}>{busy?'Saving…':'Seat guest'}<ArrowUpRight size={15}/></button>;
+function Seat({party,busy,onAction,compact=false}:{party:Party;busy:boolean;onAction:ActionHandler;compact?:boolean}){
+ return <button className={styles.button} disabled={busy||!!party.pending_exit_kind} onClick={()=>onAction(party.id,'seated')} aria-label={`Seat guest ${party.name}`}>{busy?'Saving…':compact?'Seat':'Seat guest'}{!compact&&<ArrowUpRight size={15}/>}</button>;
 }
 function Undo({party,now,busy,onAction}:{party:Party;now:number;busy:boolean;onAction:ActionHandler}){
  if(!party.pending_exit_kind)return null;
@@ -57,8 +57,7 @@ export function PilotQueue({parties,now,busy,onAction,onOpen}:{parties:Party[];n
    <td data-label="Status"><div className={styles.statusCell}><span className={`${styles.pill} ${p.status==='called'?styles.pillNotified:''}`}>{p.called_at?`${p.informed_via==='staff_confirmed'?'Informed':'Notified'} ${time(p.called_at)}`:'Waiting'}</span>{p.message_status&&<small title={messageLabel(p)} className={messageFailed(p)?styles.failed:styles.hint}>{messageLabel(p,true)}</small>}</div></td>
    <td className={styles.rowActions}><div className={styles.actions} aria-busy={busy.includes(p.id)}>
     <a href={'tel:'+p.phone} aria-label={`Call ${p.name}`} className={`${styles.secondary} ${needsPhone(p)?styles.callProminent:''}`} aria-disabled={disabled} onClick={e=>{if(disabled)e.preventDefault();else onAction(p.id,'phone_call');}}><Phone size={15}/>Call</a>
-    <Seat party={p} busy={busy.includes(p.id)} onAction={onAction}/>
-    {p.status==='waiting'&&<Primary party={p} busy={busy.includes(p.id)} onAction={onAction}/>}
+    <Seat party={p} busy={busy.includes(p.id)} onAction={onAction} compact/>
     <button className={styles.secondary} aria-label={`Guest details for ${p.name}`} onClick={()=>onOpen(p.id)}><MoreHorizontal size={18}/></button>
    </div><Undo party={p} now={now} busy={busy.includes(p.id)} onAction={onAction}/></td>
   </tr>;})}</tbody>
