@@ -7,6 +7,25 @@ import PartyForm from './party-form';
 import JoinQR from './join-qr';
 import {PilotQueue,PilotDrawer,observedPartyTime,type Party,type QueueAction} from './queue';
 import styles from './pilot.module.css';
+async function fetchWithTimeout(url:string,options:RequestInit,ms:number){
+ const controller=new AbortController();
+ const parent=options.signal;
+ const abort=()=>controller.abort();
+ let timedOut=false;
+ if(parent?.aborted)abort();
+ else parent?.addEventListener('abort',abort,{once:true});
+ const timer=window.setTimeout(()=>{timedOut=true;abort();},ms);
+ try{return await fetch(url,{...options,signal:controller.signal});}
+ catch(error){if(timedOut){const timeout=new Error('Request timed out.');timeout.name='TimeoutError';throw timeout;}throw error;}
+ finally{window.clearTimeout(timer);parent?.removeEventListener('abort',abort);}
+}
+function eventId(){
+ if(typeof crypto.randomUUID==='function')return crypto.randomUUID();
+ const b=crypto.getRandomValues(new Uint8Array(16));
+ b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;
+ const hex=Array.from(b,n=>('0'+n.toString(16)).slice(-2)).join('');
+ return [hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-');
+}
 export default function PilotReception({username}:{username:string}){
  const router=useRouter();const [now,setNow]=useState(0);
  const [parties,setParties]=useState<Party[]>([]),[error,setError]=useState(''),[loaded,setLoaded]=useState(false);
@@ -24,8 +43,7 @@ export default function PilotReception({username}:{username:string}){
   try{do{
    refreshQueued.current=false;const version=++refreshVersion.current;
    try{
-   const timeout=AbortSignal.timeout(15000);
-   const r=await fetch('/api/pilot/queue',{cache:'no-store',signal:signal?AbortSignal.any([signal,timeout]):timeout});
+   const r=await fetchWithTimeout('/api/pilot/queue',{cache:'no-store',signal},15000);
    if(r.status===401){router.replace('/login');return;}
    const data=await r.json();if(!r.ok)throw Error(data.error||'Queue unavailable.');
    if(!signal?.aborted&&version===refreshVersion.current){const received_at=Date.now();setParties(data.map((p:Party)=>({...p,received_at})));setNow(received_at);setLoaded(true);setError('');}
@@ -35,7 +53,7 @@ export default function PilotReception({username}:{username:string}){
  useEffect(()=>{const controller=new AbortController();void Promise.resolve().then(()=>refresh(controller.signal));const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refresh(controller.signal);},5000);const clock=window.setInterval(()=>setNow(Date.now()),250);return()=>{controller.abort();window.clearInterval(timer);window.clearInterval(clock);};},[refresh]);
  async function action(id:number,value:QueueAction,reason?:string){
   if(pending.current.has(id))return;pending.current.add(id);refreshVersion.current++;setBusy([...pending.current]);setError('');
-  try{const undo_token=value==='undo'?parties.find(p=>p.id===id)?.pending_exit_token:undefined;const r=await fetch(`/api/pilot/parties/${id}`,{method:'PATCH',keepalive:true,signal:AbortSignal.timeout(20000),headers:{'Content-Type':'application/json'},body:JSON.stringify({action:value,...(undo_token?{undo_token}:{}),...(reason?{reason}:{}),...(['phone_call','retry'].includes(value)?{event_id:crypto.randomUUID()}:{})})});const data=await r.json();if(!r.ok)throw Error(data.error||'Action failed.');await refresh(undefined,true);}catch(e){setError(e instanceof Error&&e.name==='TimeoutError'?'The action is taking longer than expected. The queue will refresh its result.':e instanceof Error?e.message:'Action failed.');}finally{pending.current.delete(id);setBusy([...pending.current]);}
+  try{const undo_token=value==='undo'?parties.find(p=>p.id===id)?.pending_exit_token:undefined;const r=await fetchWithTimeout(`/api/pilot/parties/${id}`,{method:'PATCH',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({action:value,...(undo_token?{undo_token}:{}),...(reason?{reason}:{}),...(['phone_call','retry'].includes(value)?{event_id:eventId()}:{})})},20000);const data=await r.json();if(!r.ok)throw Error(data.error||'Action failed.');await refresh(undefined,true);}catch(e){setError(e instanceof Error&&e.name==='TimeoutError'?'The action is taking longer than expected. The queue will refresh its result.':e instanceof Error?e.message:'Action failed.');}finally{pending.current.delete(id);setBusy([...pending.current]);}
  }
  const waiting=parties.filter(p=>p.status==='waiting');
  const called=parties.filter(p=>p.status==='called').length;

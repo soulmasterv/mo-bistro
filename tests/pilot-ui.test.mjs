@@ -74,6 +74,11 @@ test('Pilot QA: expanded reception layout, dark scrolling and booking subtitles'
     try {
       browser=await chromium.launch({headless:true, executablePath:process.env.PILOT_TEST_BROWSER});
       const page=await browser.newPage();
+      await page.addInitScript(()=>{
+        Object.defineProperty(AbortSignal,'timeout',{value:undefined});
+        Object.defineProperty(AbortSignal,'any',{value:undefined});
+        Object.defineProperty(Crypto.prototype,'randomUUID',{value:undefined});
+      });
       const errors=[];
       page.on('pageerror',error=>errors.push(error.message));
       await page.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
