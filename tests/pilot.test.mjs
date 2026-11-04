@@ -214,12 +214,13 @@ test('Opt-in alone, expired windows, wrong business number and STOP never send',
 
 test('Pilot native login redirects with 303 and preserves the JSON login contract',async()=>{
  let received;
- const route=load('src/app/api/auth/login/route.ts',{'@/lib/login-postgres':{loginPostgres:async request=>{
-  received=await request.json();
-  return Response.json({}, {status:received.credential==='fixture-password'?200:received.credential==='rate'?429:401});
+ const route=load('src/app/api/auth/login/route.ts',{'@/lib/login-postgres':{loginPostgres:async (request,body)=>{
+  assert.equal(request.url,'https://development.mo-bistro.labbing.space/api/auth/login');
+  received=JSON.parse(JSON.stringify(body));
+  return Response.json({}, {status:received.credential==='fixture-password'?200:received.credential==='rate'?429:received.credential==='origin'?403:401});
  }}});
  const form=credential=>new Request('https://development.mo-bistro.labbing.space/api/auth/login',{method:'POST',body:new URLSearchParams({username:'OmarMohsen',credential})});
- for(const [credential,target] of [['fixture-password','/queue'],['invalid','/login?error=credentials'],['rate','/login?error=rate']]){
+ for(const [credential,target] of [['fixture-password','/queue'],['invalid','/login?error=credentials'],['rate','/login?error=rate'],['origin','/login?error=request']]){
   const result=await route.POST(form(credential));
   assert.equal(result.status,303);
   assert.equal(result.headers.get('location'),target);

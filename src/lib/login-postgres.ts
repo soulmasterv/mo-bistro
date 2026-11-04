@@ -22,7 +22,7 @@ function response(error: string, status: number) {
   );
 }
 
-export async function loginPostgres(request: Request) {
+export async function loginPostgres(request: Request, parsedBody?: { username: string; credential: unknown }) {
   const limited = await checkRateLimit(
     request, "staff-login", 10, 900
   );
@@ -32,7 +32,7 @@ export async function loginPostgres(request: Request) {
     const originError=rejectCrossOrigin(request);
     if(originError) return originError;
 
-    const body = await request.json().catch(() => null);
+    const body = parsedBody ?? await request.json().catch(() => null);
     const username = body?.username;
     const credential = body?.credential;
 

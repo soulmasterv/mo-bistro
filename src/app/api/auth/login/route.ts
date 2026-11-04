@@ -12,13 +12,10 @@ export async function POST(request:Request){
   if(typeof body?.username!=='string'||body.username.trim().toLowerCase()!==PILOT_STAFF_USERNAME){
    return form?redirectTo('/login?error=credentials'):Response.json({error:'Invalid login details.'},{status:401});
   }
-  if(!form)return loginPostgres(request);
-  const headers=new Headers(request.headers);
-  headers.set('content-type','application/json');
-  headers.delete('content-length');
-  const result=await loginPostgres(new Request(request.url,{method:'POST',headers,body:JSON.stringify(body)}));
+  const result=await loginPostgres(request,{username:body.username,credential:body.credential});
+  if(!form)return result;
   if(result.ok)return redirectTo('/queue');
-  return redirectTo('/login?error='+(result.status===429?'rate':result.status>=500?'unavailable':'credentials'));
+  return redirectTo('/login?error='+(result.status===429?'rate':result.status===403?'request':result.status>=500?'unavailable':'credentials'));
  }catch{
   return form?redirectTo('/login?error=unavailable'):Response.json({error:'Unable to log in.'},{status:500});
  }

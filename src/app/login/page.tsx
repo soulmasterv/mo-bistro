@@ -7,6 +7,6 @@ export default async function Page({searchParams}:{searchParams:Promise<{error?:
  const staff=await currentStaff();
  if(staff?.username.toLowerCase()===PILOT_STAFF_USERNAME)redirect('/queue');
  const {error}=await searchParams;
- const message=error==='credentials'?'Incorrect username or password.':error==='rate'?'Too many sign-in attempts. Try again in 15 minutes.':error==='unavailable'?'Sign-in is temporarily unavailable. Please try again.':'';
+ const message=error==='credentials'?'Incorrect username or password.':error==='rate'?'Too many sign-in attempts. Try again in 15 minutes.':error==='request'?'Sign-in could not verify this request. Open the Pilot login page directly and try again.':error==='unavailable'?'Sign-in is temporarily unavailable. Please try again.':'';
  return <PilotLogin error={message}/>;
 }
