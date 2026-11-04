@@ -3,6 +3,8 @@ import PilotLogin from "@/components/pilot/login";
 import { currentStaff } from "@/lib/staff-auth";
 import { PILOT_STAFF_USERNAME } from "@/lib/pilot/config";
 
+export const metadata = { referrer: "same-origin" as const };
+
 export default async function Page({searchParams}:{searchParams:Promise<{error?:string}>}){
  const staff=await currentStaff();
  if(staff?.username.toLowerCase()===PILOT_STAFF_USERNAME)redirect('/queue');
