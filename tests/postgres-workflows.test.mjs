@@ -71,42 +71,9 @@ test(
       await db.exec(repair);
       await db.exec(repair);
       const h = routes(db);
-      const response = await h.route("management/staff-shifts").PUT(
-        request("PUT", {
-          staff_id: 2,
-          weekday: 0,
-          is_off: false,
-          start_time: "22:00",
-          end_time: "06:00",
-        }),
-      );
-      assert.equal(response.status, 200);
-      const shifts = await h.route("management/staff-shifts").GET();
-      assert.equal(shifts.status, 200);
-      const data = await shifts.json();
-      assert.equal(data.shifts[0].start_time, "22:00");
-      assert.equal(data.shifts[0].end_time, "06:00");
-      const users = await h.route("management/staff-pin/users").GET();
-      assert.equal((await users.json()).pin_supported, true);
-      await db.exec(
-        "INSERT INTO staff_sessions(id_hash,staff_id,expires_at) VALUES ('test-session',2,9999999999999)",
-      );
-      assert.equal(
-        (
-          await h
-            .route("management/staff-pin")
-            .PATCH(request("PATCH", { staff_id: 2, pin: "482719" }))
-        ).status,
-        200,
-      );
-      assert.equal(
-        (
-          await db.query(
-            "SELECT COUNT(*)::integer AS count FROM staff_sessions WHERE staff_id=2",
-          )
-        ).rows[0].count,
-        0,
-      );
+      const users = await h.route("management/staff").GET();
+      assert.equal(users.status, 200);
+      assert.equal((await users.json()).users.length, 2);
       assert.equal(
         (
           await h.route("management/staff").POST(

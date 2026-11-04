@@ -2,7 +2,6 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   ArrowRight,
   Eye,
@@ -151,9 +150,6 @@ export default function LoginPage() {
           {!loading && <ArrowRight size={19} />}
         </button>
 
-        <Link href="/login/pin" aria-disabled={loading} tabIndex={loading ? -1 : undefined} onClick={event => { if (submitting.current) event.preventDefault(); }} className="mt-4 flex min-h-12 w-full items-center justify-center rounded-xl border border-[#D6B681]/50 px-4 py-3 font-medium text-[#F5F0E7]">
-          Sign in with PIN
-        </Link>
 
         <div className="mt-7 flex items-center justify-center gap-2 text-xs text-[#D0D3C9]">
           <ShieldCheck size={15} />

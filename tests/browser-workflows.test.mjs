@@ -37,12 +37,6 @@ test(
       "import Login from " +
       component("src/app/login/page.tsx") +
       ";" +
-      "import PinLogin from " +
-      component("src/app/login/pin/page.tsx") +
-      ";" +
-      "import StaffPins from " +
-      component("src/app/management/staff-pins/staff-pins-client.tsx") +
-      ";" +
       "import Reception from " +
       component("src/app/reception-dashboard.tsx") +
       ";" +
@@ -61,7 +55,7 @@ test(
       ";" +
       'const p=location.pathname;const role=document.cookie.match(/fixture_role=(manager|reception|waiter)/)?.[1] ?? "manager";' +
       'const title=p==="/waiter"?"Waiter":p.startsWith("/management")||p==="/manager"?"Management":"Reception";' +
-      'createRoot(document.getElementById("root")).render(<ConfirmationProvider>{p==="/join"?<><ThemePreference/><Join/></>:p==="/menu"?<><ThemePreference/><Menu/></>:p==="/status"?<><ThemePreference/><Status/></>:p==="/login"?<><ThemePreference/><Login/></>:p==="/login/pin"?<><ThemePreference/><PinLogin/></>:<><ThemePreference/><Header role={role} workspace={p==="/workspace-fixture"?"Workspaces":title}/>{title==="Waiter"?<Waiter/>:title==="Management"?(p==="/management/staff-pins"?<StaffPins/>:<Management/>):<Reception/>}</>}</ConfirmationProvider>);';
+      'createRoot(document.getElementById("root")).render(<ConfirmationProvider>{p==="/join"?<><ThemePreference/><Join/></>:p==="/menu"?<><ThemePreference/><Menu/></>:p==="/status"?<><ThemePreference/><Status/></>:p==="/login"?<><ThemePreference/><Login/></>:<><ThemePreference/><Header role={role} workspace={p==="/workspace-fixture"?"Workspaces":title}/>{title==="Waiter"?<Waiter/>:title==="Management"?<Management/>:<Reception/>}</>}</ConfirmationProvider>);';
     await esbuild.build({
       stdin: { contents: source, loader: "tsx", resolveDir: root },
       bundle: true,
@@ -399,7 +393,7 @@ test(
               activityAvailable:true,activity:[{id:1,actor:"Synthetic manager",event:"public_waitlist_changed",guest_id:null,created_at:"2026-10-14T12:00:00Z",details:{paused:false}}],
               whatsapp:{configured:{live:false},blockers:["Automatic sending is simulated."],jobs:[{guest_id:1,kind:"almost_ready",status:"simulated",due_at:"2026-10-14T12:00:00Z",delivery:null,subscribed:true,window_open:true,reason:null}]}};
             break;
-          case "/api/management/staff-pin/users":
+          case "/api/management/staff":
             data = {
               users: [
                 {
@@ -1227,43 +1221,6 @@ test(
             );
           }),
         );
-        await page.goto(origin + "/management/staff-pins");
-        await page
-          .locator('select:not([aria-label="Color theme"])')
-          .selectOption("1");
-        await page.getByLabel("New six-digit PIN", { exact: true }).waitFor();
-        await assertNoSideScroll("Staff PIN form");
-        await page.goto(origin + "/login/pin");
-        await page
-          .getByLabel("Staff username", { exact: true })
-          .fill(staffUsername);
-        if(width<=900) {
-          await page.setViewportSize({width,height:650});
-          assert.ok(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+1),"PIN login should fit a short mobile viewport");
-          await page.setViewportSize({width,height:900});
-        }
-        if(width===390) {
-          let finishPin;
-          let attempts=0;
-          await page.route("**/api/auth/pin-login",async route=>{
-            attempts++;
-            await new Promise(resolve=>{finishPin=resolve;});
-            await route.fulfill({status:401,contentType:"application/json",body:'{"error":"Synthetic invalid PIN"}'});
-          });
-          for(let digit=0;digit<6;digit++)await page.getByRole("button",{name:"1",exact:true}).click();
-          await page.getByRole("button",{name:"Sign in",exact:true}).click();
-          const pending=page.getByRole("button",{name:"Signing in...",exact:true});
-          await pending.waitFor();
-          assert.equal(await pending.isDisabled(),true);
-          assert.equal(await pending.evaluate(el=>getComputedStyle(el).backgroundColor),"rgb(191, 192, 191)");
-          await pending.evaluate(button=>button.click());
-          assert.equal(attempts,1);
-          finishPin();
-          await page.getByText("Synthetic invalid PIN",{exact:true}).waitFor();
-          assert.equal(await page.getByRole("button",{name:"1",exact:true}).isEnabled(),true);
-          await page.unroute("**/api/auth/pin-login");
-        }
-        await assertNoSideScroll("PIN login");
         await context.close();
       }
       for (const role of ["reception", "waiter"]) {

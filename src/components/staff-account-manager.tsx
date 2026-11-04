@@ -11,7 +11,6 @@ type Employee = {
   username: string;
   role: Role;
   active: number;
-  has_pin: boolean;
 };
 
 export default function StaffAccountManager() {
@@ -22,14 +21,13 @@ export default function StaffAccountManager() {
   const [busy, setBusy] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [currentStaffId, setCurrentStaffId] = useState<number | null>(null);
-  const [warning, setWarning] = useState("");
   const [staffError, setStaffError] = useState("");
   const [staffMessage, setStaffMessage] = useState("");
   const [updatingId, setUpdatingId] = useState<number | null>(null);
 
   const loadEmployees = useCallback(async () => {
     try {
-      const response = await fetch("/api/management/staff-pin/users", {
+      const response = await fetch("/api/management/staff", {
         credentials: "same-origin",
         cache: "no-store",
       });
@@ -39,7 +37,6 @@ export default function StaffAccountManager() {
       }
       setEmployees(Array.isArray(result.users) ? result.users : []);
       setCurrentStaffId(result.current_staff_id ?? null);
-      setWarning(result.warning ?? "");
       setStaffError("");
     } catch (error) {
       setStaffError(error instanceof Error ? error.message : "Unable to load employees.");
@@ -139,7 +136,6 @@ export default function StaffAccountManager() {
           </button>
         </div>
 
-        {warning && <p role="status" className="mt-3 text-sm text-amber-200">{warning}</p>}
         {staffError && <p role="alert" className="mt-3 text-sm text-red-300">{staffError}</p>}
         {staffMessage && <p role="status" className="mt-3 text-sm text-emerald-300">{staffMessage}</p>}
 
@@ -152,16 +148,10 @@ export default function StaffAccountManager() {
               <div>
                 <p className="font-medium">{employee.username}</p>
                 <p className="text-xs capitalize text-slate-400">
-                  {employee.role} · {employee.active === 1 ? "Active" : "Disabled"} · {employee.has_pin ? "PIN assigned" : "No PIN"}
+                  {employee.role} · {employee.active === 1 ? "Active" : "Disabled"}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <a
-                  href="/management/staff-pins"
-                  className="rounded-lg border border-white/20 px-3 py-2 text-xs font-medium"
-                >
-                  {employee.has_pin ? "Reset PIN" : "Set PIN"}
-                </a>
                 <button
                   type="button"
                   disabled={updatingId !== null || (employee.active === 1 && (employee.id === currentStaffId || (employee.role === "manager" && employees.filter(user => user.role === "manager" && user.active === 1).length <= 1)))}

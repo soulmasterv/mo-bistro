@@ -30,22 +30,13 @@ test("Unread IDs reconcile disappearing, duplicate, initial and visible requests
   }
 });
 
-test("Staff list handles missing PIN column visibly, preserving accounts and no-store", async () => {
-  const h = harness({
-    query: (q) =>
-      q.includes("information_schema")
-        ? [{ pin_supported: false }]
-        : [{ id: 1, role: "manager", active: 1, has_pin: false }],
-  });
-  const response = await h.route("management/staff-pin/users").GET();
-  const data = await response.json();
+test("Staff list returns accounts without credential fields and prevents caching", async () => {
+  const h = harness({query: () => [{id:1, username:"manager", role:"manager", active:1}]});
+  const response = await h.route("management/staff").GET();
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.equal(data.users.length, 1);
-  assert.equal(data.pin_supported, false);
-  assert.match(data.warning, /20261010_staff_pin_login/);
-  assert.equal(data.current_staff_id, 1);
-  assert.match(h.queries[1].query, /to_jsonb/);
+  assert.deepEqual(await response.json(), {users:[{id:1, username:"manager", role:"manager", active:1}],current_staff_id:1});
+  assert.match(h.queries[0].query, /SELECT id, username, role, active FROM staff_users/);
 });
 
 test("Staff list reports authentication and database failure without exposing details", async () => {
@@ -56,7 +47,7 @@ test("Staff list reports authentication and database failure without exposing de
       });
     },
   });
-  const response = await h.route("management/staff-pin/users").GET();
+  const response = await h.route("management/staff").GET();
   assert.equal(response.status, 500);
   assert.equal((await response.json()).error, "Unable to load staff accounts.");
 });
@@ -67,12 +58,9 @@ for (const role of [null, "waiter", "reception"]) {
     async () => {
       const h = harness({ actor: role ? { id: 2, role } : null });
       for (const [file, method, body] of [
-        ["management/staff-pin/users", "GET"],
+        ["management/staff", "GET"],
         ["management/staff", "POST", {}],
         ["management/staff", "PATCH", { staff_id: 2, active: 0 }],
-        ["management/staff-pin", "PATCH", {}],
-        ["management/staff-shifts", "GET"],
-        ["management/staff-shifts", "PUT", {}],
       ]) {
         const response = await h.route(file)[method](request(method, body));
         assert.equal(response.status, 403, file);
@@ -147,84 +135,6 @@ test("Staff disabling prevents self and last-manager lockout; disables revoke se
     200,
   );
   assert.ok(!h.queries.some((x) => x.query.startsWith("DELETE")));
-});
-
-test("PIN creation/reset requires six nontrivial digits, active account and session revocation", async () => {
-  const h = harness({
-    query: (q) => (q.startsWith("UPDATE staff_users") ? [{ id: 2 }] : []),
-  });
-  const route = h.route("management/staff-pin");
-  for (const pin of ["123", "123456", "111111", "abcxyz"]) {
-    assert.equal(
-      (await route.PATCH(request("PATCH", { staff_id: 2, pin }))).status,
-      400,
-    );
-  }
-  assert.equal(h.queries.length, 0);
-  assert.equal(
-    (await route.PATCH(request("PATCH", { staff_id: 2, pin: "482719" })))
-      .status,
-    200,
-  );
-  assert.ok(h.queries.some((x) => x.query.includes("active = 1")));
-  assert.ok(
-    h.queries.some((x) => x.query.startsWith("DELETE FROM staff_sessions")),
-  );
-  h.state.query = () => [];
-  assert.equal(
-    (await route.PATCH(request("PATCH", { staff_id: 2, pin: "482719" })))
-      .status,
-    404,
-  );
-});
-
-test("Shift times accept normal and overnight hours; reject invalid/off-day hours", async () => {
-  const h = harness({
-    query: (q) =>
-      q.startsWith("SELECT id FROM staff_users") ? [{ id: 2 }] : [],
-  });
-  const route = h.route("management/staff-shifts");
-  const body = {
-    staff_id: 2,
-    weekday: 0,
-    is_off: false,
-    start_time: "09:30",
-    end_time: "17:00",
-  };
-  assert.equal((await route.PUT(request("PUT", body))).status, 200);
-  assert.equal(
-    (
-      await route.PUT(
-        request("PUT", { ...body, start_time: "22:00", end_time: "06:00" }),
-      )
-    ).status,
-    200,
-  );
-  assert.equal(
-    (
-      await route.PUT(
-        request("PUT", {
-          ...body,
-          is_off: true,
-          start_time: null,
-          end_time: null,
-        }),
-      )
-    ).status,
-    200,
-  );
-  for (const changes of [
-    { start_time: "24:00" },
-    { start_time: "9:30" },
-    { end_time: "17:60" },
-    { is_off: true },
-    { weekday: 7 },
-  ]) {
-    assert.equal(
-      (await route.PUT(request("PUT", { ...body, ...changes }))).status,
-      400,
-    );
-  }
 });
 
 for (const area of ["indoor", "outdoor"]) {
@@ -707,15 +617,12 @@ test("Reception queue badges and QR dialog contain accessible Mo Bistro copy", (
   assert.ok(!markup.includes("Restaurant Concierge"));
 });
 
-test("Staff account and shift operations retain authentication after licensing removal", async () => {
+test("Staff account operations retain authentication after licensing removal", async () => {
   const h = harness({ actor: null });
   for (const [file, method, body] of [
-    ["management/staff-pin/users", "GET"],
+    ["management/staff", "GET"],
     ["management/staff", "POST", {}],
     ["management/staff", "PATCH", { staff_id: 2, active: 0 }],
-    ["management/staff-pin", "PATCH", {}],
-    ["management/staff-shifts", "GET"],
-    ["management/staff-shifts", "PUT", {}],
   ]) assert.equal((await h.route(file)[method](request(method, body))).status, 403, file);
   assert.equal(h.queries.length, 0);
 });

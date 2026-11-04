@@ -3,7 +3,6 @@ import WhatsAppPreviewTest from "@/components/whatsapp-preview-test";
 import ManagementDangerZone from "@/components/management-danger-zone";
 import ManagementOperations from "@/components/management-operations";
 import StaffAccountManager from "@/components/staff-account-manager";
-import StaffShiftScheduler from "@/components/staff-shift-scheduler";
 import DemoControls from "@/components/demo-controls";
 import SeatingSettings from "@/components/seating-settings";
 
@@ -132,7 +131,7 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
               <Settings2 size={18} /> Restaurant <ArrowUpRight size={14} />
             </a>
             <a href="#team-settings">
-              <Users size={18} /> Team & shifts <ArrowUpRight size={14} />
+              <Users size={18} /> Team <ArrowUpRight size={14} />
             </a>
             <a href="#floor-settings">
               <Armchair size={18} /> Floor & seating <ArrowUpRight size={14} />
@@ -270,13 +269,12 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
             <section id="team-settings" className="bistro-settings-group">
               <div className="bistro-group-heading">
                 <p className="bistro-eyebrow">PEOPLE MAKE THE EXPERIENCE</p>
-                <h2>Your team, in sync.</h2>
+                <h2>Staff accounts</h2>
                 <p className="bistro-muted">
                   Accounts, access, and a well-planned week.
                 </p>
               </div>
               <StaffAccountManager />
-              <StaffShiftScheduler />
             </section>
             <section id="floor-settings" className="bistro-settings-group">
               <div className="bistro-group-heading">

@@ -16,6 +16,20 @@ const createSchema = z.object({
   credential: z.string().min(4).max(256),
 });
 
+export async function GET() {
+  try {
+    const actor = await currentStaff();
+    if (actor?.role !== "manager") return NextResponse.json({ error: "Manager access required" }, { status: 403 });
+    const users = process.env.MO_BISTRO_DB === "postgres"
+      ? await getPostgres()`SELECT id, username, role, active FROM staff_users ORDER BY LOWER(username)`
+      : db.prepare("SELECT id, username, role, active FROM staff_users ORDER BY LOWER(username)").all();
+    return NextResponse.json({ users, current_staff_id: actor.id }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    console.error("Staff list failed:", databaseErrorCode(error) ?? "unavailable");
+    return NextResponse.json({ error: "Unable to load staff accounts." }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   const badOrigin = rejectCrossOrigin(request);
   if (badOrigin) return badOrigin;
@@ -58,7 +72,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Username already exists." }, { status: 409 });
       }
       console.error("Staff creation failed:", databaseErrorCode(error) ?? "unavailable");
-      const failure = databaseFailure(error, "Unable to create staff account.", "migrations/20261010_staff_pin_login.sql");
+      const failure = databaseFailure(error, "Unable to create staff account.", "migrations/001_postgres_schema.sql");
       return NextResponse.json({ error: failure.error }, { status: failure.status });
     }
   }
