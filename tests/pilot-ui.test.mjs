@@ -26,7 +26,8 @@ test('Pilot QA: expanded reception layout, dark scrolling and booking subtitles'
       stdin: {contents: `import React from 'react';import {createRoot} from 'react-dom/client';
         import Reception from './src/components/pilot/reception';
         import Status from './src/components/pilot/status';
-        createRoot(document.getElementById('root')).render(location.pathname==='/status'?<Status/>:<Reception username="Synthetic Reception"/>);`,
+        import Login from './src/components/pilot/login';
+        createRoot(document.getElementById('root')).render(location.pathname==='/login'?<Login/>:location.pathname==='/status'?<Status/>:<Reception username="Synthetic Reception"/>);`,
       loader:'tsx', resolveDir:root},
       bundle:true, outfile:path.join(temp,'app.js'), jsx:'automatic',
       nodePaths:[path.join(root,'node_modules')],
@@ -147,6 +148,18 @@ test('Pilot QA: expanded reception layout, dark scrolling and booking subtitles'
           assert.equal(await page.locator('[data-pilot-reception]').evaluate(el=>el.getBoundingClientRect().top),0);
         });
       }
+      await t.test('Pilot login fills an Android-sized viewport and keeps fields styled',async()=>{
+        await page.setViewportSize({width:360,height:740});
+        await page.goto(origin+'/login');
+        const main=page.locator('[data-pilot-login]');
+        await main.waitFor();
+        assert.ok(await main.evaluate(el=>el.getBoundingClientRect().bottom>=innerHeight));
+        for(const label of ['Username','Password']){
+          const field=page.getByLabel(label,{exact:true});
+          assert.equal(await field.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(16, 17, 17)');
+          assert.ok((await field.boundingBox()).height>=46);
+        }
+      });
       await t.test('Waiting and failed-message guests can be seated directly and informed in person',async()=>{
         await page.setViewportSize({width:1280,height:720});parties[0].message_status='failed';parties[0].message_error='whatsapp_disabled';
         await page.goto(origin);
