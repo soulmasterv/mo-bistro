@@ -6,8 +6,6 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
-  LockKeyhole,
-  ShieldCheck,
   UtensilsCrossed,
 } from "lucide-react";
 
@@ -149,13 +147,6 @@ export default function LoginPage() {
           {loading ? "Signing in..." : "Sign in"}
           {!loading && <ArrowRight size={19} />}
         </button>
-
-
-        <div className="mt-7 flex items-center justify-center gap-2 text-xs text-[#D0D3C9]">
-          <ShieldCheck size={15} />
-          Authorized staff only
-          <LockKeyhole size={13} />
-        </div>
       </form>
     </main>
   );
