@@ -12,6 +12,7 @@ export default function PilotReception({username}:{username:string}){
  const [parties,setParties]=useState<Party[]>([]),[error,setError]=useState(''),[loaded,setLoaded]=useState(false);
  const [busy,setBusy]=useState<number[]>([]),[handoff,setHandoff]=useState<{id:number;token:string}|null>(null);
  const [openParty,setOpenParty]=useState<number|null>(null);
+ const [showWalkIn,setShowWalkIn]=useState(false);
  const [showQR,setShowQR]=useState(false);
  const pending=useRef(new Set<number>());
  const refreshVersion=useRef(0);
@@ -39,17 +40,20 @@ export default function PilotReception({username}:{username:string}){
  const selected=parties.find(p=>p.id===openParty);
  return <main className={`${styles.page} ${styles.receptionPage}`} data-pilot-reception><div className={styles.wrap}>
   <header className={styles.header}><div><p className={styles.brand}>Mo Bistro - District 5</p><small>Reception · {username}</small></div>
-   <div className={styles.tools}><button type="button" className={styles.secondary} onClick={()=>setShowQR(true)} aria-haspopup="dialog">QR join</button>
    <details className={styles.menu} onKeyDown={event=>{if(event.key==='Escape'){event.currentTarget.open=false;event.currentTarget.querySelector('summary')?.focus();}}}>
     <summary aria-label="Reception menu" title="Reception menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></summary>
     <nav className={styles.menuItems} aria-label="Reception options">
      <a href="/api/pilot/export" onClick={event=>{const details=event.currentTarget.closest('details');if(details)details.open=false;}}>Export CSV</a>
      <button onClick={()=>void fetch('/api/auth/logout',{method:'POST'}).then(()=>{router.replace('/login');router.refresh();})}>Sign out</button>
     </nav>
-   </details></div>
+   </details>
   </header>
   <div className={styles.entryTools}>
-   <details className={styles.panel}><summary>Add walk-in</summary><PartyForm staff onCreated={party=>{setHandoff(party);void refresh(undefined,true);}}/></details>
+   <div className={styles.tools}>
+    <button type="button" className={styles.button} aria-expanded={showWalkIn} aria-controls="pilot-walk-in" onClick={()=>setShowWalkIn(!showWalkIn)}>Add walk-in</button>
+    <button type="button" className={styles.secondary} onClick={()=>setShowQR(true)} aria-haspopup="dialog">QR join</button>
+   </div>
+   <section id="pilot-walk-in" aria-label="Walk-in form" className={styles.panel} hidden={!showWalkIn}><PartyForm staff onCreated={party=>{setHandoff(party);void refresh(undefined,true);}}/></section>
   </div>
   {handoff&&<section className={styles.panel}><strong>Ticket #{handoff.id} added</strong><p className={styles.hint}>Ask the guest to scan their private status link.</p><div className={styles.qr}><QRCodeSVG value={PILOT_ORIGIN+'/status?token='+handoff.token} size={130}/><button className={styles.secondary} onClick={()=>setHandoff(null)}>Done</button></div></section>}
   <div className={styles.title}><h1>Waiting queue <span className={styles.count}>{parties.length}</span></h1><button className={styles.secondary} onClick={()=>void refresh()}>Refresh</button></div>

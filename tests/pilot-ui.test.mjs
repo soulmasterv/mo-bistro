@@ -71,7 +71,7 @@ test('Pilot QA: expanded reception layout, dark scrolling and booking subtitles'
     const origin=`http://127.0.0.1:${server.address().port}`;
     let browser;
     try {
-      browser=await chromium.launch({headless:true});
+      browser=await chromium.launch({headless:true, executablePath:process.env.PILOT_TEST_BROWSER});
       const page=await browser.newPage();
       const errors=[];
       page.on('pageerror',error=>errors.push(error.message));
@@ -84,7 +84,7 @@ test('Pilot QA: expanded reception layout, dark scrolling and booking subtitles'
           await page.getByRole('button',{name:'Synthetic QA Guest 135',exact:true}).waitFor();
           for(const expanded of [false,true]) {
             if(expanded) {
-              await page.getByText('Add walk-in',{exact:true}).first().click();
+              await page.getByRole('button',{name:'Add walk-in',exact:true}).first().click();
               await page.getByLabel('Name',{exact:true}).fill('Preserved walk-in draft');
             }
             await page.evaluate(()=>window.scrollTo(0,0));
@@ -125,7 +125,14 @@ test('Pilot QA: expanded reception layout, dark scrolling and booking subtitles'
             await qrDialog.getByRole('button',{name:'Close QR code'}).click();await qrDialog.waitFor({state:'detached'});
             assert.equal(await trigger.evaluate(el=>el===document.activeElement),true,'Focus returns to QR opener');
             await trigger.click();await page.keyboard.press('Escape');await qrDialog.waitFor({state:'detached'});
-            if(expanded) assert.equal(await page.getByLabel('Name',{exact:true}).inputValue(),'Preserved walk-in draft');
+            if(expanded) {
+              assert.equal(await page.getByLabel('Name',{exact:true}).inputValue(),'Preserved walk-in draft');
+              const toggle=page.getByRole('button',{name:'Add walk-in',exact:true}).first();
+              await toggle.click();
+              await page.getByRole('region',{name:'Walk-in form'}).waitFor({state:'hidden'});
+              await toggle.click();
+              assert.equal(await page.getByLabel('Name',{exact:true}).inputValue(),'Preserved walk-in draft');
+            }
           }
           await page.screenshot({path:path.join(temp,`reception-${viewport.width}.png`)});
           // Resizing a populated page must not leave a cream gap or stale offset.
