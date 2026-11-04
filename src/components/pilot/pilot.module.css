@@ -17,7 +17,7 @@
 .panel { background:#191a1a; border:1px solid var(--line); border-radius:14px; padding:20px; margin:20px 0; }
 .panel summary { cursor:pointer; font-weight:700; min-height:30px; }
 .title { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:28px 0 16px; }
-.title h1 { font-size:26px; margin:0; }
+.title h1 { font-size:26px; font-weight:700; margin:0; }
 .count { display:inline-block; background:#e6c58a; color:#181818; padding:4px 12px; border-radius:7px; margin-left:10px; }
 .list { list-style:none; margin:0; padding:0; display:grid; gap:10px; }
 .party { display:grid; grid-template-columns:50px minmax(0,1fr) auto; gap:16px; align-items:center; padding:16px; background:#191a1a; border:1px solid var(--line); border-radius:12px; }
@@ -156,3 +156,12 @@
 }
 .rowActions .actions button:last-child { flex:0; }
 .reasonChoices{display:grid;gap:8px;margin-top:12px}.reasonChoices button{text-align:left;justify-content:flex-start;white-space:normal}
+
+.headerActions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.headerActions>button { white-space:nowrap; }
+.entryBar { display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; padding:3px; }
+.queueStats { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; margin:0; padding:8px 12px; border:1px solid var(--line); border-radius:9px; background:#191a1a; font-size:12px; }
+.queueStats>div { display:flex; flex-direction:row-reverse; gap:5px; align-items:baseline; white-space:nowrap; }
+.queueStats dt { color:var(--muted); }
+.queueStats dd { margin:0; font-weight:700; font-variant-numeric:tabular-nums; }
+@media(max-width:450px) { .headerActions>button { padding-inline:9px; font-size:12px; } .queueStats { padding-inline:8px; column-gap:8px; } }

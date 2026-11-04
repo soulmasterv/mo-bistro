@@ -82,6 +82,11 @@ test('Pilot QA: expanded reception layout, dark scrolling and booking subtitles'
           await page.setViewportSize(viewport);
           await page.goto(origin);
           await page.getByRole('button',{name:'Synthetic QA Guest 135',exact:true}).waitFor();
+          const statsList=page.locator('dl[aria-label="Queue stats"]');
+          assert.deepEqual(await statsList.locator('dd').allTextContents().then(values=>values.slice(0,2)),['135','0']);
+          assert.match(await statsList.locator('dd').last().textContent(),/^\d+ min$/);
+          assert.equal(await page.getByRole('heading',{name:'Waiting queue',exact:true}).evaluate(el=>getComputedStyle(el).fontWeight),'700');
+          assert.equal(await page.locator('header').getByRole('button',{name:'QR join'}).count(),1);
           for(const expanded of [false,true]) {
             if(expanded) {
               await page.getByRole('button',{name:'Add walk-in',exact:true}).first().click();
