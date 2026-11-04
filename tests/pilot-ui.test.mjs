@@ -113,8 +113,10 @@ test('Pilot QA: expanded reception layout, dark scrolling and booking subtitles'
             assert.ok(await scroller.evaluate(el=>el.scrollTop)>0,'Queue tail is reached with internal scrolling');
             await scroller.evaluate(el=>el.scrollTop=0);
             const trigger=page.getByRole('button',{name:'QR join',exact:true});
-            await trigger.click();const qrDialog=page.getByRole('dialog',{name:'Join the waitlist'});
+            await trigger.click();const qrDialog=page.getByRole('dialog',{name:'Mo Bistro'});
             await qrDialog.waitFor();
+            assert.equal(await qrDialog.getByRole('link',{name:/development\.mo-bistro\.labbing\.space/}).getAttribute('href'),'https://development.mo-bistro.labbing.space/join');
+            await qrDialog.getByRole('button',{name:'Copy link'}).waitFor();
             const qrMetrics=await qrDialog.evaluate(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,background:getComputedStyle(el).backgroundColor,modal:el.matches(':modal'),focusInside:el.contains(document.activeElement)};});
             assert.equal(qrMetrics.x,0);assert.equal(qrMetrics.y,0);
             assert.equal(qrMetrics.width,viewport.width);assert.equal(qrMetrics.height,viewport.height);
@@ -122,7 +124,7 @@ test('Pilot QA: expanded reception layout, dark scrolling and booking subtitles'
             assert.equal(qrMetrics.modal,true,'Background staff controls are inert');assert.equal(qrMetrics.focusInside,true);
             if(expanded&&[390,1280].includes(viewport.width))await page.screenshot({path:path.join(temp,`qr-overlay-${viewport.width}.png`)});
             for(let key=0;key<4;key++){await page.keyboard.press('Tab');assert.equal(await qrDialog.evaluate(el=>el.contains(document.activeElement)),true);}
-            await qrDialog.getByRole('button',{name:'Close QR code'}).click();await qrDialog.waitFor({state:'detached'});
+            await qrDialog.getByRole('button',{name:'Close',exact:true}).click();await qrDialog.waitFor({state:'detached'});
             assert.equal(await trigger.evaluate(el=>el===document.activeElement),true,'Focus returns to QR opener');
             await trigger.click();await page.keyboard.press('Escape');await qrDialog.waitFor({state:'detached'});
             if(expanded) {

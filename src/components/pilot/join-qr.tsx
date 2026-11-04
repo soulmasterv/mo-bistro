@@ -1,10 +1,16 @@
 "use client";
-import {useEffect,useRef} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {QRCodeSVG} from 'qrcode.react';
 import {PILOT_ORIGIN} from '@/lib/pilot/config';
 import styles from './pilot.module.css';
 
 export default function JoinQR({onClose}:{onClose:()=>void}){
+ const link=PILOT_ORIGIN+'/join';
+ const [copyStatus,setCopyStatus]=useState('');
+ async function copyLink(){
+  try{await navigator.clipboard.writeText(link);setCopyStatus('Link copied');}
+  catch{setCopyStatus('Could not copy. Select the registration link to copy it manually.');}
+ }
  const dialog=useRef<HTMLDialogElement>(null);
  useEffect(()=>{
   const element=dialog.current;if(!element)return;
@@ -21,11 +27,17 @@ export default function JoinQR({onClose}:{onClose:()=>void}){
   else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
  }}>
   <div className={styles.joinCard}>
-   <button type="button" className={styles.secondary} onClick={onClose}>Close QR code</button>
-   <h2 id="pilot-qr-heading">Join the waitlist</h2>
-   <p id="pilot-qr-instructions">Scan this QR code with your phone to register your party.</p>
-   <QRCodeSVG value={PILOT_ORIGIN+'/join'} size={280} marginSize={4} title="Mo Bistro guest registration QR code"/>
-   <a className={styles.secondary} href="/join" target="_blank" rel="noreferrer">Open join page</a>
+   <span className={styles.joinEyebrow}>Welcome to the table</span>
+   <h2 id="pilot-qr-heading">Mo Bistro</h2>
+   <p id="pilot-qr-instructions">Scan this QR code to join the waitlist.</p>
+   <div className={styles.joinCode}><QRCodeSVG value={link} size={220} marginSize={4} title="Mo Bistro guest registration QR code"/></div>
+   <p className={styles.joinLinkLabel}>Registration link</p>
+   <a className={styles.joinLink} href={link} target="_blank" rel="noreferrer">{link}</a>
+   <div className={styles.joinActions}>
+    <button type="button" className={styles.secondary} onClick={()=>void copyLink()}>Copy link</button>
+    <button type="button" className={styles.button} onClick={onClose}>Close</button>
+   </div>
+   {copyStatus&&<p role="status">{copyStatus}</p>}
   </div>
  </dialog>;
 }

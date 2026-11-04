@@ -61,11 +61,19 @@
 .joinScreen { position:fixed; inset:0; width:100%; max-width:none; height:100dvh; max-height:none; margin:0; padding:24px; box-sizing:border-box; border:0; overflow:auto; background:#101111; color:#f4f0e7; font-family:Arial,sans-serif; }
 .joinScreen[open] { display:grid; place-items:center; }
 .joinScreen::backdrop { background:#101111; }
-.joinCard { display:flex; flex-direction:column; align-items:center; gap:20px; width:100%; max-width:460px; text-align:center; margin:auto; }
-.joinCard h2 { font-size:28px; margin:0; }
-.joinCard p { margin:0; line-height:1.6; color:#b6b6b2; }
-.joinCard svg { width:min(280px,100%); height:auto; flex-shrink:0; background:white; border-radius:8px; }
-.joinCard>button { align-self:flex-end; }
+.joinCard { --ink:#f4f0e7; --line:#343535; width:100%; max-width:460px; text-align:center; margin:auto; background:#171919; border-radius:12px; padding:32px clamp(16px,6vw,33px); box-shadow:0 10px 24px #0002; }
+.joinEyebrow { display:block; color:#d6ad77; font-size:12px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; }
+.joinCard h2 { font-size:28px; line-height:1.2; font-weight:700; margin:12px 0 8px; }
+.joinCard p { margin:0; line-height:1.6; color:#c0b9b0; font-size:13px; }
+.joinCode { display:grid; place-items:center; width:min(268px,100%); aspect-ratio:1; margin:26px auto 22px; background:#fff; border-radius:15px; }
+.joinCode svg { display:block; width:82%; height:auto; }
+.joinCard .joinLinkLabel { font-size:12px; }
+.joinLink { display:block; color:#f4f0e7; font-size:12px; overflow-wrap:anywhere; margin-top:19px; }
+.joinActions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:37px; }
+.joinActions button { min-height:46px; border-radius:12px; font-size:14px; }
+.joinActions .secondary { background:transparent; border-color:transparent; }
+.joinActions .button { background:#d4b481; }
+.joinCard [role=status] { margin-top:8px; }
 .queueTable { width:100%; border-collapse:collapse; font-size:13px; }
 .queueTable th { position:sticky; top:0; z-index:1; background:#202222; color:#c5c3bc; font-size:11px; font-weight:500; text-align:left; padding:16px; white-space:nowrap; }
 .queueTable td { padding:14px 16px; border-top:1px solid var(--line); vertical-align:middle; }
