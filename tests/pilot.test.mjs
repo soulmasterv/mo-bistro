@@ -145,7 +145,7 @@ test('Pilot rejects invalid/public staff actions, cross-origin joins and other s
  h.state.actor=null;assert.equal((await h.route('pilot/export').GET()).status,401);assert.equal((await h.route('pilot/queue').POST(request('POST',input))).status,401);
  h.state.actor={username:'SomeoneElse',role:'manager'};assert.equal((await h.route('pilot/queue').GET()).status,401);
  }finally{await db.close();}});
-test('Pilot only exposes selected routes',()=>{const {pilotPathAllowed}=load('src/lib/pilot/config.ts');for(const p of ['/','/join','/status','/login','/api/pilot/queue','/api/auth/login'])assert.equal(pilotPathAllowed(p),true,p);for(const p of ['/management','/waiter','/api/whatsapp/jobs','/api/guests','/api/internal/database-cleanup','/api/simple-tables','/api/license/status','/api/auth/pin-login'])assert.equal(pilotPathAllowed(p),false,p);});
+test('Pilot only exposes selected routes',()=>{const {pilotPathAllowed}=load('src/lib/pilot/config.ts');for(const p of ['/','/queue','/join','/status','/login','/api/pilot/queue','/api/auth/login'])assert.equal(pilotPathAllowed(p),true,p);for(const p of ['/management','/waiter','/api/whatsapp/jobs','/api/guests','/api/internal/database-cleanup','/api/simple-tables','/api/license/status','/api/auth/pin-login'])assert.equal(pilotPathAllowed(p),false,p);});
 test('Ready sender is consent-gated and claims each Call at most once',async()=>{const {db,h,store}=await setup();try{
 
  let sends=0;const payloads=[];h.mocks['@/lib/whatsapp/transport']={requestMetaTemplate:async p=>{sends++;payloads.push(p);return {state:'sent',messageId:'synthetic-provider-id'};}};
@@ -210,4 +210,22 @@ test('Opt-in alone, expired windows, wrong business number and STOP never send',
   await store.transition(party.id,'seated');
  }
  }finally{await db.close();}
+});
+
+test('Pilot native login redirects with 303 and preserves the JSON login contract',async()=>{
+ let received;
+ const route=load('src/app/api/auth/login/route.ts',{'@/lib/login-postgres':{loginPostgres:async request=>{
+  received=await request.json();
+  return Response.json({}, {status:received.credential==='fixture-password'?200:received.credential==='rate'?429:401});
+ }}});
+ const form=credential=>new Request('https://development.mo-bistro.labbing.space/api/auth/login',{method:'POST',body:new URLSearchParams({username:'OmarMohsen',credential})});
+ for(const [credential,target] of [['fixture-password','/queue'],['invalid','/login?error=credentials'],['rate','/login?error=rate']]){
+  const result=await route.POST(form(credential));
+  assert.equal(result.status,303);
+  assert.equal(result.headers.get('location'),target);
+  assert.deepEqual(received,{username:'OmarMohsen',credential});
+ }
+ const json=await route.POST(new Request('https://development.mo-bistro.labbing.space/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'OmarMohsen',credential:'fixture-password'})}));
+ assert.equal(json.status,200);
+ assert.equal(json.headers.get('location'),null);
 });

@@ -30,6 +30,7 @@ function load(file, mocks = {}, globals = {}, cache = new Map()) {
       process: { env: { MO_BISTRO_DB: "postgres" } },
       Buffer,
       URL,
+      Headers,
       Request,
       Response,
       AbortController,
