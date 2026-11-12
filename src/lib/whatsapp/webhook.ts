@@ -1,3 +1,4 @@
+import { whatsappPhoneId } from "@/lib/whatsapp/kapso";
 import "server-only";
 import { recordPreviewInbound, recordPreviewDelivery } from "@/lib/whatsapp/preview-test";
 import { recordCustomerWindow } from "@/lib/whatsapp/customer-window";
@@ -19,8 +20,8 @@ export async function processMetaWebhook(payload: MetaPayload) {
   for (const entry of payload.entry) for (const change of entry.changes || []) {
     if (change.field !== "messages") continue;
     const value = change.value;
-    if (!process.env.META_WHATSAPP_PHONE_NUMBER_ID ||
-        value?.metadata?.phone_number_id !== process.env.META_WHATSAPP_PHONE_NUMBER_ID) continue;
+    const phoneId = whatsappPhoneId();
+    if (!phoneId || !value || value.metadata?.phone_number_id !== phoneId) continue;
     for (const message of value.messages || []) {
       if (typeof message.id !== "string" || message.id.length > 256 ||
           typeof message.from !== "string" || !/^\d{8,15}$/.test(message.from)) continue;

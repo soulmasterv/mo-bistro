@@ -134,6 +134,50 @@ const policy = load("src/lib/whatsapp/policy.ts"),
   service = load("src/lib/whatsapp/service.ts"),
   webhook = load("src/lib/whatsapp/webhook.ts");
 const transport = load("src/lib/whatsapp/transport.ts");
+test("Kapso Preview verifies its own signature and limits outbound recipients", async () => {
+  const kapso = load("src/lib/whatsapp/kapso.ts");
+  const originalEnv = { ...env };
+  const originalFetch = transportFetch;
+  const secret = "synthetic-kapso-webhook-signing-secret";
+  const body = '{"object":"whatsapp_business_account","entry":[]}';
+  const signature = createHmac("sha256", secret).update(body).digest("hex");
+  const recipient = "201000000001";
+  Object.assign(env, {
+    VERCEL_ENV: "preview",
+    WHATSAPP_PROVIDER: "kapso",
+    KAPSO_WEBHOOK_SECRET: secret,
+    KAPSO_PHONE_NUMBER_ID: "5678",
+    KAPSO_API_KEY: "synthetic-kapso-key",
+    META_GRAPH_API_VERSION: "v24.0",
+    WHATSAPP_TEST_RECIPIENT: recipient,
+  });
+  let requests = 0;
+  transportFetch = async (url, options) => {
+    requests++;
+    assert.equal(url, "https://api.kapso.ai/meta/whatsapp/v24.0/5678/messages");
+    assert.equal(options.headers["X-API-Key"], "synthetic-kapso-key");
+    return Response.json({ messages: [{ id: "wamid.synthetic" }] });
+  };
+  try {
+    assert.equal(kapso.verifyKapsoSignature(body, signature), true);
+    assert.equal(kapso.verifyKapsoSignature(body + " ", signature), false);
+    assert.equal(kapso.verifyKapsoSignature(body, null), false);
+    const payload = {
+      messaging_product: "whatsapp", to: recipient, type: "text",
+      text: { body: "Synthetic confirmation" }, biz_opaque_callback_data: randomUUID(),
+    };
+    assert.equal((await transport.requestMetaTemplate({ ...payload, to: "201000000002" })).state, "skipped");
+    assert.equal(requests, 0);
+    assert.equal((await transport.requestMetaTemplate(payload)).state, "sent");
+    assert.equal(requests, 1);
+    env.VERCEL_ENV = "production";
+    assert.equal(kapso.usesKapso(), false);
+  } finally {
+    for (const key of Object.keys(env)) delete env[key];
+    Object.assign(env, originalEnv);
+    transportFetch = originalFetch;
+  }
+});
 test.after(async () => {
   await database.close();
 });

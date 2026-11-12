@@ -1,3 +1,4 @@
+import { usesKapso, whatsappPhoneId } from "@/lib/whatsapp/kapso";
 import "server-only";
 import { Receiver } from "@upstash/qstash";
 import { callbackUrl, liveSendingEnabled, type NotificationKind } from "@/lib/whatsapp/policy";
@@ -86,14 +87,22 @@ export type MetaReplyButtonPayload = { messaging_product: "whatsapp"; to: string
   biz_opaque_callback_data: string; interactive: { type: "button"; body: { text: string };
     action: { buttons: { type: "reply"; reply: { id: string; title: string } }[] } } };
 export async function requestMetaTemplate(payload: ReturnType<typeof templatePayload> | MetaTextPayload | MetaReplyButtonPayload): Promise<SendResult> {
-  const access = process.env.META_WHATSAPP_ACCESS_TOKEN, phoneId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
+  const kapso = usesKapso();
+  const access = kapso ? process.env.KAPSO_API_KEY : process.env.META_WHATSAPP_ACCESS_TOKEN;
+  const phoneId = whatsappPhoneId();
+  if (kapso && (!process.env.WHATSAPP_TEST_RECIPIENT || payload.to !== process.env.WHATSAPP_TEST_RECIPIENT)) {
+    return { state: "skipped", error: "kapso_preview_recipient_not_allowed" };
+  }
   const version = process.env.META_GRAPH_API_VERSION;
   if (!access || !phoneId || !/^\d+$/.test(phoneId) || !/^v\d+\.\d+$/.test(version || "")) {
     return { state: "failed", error: "meta_configuration_missing" };
   }
   try {
-    const response = await fetch(`https://graph.facebook.com/${version}/${phoneId}/messages`, {
-      method: "POST", headers: { Authorization: `Bearer ${access}`, "Content-Type": "application/json" },
+    const host = kapso ? "https://api.kapso.ai/meta/whatsapp" : "https://graph.facebook.com";
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    headers[kapso ? "X-API-Key" : "Authorization"] = kapso ? access : `Bearer ${access}`;
+    const response = await fetch(`${host}/${version}/${phoneId}/messages`, {
+      method: "POST", headers,
       body: JSON.stringify(payload), signal: AbortSignal.timeout(10_000),
     });
     const body = await response.json().catch(() => null);

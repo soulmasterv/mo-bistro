@@ -1,3 +1,4 @@
+import { usesKapso, verifyKapsoSignature } from "@/lib/whatsapp/kapso";
 import { previewTestEnabled } from "@/lib/whatsapp/preview-test";
 import { after } from "next/server";
 import {
@@ -48,7 +49,10 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ error: "Invalid body" }, { status: 413 });
   }
-  if (!verifyMetaSignature(raw, request.headers.get("x-hub-signature-256")))
+  const verified = usesKapso()
+    ? verifyKapsoSignature(raw, request.headers.get("x-webhook-signature"))
+    : verifyMetaSignature(raw, request.headers.get("x-hub-signature-256"));
+  if (!verified)
     return Response.json({ error: "Invalid signature" }, { status: 401 });
   let payload;
   try {
