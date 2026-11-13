@@ -211,7 +211,8 @@ export default function JoinPage() {
         <div className="grid min-h-screen w-full overflow-hidden bg-[#FFFCF7] shadow-[0_16px_65px_rgba(42,35,25,0.08)] lg:min-h-[750px] lg:grid-cols-[0.9fr_1.1fr] lg:rounded-[28px]">
 
           {/* Restaurant introduction */}
-          <section className="relative flex min-h-[260px] max-sm:min-h-0 max-sm:px-6 max-sm:py-3 flex-col justify-between overflow-hidden bg-[#34382E] px-7 py-7 text-[#F9F4E9] sm:px-10 lg:min-h-full lg:px-12 lg:py-12">
+          <section className="relative flex min-h-[260px] flex-col justify-between overflow-hidden bg-[#34382E] px-7 py-7 max-sm:py-4 text-[#F9F4E9] sm:px-10 lg:min-h-full lg:px-12 lg:py-12">
+            <style>{".join-mobile-brand { display: none; } @media (max-width: 639px) { .join-mobile-brand { display: inline; } .join-desktop-brand { display: none; } .join-banner-headline { margin-top: 12px; } }"}</style>
             <div
               aria-hidden="true"
               className="pointer-events-none absolute -right-32 -top-24 h-80 w-80 rounded-full border border-[#D7C49E]/15"
@@ -229,33 +230,33 @@ export default function JoinPage() {
               <div>
                 <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-[#D9C29C]">
                   <UtensilsCrossed size={15} strokeWidth={1.5} />
-                  <span>Mo Bistro</span>
+                  <span className="join-desktop-brand">Mo Bistro</span><span className="join-mobile-brand">Mo Bistro - District 5</span>
                 </div>
-                <div className="mt-3 max-sm:hidden font-serif text-[31px] tracking-[-0.04em] sm:text-[36px]">
+                <div className="join-desktop-brand mt-3 font-serif text-[31px] tracking-[-0.04em] sm:text-[36px]">
                   mo bistro<span className="text-[#D6B681]">.</span>
                 </div>
               </div>
 
-              <span className="rounded-full border border-[#D8C9AA]/25 px-3 py-1.5 text-[10px] uppercase tracking-[0.15em] text-[#E1D5BD]">
+              <span className="join-desktop-brand rounded-full border border-[#D8C9AA]/25 px-3 py-1.5 text-[10px] uppercase tracking-[0.15em] text-[#E1D5BD]">
                 District 5
               </span>
             </div>
 
-            <div className="relative z-10 mt-10 max-sm:hidden lg:my-auto lg:py-14">
-              <p className="mb-4 max-sm:hidden text-[10px] font-semibold uppercase tracking-[0.32em] text-[#D6B681]">
+            <div className="join-banner-headline relative z-10 mt-10 max-sm:mt-4 lg:my-auto lg:py-14">
+              <p className="join-desktop-brand mb-4 max-sm:hidden text-[10px] font-semibold uppercase tracking-[0.32em] text-[#D6B681]">
                 MO BISTRO · DISTRICT 5
               </p>
 
-              <h1 className="max-w-[420px] font-serif text-[43px] max-sm:text-[30px] leading-[1.08] tracking-[-0.04em] sm:text-[54px] lg:text-[62px]">
+              <h1 className="max-w-[420px] font-serif text-[43px] leading-[1.08] tracking-[-0.04em] sm:text-[54px] lg:text-[62px]">
                 Goodness since 2022.
               </h1>
 
-              <p className="mt-5 max-sm:mt-2 max-w-[330px] text-[14px] leading-7 max-sm:leading-5 text-[#E0DDCF]/80">
+              <p className="mt-5 max-sm:mt-2 max-w-[330px] text-[14px] leading-7 text-[#E0DDCF]/80">
                 Quality dishes cooked with passion &amp; served with a smile.
               </p>
             </div>
 
-            <div className="relative z-10 mt-8 max-sm:hidden flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-[#F5EBD5]/15 pt-5 max-sm:pt-3 text-[12px] text-[#E0D8C7]">
+            <div className="relative z-10 mt-8 max-sm:mt-3 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-[#F5EBD5]/15 pt-5 max-sm:pt-3 text-[12px] text-[#E0D8C7]">
               <span className="flex items-center gap-2">
                 <MapPin size={15} className="text-[#D6B681]" />
                 District 5, New Cairo
@@ -277,17 +278,17 @@ export default function JoinPage() {
           <section className="flex flex-col justify-center px-6 py-9 max-sm:py-5 sm:px-12 sm:py-12 lg:px-14 xl:px-20">
             <div className="mx-auto w-full max-w-[440px]">
               <div className="mb-8 max-sm:mb-4">
-                <div className="mb-4 max-sm:hidden flex items-center gap-2">
+                <div className="mb-4 flex items-center gap-2">
                   <span className="h-[1px] w-8 bg-[#B99766]" />
                   <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#A17E4E]">
                     Welcome to Mo Bistro
                   </span>
                 </div>
 
-                <h2 className="font-serif text-[39px] max-sm:text-[32px] leading-tight tracking-[-0.035em] text-[#2C3028] sm:text-[45px]">
+                <h2 className="font-serif text-[39px] leading-tight tracking-[-0.035em] text-[#2C3028] sm:text-[45px]">
                   {qrState === "valid" ? "Join our waitlist" : "Welcome to Mo Bistro"}
                 </h2>
-                <p className={`mt-3 text-[14px] leading-6 text-[#807B71] ${qrState === "valid" ? "max-sm:hidden" : ""}`}>
+                <p className="mt-3 text-[14px] leading-6 text-[#807B71]">
                   {qrState === "valid"
                     ? "Just a few details and we'll take care of the rest."
                     : "Our waitlist is available through the QR code at reception."}
