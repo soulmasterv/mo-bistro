@@ -243,20 +243,15 @@ export default function JoinPage() {
 
             <div className="relative z-10 mt-10 lg:my-auto lg:py-14">
               <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.32em] text-[#D6B681]">
-                A little time, well spent
+                MO BISTRO · DISTRICT 5
               </p>
 
               <h1 className="max-w-[420px] font-serif text-[43px] leading-[1.08] tracking-[-0.04em] sm:text-[54px] lg:text-[62px]">
-                Good things
-                <br />
-                are worth
-                <br />
-                <em className="font-normal text-[#D6B681]">waiting for.</em>
+                Goodness since 2022.
               </h1>
 
               <p className="mt-5 max-w-[330px] text-[14px] leading-7 text-[#E0DDCF]/80">
-                We&apos;re happy you&apos;re here. Leave us your details
-                and we&apos;ll help you find your place at the table.
+                Quality dishes cooked with passion &amp; served with a smile.
               </p>
             </div>
 

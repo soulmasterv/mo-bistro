@@ -115,7 +115,6 @@ export default function WhatsappSubscription({
             updates.{" "}
           </>
         )}
-        To unsubscribe at any time, reply UNSUBSCRIBE or STOP on WhatsApp.
       </p>
       {error && (
         <p role="alert" className="text-red-700">

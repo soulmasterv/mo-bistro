@@ -67,7 +67,7 @@ export async function sendWindowNotification(
   }[job.kind];
   const subscribedConfirmation = job.kind === "confirmation" && !!booking.subscribed_at;
   const text = subscribedConfirmation
-    ? "Thanks for booking with Mo Bistro, {name}! Your booking #{booking_id} is on our waitlist. You're subscribed to WhatsApp updates. We'll let you know when your table is nearly ready."
+    ? "You're on the Mo Bistro waitlist (booking #{booking_id}). We'll message you here when your table is nearly ready."
     : process.env[prefix + "_TEXT"] ?? (job.kind === "eta_update"
     ? "Mo Bistro update: your table is expected to be ready at {eta_time}. This is an estimate; reception will confirm when your table is ready."
     : job.kind === "almost_ready"
@@ -98,7 +98,7 @@ export async function sendWindowNotification(
       };
     const optOut =
       "To unsubscribe at any time, reply UNSUBSCRIBE or STOP on WhatsApp.";
-    if (!body.includes(optOut)) body += "\n\n" + optOut;
+    if (!subscribedConfirmation && !body.includes(optOut)) body += "\n\n" + optOut;
     if (body.length > 4096)
       return { state: "skipped", error: "notification_text_invalid" };
     if (job.kind === "review") {

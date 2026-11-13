@@ -138,7 +138,7 @@ function StatusContent() {
               {status === "seated"
                 ? "You’re seated!"
                 : active || !data
-                  ? "Your table is worth the wait"
+                  ? "You're on the waitlist"
                   : statusText[status || ""] || "Your booking"}
             </h1>
             <p className="guest-intro">
@@ -294,11 +294,9 @@ function StatusContent() {
               <UtensilsCrossed size={38} />
               <p>MO BISTRO · DISTRICT 5</p>
               <h2>
-                Good food.
-                <br />
-                Good company.
+                Goodness since 2022.
               </h2>
-              <p>A little time, well spent.</p>
+              <p>Quality dishes cooked with passion &amp; served with a smile.</p>
               <a href="/menu">Discover our menu →</a>
             </div>
             {token && data && (
