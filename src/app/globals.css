@@ -2924,3 +2924,14 @@ html[data-theme="dark"] .reception-reference .bistro-guest-copy h3 .queue-next-b
  .reception-reference .reception-service-strip dd { font-size:16px; }
  .reception-reference .reception-service-strip small { font-size:11px; }
 }
+
+@media (max-width: 639px) {
+  .reception-updating {
+    width: fit-content;
+    max-width: 100%;
+    padding: 3px 8px;
+    border: 1px solid currentColor;
+    border-radius: 6px;
+    font-size: 12px;
+  }
+}

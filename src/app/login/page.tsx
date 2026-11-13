@@ -127,7 +127,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="mt-7 flex min-h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#D6B681] px-5 py-4 font-semibold text-[#293126] transition hover:bg-[#E6C99A] disabled:opacity-60"
+          className="mt-7 flex min-h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#D6B681] px-5 py-4 font-semibold text-[#293126] transition hover:bg-[#E6C99A] disabled:cursor-wait disabled:bg-[#bfc0bf] disabled:text-[#4d4e4d]"
         >
           {loading ? "Signing in..." : "Sign in"}
           {!loading && <ArrowRight size={19} />}
