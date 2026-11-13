@@ -35,6 +35,14 @@ export default function PilotReception({username}:{username:string}){
  const [showWalkIn,setShowWalkIn]=useState(false);
  const [showQR,setShowQR]=useState(false);
  const pending=useRef(new Set<number>());
+ const menu=useRef<HTMLDetailsElement>(null);
+ useEffect(()=>{
+  function dismiss(event:Event){
+   if(menu.current?.open&&event.target instanceof Node&&!menu.current.contains(event.target))menu.current.open=false;
+  }
+  document.addEventListener('click',dismiss,true);
+  return()=>document.removeEventListener('click',dismiss,true);
+ },[]);
  const refreshVersion=useRef(0);
  const refreshing=useRef(false);
  const refreshQueued=useRef(false);
@@ -97,7 +105,7 @@ export default function PilotReception({username}:{username:string}){
   <header className={styles.header}><div><p className={styles.brand}>Mo Bistro - District 5</p><small>Reception · {username}</small></div>
    <div className={styles.headerActions}>
     <button type="button" className={`${styles.secondary} ${styles.qrButton}`} onClick={()=>setShowQR(true)} aria-haspopup="dialog"><QrCode size={18} aria-hidden="true"/> QR Code</button>
-   <details className={styles.menu} onKeyDown={event=>{if(event.key==='Escape'){event.currentTarget.open=false;event.currentTarget.querySelector('summary')?.focus();}}}>
+   <details ref={menu} className={styles.menu} onKeyDown={event=>{if(event.key==='Escape'){event.currentTarget.open=false;event.currentTarget.querySelector('summary')?.focus();}}}>
     <summary aria-label="Reception menu" title="Reception menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></summary>
     <nav className={styles.menuItems} aria-label="Reception options">
      <a href="/api/pilot/export" onClick={event=>{const details=event.currentTarget.closest('details');if(details)details.open=false;}}>Export CSV</a>
