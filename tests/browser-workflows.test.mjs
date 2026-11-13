@@ -306,6 +306,17 @@ test(
           case "/api/guests/4/eta":
           case "/api/guests/1/eta":
             data={success:true,eta_at:null};break;
+          case "/api/reception/dashboard":
+            data = {
+              guests: guests.map((guest) => ({ ...guest, confirmation_required: false })),
+              tables,
+              requests: readyRequests.filter((item) => item.status === "pending"),
+              next: { areas: [] },
+              mode: { mode },
+              simple: { areas: areas() },
+              wait: { minutes: 30 },
+            };
+            break;
           case "/api/guests":
             if(req.method==="POST"){data={success:true,id:900,token:"f".repeat(64)};break;}
             data = guests.map((guest) => ({
