@@ -2,12 +2,7 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowRight,
-  Eye,
-  EyeOff,
-  UtensilsCrossed,
-} from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 
 type StaffRole = "manager" | "reception" | "waiter";
 
@@ -73,23 +68,9 @@ export default function LoginPage() {
         aria-busy={loading}
         className="w-full max-w-md rounded-3xl bg-[#252525] p-7 text-[#F5F0E7] shadow-2xl sm:p-10"
       >
-        <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#393735]">
-            <UtensilsCrossed size={27} className="text-[#D6B681]" />
-          </div>
-
-          <p className="text-xs font-semibold tracking-[0.35em] text-[#D6B681]">
-            MO BISTRO
-          </p>
-
-          <h1 className="mt-5 text-3xl font-semibold">
-            Staff sign in.
-          </h1>
-
-          <p className="mt-3 text-sm text-[#D0D3C9]">
-            Welcome back. Enter your staff credentials.
-          </p>
-        </div>
+        <h1 className="mb-8 text-center text-3xl font-semibold">
+          Reception Sign in
+        </h1>
 
         <label className="block text-sm font-medium">
           Username
