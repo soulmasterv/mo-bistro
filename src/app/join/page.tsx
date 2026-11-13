@@ -211,7 +211,7 @@ export default function JoinPage() {
         <div className="grid min-h-screen w-full overflow-hidden bg-[#FFFCF7] shadow-[0_16px_65px_rgba(42,35,25,0.08)] lg:min-h-[750px] lg:grid-cols-[0.9fr_1.1fr] lg:rounded-[28px]">
 
           {/* Restaurant introduction */}
-          <section className="relative flex min-h-[260px] flex-col justify-between overflow-hidden bg-[#34382E] px-7 py-7 text-[#F9F4E9] sm:px-10 lg:min-h-full lg:px-12 lg:py-12">
+          <section className="relative flex min-h-[260px] max-sm:min-h-0 max-sm:px-6 max-sm:py-3 flex-col justify-between overflow-hidden bg-[#34382E] px-7 py-7 text-[#F9F4E9] sm:px-10 lg:min-h-full lg:px-12 lg:py-12">
             <div
               aria-hidden="true"
               className="pointer-events-none absolute -right-32 -top-24 h-80 w-80 rounded-full border border-[#D7C49E]/15"
@@ -231,7 +231,7 @@ export default function JoinPage() {
                   <UtensilsCrossed size={15} strokeWidth={1.5} />
                   <span>Mo Bistro</span>
                 </div>
-                <div className="mt-3 font-serif text-[31px] tracking-[-0.04em] sm:text-[36px]">
+                <div className="mt-3 max-sm:hidden font-serif text-[31px] tracking-[-0.04em] sm:text-[36px]">
                   mo bistro<span className="text-[#D6B681]">.</span>
                 </div>
               </div>
@@ -241,7 +241,7 @@ export default function JoinPage() {
               </span>
             </div>
 
-            <div className="relative z-10 mt-10 max-sm:mt-4 lg:my-auto lg:py-14">
+            <div className="relative z-10 mt-10 max-sm:hidden lg:my-auto lg:py-14">
               <p className="mb-4 max-sm:hidden text-[10px] font-semibold uppercase tracking-[0.32em] text-[#D6B681]">
                 MO BISTRO · DISTRICT 5
               </p>
@@ -255,7 +255,7 @@ export default function JoinPage() {
               </p>
             </div>
 
-            <div className="relative z-10 mt-8 max-sm:mt-4 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-[#F5EBD5]/15 pt-5 max-sm:pt-3 text-[12px] text-[#E0D8C7]">
+            <div className="relative z-10 mt-8 max-sm:hidden flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-[#F5EBD5]/15 pt-5 max-sm:pt-3 text-[12px] text-[#E0D8C7]">
               <span className="flex items-center gap-2">
                 <MapPin size={15} className="text-[#D6B681]" />
                 District 5, New Cairo
@@ -277,7 +277,7 @@ export default function JoinPage() {
           <section className="flex flex-col justify-center px-6 py-9 max-sm:py-5 sm:px-12 sm:py-12 lg:px-14 xl:px-20">
             <div className="mx-auto w-full max-w-[440px]">
               <div className="mb-8 max-sm:mb-4">
-                <div className="mb-4 flex items-center gap-2">
+                <div className="mb-4 max-sm:hidden flex items-center gap-2">
                   <span className="h-[1px] w-8 bg-[#B99766]" />
                   <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#A17E4E]">
                     Welcome to Mo Bistro
@@ -287,7 +287,7 @@ export default function JoinPage() {
                 <h2 className="font-serif text-[39px] max-sm:text-[32px] leading-tight tracking-[-0.035em] text-[#2C3028] sm:text-[45px]">
                   {qrState === "valid" ? "Join our waitlist" : "Welcome to Mo Bistro"}
                 </h2>
-                <p className="mt-3 text-[14px] leading-6 text-[#807B71]">
+                <p className={`mt-3 text-[14px] leading-6 text-[#807B71] ${qrState === "valid" ? "max-sm:hidden" : ""}`}>
                   {qrState === "valid"
                     ? "Just a few details and we'll take care of the rest."
                     : "Our waitlist is available through the QR code at reception."}
