@@ -37,11 +37,11 @@ const schema = z.object({
     }, "Please enter your first and last name."),
   phone: z
     .string()
-    .trim()
-    .regex(
+    .transform((value) => value.replace(/[\s()-]/g, "").replace(/^(?:\+20|0020|20)(?=1[0125]\d{8}$)/, "0"))
+    .pipe(z.string().regex(
       /^01[0125][0-9]{8}$/,
-      "Enter a valid 11-digit Egyptian mobile number.",
-    ),
+      "Enter an Egyptian mobile number like 010 1234 5678 or +20 10 1234 5678.",
+    )),
   party_size: z.number().int().min(1).max(30),
   seating_preference: z.enum(["indoor", "outdoor", "any"]).default("any"),
   qr_code: z.string().optional(),

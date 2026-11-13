@@ -75,7 +75,7 @@ export async function deliverReminder(id:string) {
       else {
        try{
         const result=await requestMetaTemplate({messaging_product:'whatsapp',to:booking.phone,type:'text',biz_opaque_callback_data:id,
-         text:{body:reminderText(claimed.kind,booking.name,booking.id)+'\n\nTo unsubscribe, reply STOP.'}});
+         text:{body:reminderText(claimed.kind,booking.name,booking.id)}});
         state=result.state==='pending'?'failed':result.state;
         reason=result.error??(state==='sent'?'provider_accepted':state==='unknown'?'send_outcome_unconfirmed':'provider_'+state);
         providerId=result.messageId??null;

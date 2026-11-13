@@ -96,11 +96,6 @@ export async function sendWindowNotification(
         state: "skipped",
         error: "confirmation_subscription_copy_missing",
       };
-    const optOut =
-      "To unsubscribe at any time, reply UNSUBSCRIBE or STOP on WhatsApp.";
-    if (!subscribedConfirmation && !body.includes(optOut)) body += "\n\n" + optOut;
-    if (body.length > 4096)
-      return { state: "skipped", error: "notification_text_invalid" };
     if (job.kind === "review") {
       if (body.length > 1024)
         return { state: "skipped", error: "notification_text_invalid" };
