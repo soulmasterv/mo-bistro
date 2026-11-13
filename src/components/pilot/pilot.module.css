@@ -168,3 +168,6 @@
 
 .page[data-pilot-login] { color-scheme:dark; }
 .page[data-pilot-login] input { -webkit-appearance:none; appearance:none; }
+.loginBrand { display:flex; flex-direction:column; align-items:center; gap:12px; margin-bottom:16px; color:#D6B681; }
+.loginBrand span { display:grid; place-items:center; width:56px; height:56px; border-radius:16px; background:#393735; }
+.loginBrand p { margin:0; font-size:12px; font-weight:600; letter-spacing:.35em; }
