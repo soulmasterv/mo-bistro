@@ -1,6 +1,6 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { MessageCircle, Phone } from "lucide-react";
 type Subscription = {
   available: boolean;
   subscribed?: boolean;
@@ -18,10 +18,7 @@ export default function WhatsappSubscription({
   const [subscription, setSubscription] = useState<Subscription>({
     available: false,
   });
-  const [error, setError] = useState("");
   const [awaitingReply, setAwaitingReply] = useState(false);
-  const [checking, setChecking] = useState(false);
-  const checkingRef = useRef(false);
   const refresh = useCallback(async () => {
     const response = await fetch(
       `/api/whatsapp/subscription?token=${encodeURIComponent(token)}`,
@@ -57,7 +54,7 @@ export default function WhatsappSubscription({
       <p>
         {subscription.subscribed
           ? "WhatsApp updates enabled"
-          : "Get WhatsApp updates for this booking"}
+          : "WhatsApp updates"}
       </p>
       {subscription.subscribed ? (
         <p className="guest-small-note">
@@ -65,7 +62,7 @@ export default function WhatsappSubscription({
         </p>
       ) : (
         <p className="guest-small-note">
-          Subscribe for booking updates and one review request 60 minutes after seating. Open WhatsApp and send your booking message to enable both.
+          Includes booking updates and one review request after seating.
         </p>
       )}
       {!subscription.subscribed && allowSubscribe && subscription.url && (
@@ -74,52 +71,19 @@ export default function WhatsappSubscription({
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => setAwaitingReply(true)}
-          className="block rounded-xl bg-[#242424] px-4 py-3 text-center font-medium text-white"
+          className="flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-center font-medium"
+          style={{ backgroundColor: "#242424", color: "#ffffff" }}
         >
+          <span aria-hidden="true" className="relative inline-flex items-center justify-center" style={{ color: "#25D366" }}>
+            <MessageCircle size={21} />
+            <Phone size={10} className="absolute" />
+          </span>
           Get WhatsApp updates
         </a>
       )}
-      {!subscription.subscribed && awaitingReply && <p role="status" className="guest-small-note">Waiting for WhatsApp confirmation. Your subscription activates after we receive your booking-specific reply.</p>}
-      {!subscription.subscribed && (
-        <button
-          type="button"
-          className="guest-subscription-refresh"
-          disabled={checking}
-          aria-busy={checking}
-          onClick={async () => {
-            if (checkingRef.current) return;
-            checkingRef.current = true;
-            setChecking(true);
-            setError("");
-            try {
-              await refresh();
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "Could not check your subscription.");
-            } finally {
-              checkingRef.current = false;
-              setChecking(false);
-            }
-          }}
-        >
-          <RefreshCw size={15} aria-hidden="true" />
-          {checking ? "Checking subscription…" : "Check subscription status"}
-        </button>
-      )}
+      {!subscription.subscribed && awaitingReply && <p role="status" className="guest-small-note">Waiting for WhatsApp confirmation…</p>}
       {subscription.subscribed && subscription.feedbackConsent && (
         <p className="guest-review-status">Review requests enabled</p>
-      )}
-      <p className="text-xs text-[#77716A]">
-        {!subscription.subscribed && (
-          <>
-            Open WhatsApp, then send the message to enable
-            updates.{" "}
-          </>
-        )}
-      </p>
-      {error && (
-        <p role="alert" className="text-red-700">
-          {error}
-        </p>
       )}
     </section>
   );

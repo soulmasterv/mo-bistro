@@ -159,7 +159,7 @@ function StatusContent() {
               <p role="alert">{error}</p>
             ) : data ? (
               <>
-                <div
+                {status !== "waiting" && <div
                   className={`guest-current-status ${status === "seated" ? "is-seated" : ""}`}
                 >
                   {status === "seated" ? (
@@ -187,7 +187,8 @@ function StatusContent() {
                             : "This booking is now closed."}
                     </p>
                   </div>
-                </div>
+                </div>}
+                {token && <WhatsappSubscription token={token} allowSubscribe={active} />}
                 <dl className="guest-booking-facts">
                   <div>
                     <dt>Guest</dt>
@@ -299,9 +300,6 @@ function StatusContent() {
               <p>Quality dishes cooked with passion &amp; served with a smile.</p>
               <a href="/menu">Discover our menu →</a>
             </div>
-            {token && data && (
-              <WhatsappSubscription token={token} allowSubscribe={active} />
-            )}
           </aside>
         </div>
       </div>
