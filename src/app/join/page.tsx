@@ -241,21 +241,21 @@ export default function JoinPage() {
               </span>
             </div>
 
-            <div className="relative z-10 mt-10 lg:my-auto lg:py-14">
-              <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.32em] text-[#D6B681]">
+            <div className="relative z-10 mt-10 max-sm:mt-4 lg:my-auto lg:py-14">
+              <p className="mb-4 max-sm:hidden text-[10px] font-semibold uppercase tracking-[0.32em] text-[#D6B681]">
                 MO BISTRO · DISTRICT 5
               </p>
 
-              <h1 className="max-w-[420px] font-serif text-[43px] leading-[1.08] tracking-[-0.04em] sm:text-[54px] lg:text-[62px]">
+              <h1 className="max-w-[420px] font-serif text-[43px] max-sm:text-[30px] leading-[1.08] tracking-[-0.04em] sm:text-[54px] lg:text-[62px]">
                 Goodness since 2022.
               </h1>
 
-              <p className="mt-5 max-w-[330px] text-[14px] leading-7 text-[#E0DDCF]/80">
+              <p className="mt-5 max-sm:mt-2 max-w-[330px] text-[14px] leading-7 max-sm:leading-5 text-[#E0DDCF]/80">
                 Quality dishes cooked with passion &amp; served with a smile.
               </p>
             </div>
 
-            <div className="relative z-10 mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-[#F5EBD5]/15 pt-5 text-[12px] text-[#E0D8C7]">
+            <div className="relative z-10 mt-8 max-sm:mt-4 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-[#F5EBD5]/15 pt-5 max-sm:pt-3 text-[12px] text-[#E0D8C7]">
               <span className="flex items-center gap-2">
                 <MapPin size={15} className="text-[#D6B681]" />
                 District 5, New Cairo
@@ -274,9 +274,9 @@ export default function JoinPage() {
           </section>
 
           {/* Booking form */}
-          <section className="flex flex-col justify-center px-6 py-9 sm:px-12 sm:py-12 lg:px-14 xl:px-20">
+          <section className="flex flex-col justify-center px-6 py-9 max-sm:py-5 sm:px-12 sm:py-12 lg:px-14 xl:px-20">
             <div className="mx-auto w-full max-w-[440px]">
-              <div className="mb-8">
+              <div className="mb-8 max-sm:mb-4">
                 <div className="mb-4 flex items-center gap-2">
                   <span className="h-[1px] w-8 bg-[#B99766]" />
                   <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#A17E4E]">
@@ -284,7 +284,7 @@ export default function JoinPage() {
                   </span>
                 </div>
 
-                <h2 className="font-serif text-[39px] leading-tight tracking-[-0.035em] text-[#2C3028] sm:text-[45px]">
+                <h2 className="font-serif text-[39px] max-sm:text-[32px] leading-tight tracking-[-0.035em] text-[#2C3028] sm:text-[45px]">
                   {qrState === "valid" ? "Join our waitlist" : "Welcome to Mo Bistro"}
                 </h2>
                 <p className="mt-3 text-[14px] leading-6 text-[#807B71]">

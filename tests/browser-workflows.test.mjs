@@ -1302,18 +1302,18 @@ test(
           await guestPage.getByText(/one review request after seating/).waitFor();
           subscriptionSubscribed=true;
         }
-        await guestPage.getByText("WhatsApp updates enabled",{exact:true}).waitFor();
+        await guestPage.getByText("You’re all set!",{exact:true}).waitFor();
         assert.equal(await guestPage.getByRole("link",{name:"Get WhatsApp updates"}).count(),0);
         assert.equal(await guestPage.getByRole("checkbox").count(),0); // Review preference is collapsed for subscribers.
         feedbackEditable=false; await guestPage.reload();
-        await guestPage.getByText("WhatsApp updates enabled",{exact:true}).waitFor();
+        await guestPage.getByText("You’re all set!",{exact:true}).waitFor();
         assert.equal(await guestPage.getByRole("checkbox").count(),0);
         if(screenshots) await guestPage.screenshot({path:path.join(screenshots,"whatsapp-updates-enabled.png"),fullPage:true});
         subscriptionSubscribed=false; await guestPage.reload();
         await guestPage.getByRole("link",{name:"Get WhatsApp updates"}).waitFor();
         assert.equal(await guestPage.getByRole("checkbox").count(),0);
         subscriptionSubscribed=true;
-        await guestPage.getByText("WhatsApp updates enabled",{exact:true}).waitFor();
+        await guestPage.getByText("You’re all set!",{exact:true}).waitFor();
         assert.equal(await guestPage.getByRole("link",{name:"Get WhatsApp updates"}).count(),0);
         subscriptionSubscribed=true; feedbackEditable=true;
         assert.equal(submittedBooking.whatsapp_confirmation_consent, false);

@@ -53,12 +53,12 @@ export default function WhatsappSubscription({
     >
       <p>
         {subscription.subscribed
-          ? "WhatsApp updates enabled"
+          ? "You’re all set!"
           : "WhatsApp updates"}
       </p>
       {subscription.subscribed ? (
         <p className="guest-small-note">
-          You’ll receive booking updates on WhatsApp.
+          We’ll keep you posted on WhatsApp.
         </p>
       ) : (
         <p className="guest-small-note">
@@ -83,7 +83,7 @@ export default function WhatsappSubscription({
       )}
       {!subscription.subscribed && awaitingReply && <p role="status" className="guest-small-note">Waiting for WhatsApp confirmation…</p>}
       {subscription.subscribed && subscription.feedbackConsent && (
-        <p className="guest-review-status">Review requests enabled</p>
+        <p className="guest-review-status">After you’re seated, we’ll ask how your visit went.</p>
       )}
     </section>
   );
