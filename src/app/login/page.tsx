@@ -2,7 +2,7 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, UtensilsCrossed } from "lucide-react";
 
 type StaffRole = "manager" | "reception" | "waiter";
 
@@ -68,6 +68,10 @@ export default function LoginPage() {
         aria-busy={loading}
         className="w-full max-w-md rounded-3xl bg-[#252525] p-7 text-[#F5F0E7] shadow-2xl sm:p-10"
       >
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#393735] text-[#D6B681]" aria-hidden="true">
+          <UtensilsCrossed size={27} />
+        </div>
+        <p className="mb-4 text-center text-xs font-semibold tracking-[0.35em] text-[#D6B681]">MO BISTRO</p>
         <h1 className="mb-8 text-center text-3xl font-semibold">
           Reception Sign in
         </h1>
