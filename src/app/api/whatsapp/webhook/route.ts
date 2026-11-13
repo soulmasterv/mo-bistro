@@ -49,11 +49,22 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ error: "Invalid body" }, { status: 413 });
   }
-  const verified = usesKapso()
-    ? verifyKapsoSignature(raw, request.headers.get("x-webhook-signature"))
+  const kapso = usesKapso();
+  const kapsoSignature = request.headers.get("x-webhook-signature");
+  const verified = kapso
+    ? verifyKapsoSignature(raw, kapsoSignature)
     : verifyMetaSignature(raw, request.headers.get("x-hub-signature-256"));
-  if (!verified)
+  if (!verified) {
+    if (process.env.VERCEL_ENV === "preview" && (kapso || kapsoSignature)) {
+      console.warn("Kapso webhook signature rejected", {
+        providerSelected: kapso,
+        secretConfigured: Boolean(process.env.KAPSO_WEBHOOK_SECRET),
+        signaturePresent: Boolean(kapsoSignature),
+        signatureFormatValid: /^[a-f0-9]{64}$/.test(kapsoSignature ?? ""),
+      });
+    }
     return Response.json({ error: "Invalid signature" }, { status: 401 });
+  }
   let payload;
   try {
     payload = JSON.parse(raw);
