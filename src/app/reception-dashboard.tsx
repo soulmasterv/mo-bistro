@@ -1,5 +1,5 @@
 "use client";
-import {receptionRead,refreshReception,watchReception} from "@/lib/reception-feed";
+import {checkReception,receptionRead,refreshReception,watchReception} from "@/lib/reception-feed";
 
 import { useConfirmation } from "@/components/confirmation-provider";
 import TrackingHandoff from "@/components/tracking-handoff";
@@ -294,7 +294,7 @@ export default function Home() {
             </span>
             <button
               className="bistro-icon-button"
-              onClick={() => void loadGuests(true)}
+              onClick={() => void checkReception().catch(()=>{})}
               title="Refresh queue"
               aria-label="Refresh queue"
             >

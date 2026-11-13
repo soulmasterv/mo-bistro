@@ -9,6 +9,7 @@ export function createReceptionFeed(options:Options){
  let data:Record<string,unknown>|null=null,inFlight:Promise<void>|null=null,controller:AbortController|null=null;
  let timer:ReturnType<typeof setTimeout>|null=null,failures=0,active=false,stopped=false,dirty=false,version=0;
  let state:FeedState={updating:false,updatedAt:0,stopped:false};
+ let retryAt=0;
  const listeners=new Set<()=>void>();
  const publish=()=>{for(const listener of listeners)listener();};
  function schedule(){
@@ -16,7 +17,7 @@ export function createReceptionFeed(options:Options){
   timer=null;
   if(!active||stopped||!options.visible())return;
   const delay=failures?Math.min(60000,5000*2**Math.min(failures,4))*(.8+options.random()*.4):5000;
-  timer=options.setTimeout(()=>{void refresh().catch(()=>{});},delay);
+  timer=options.setTimeout(()=>{void refresh().catch(()=>{});},Math.max(delay,retryAt-options.now()));
  }
  async function refresh(invalidate=false):Promise<void>{
   if(stopped)throw Error('Reception session ended.');
@@ -27,6 +28,7 @@ export function createReceptionFeed(options:Options){
    return;
   }
   if(!options.visible())return;
+  if(options.now()<retryAt)return;
   if(timer){options.clearTimeout(timer);timer=null;}
   const generation=version;dirty=false;const current=new AbortController();controller=current;
   let timedOut=false;
@@ -35,12 +37,17 @@ export function createReceptionFeed(options:Options){
    try{
     const response=await options.fetch('/api/reception/dashboard',{cache:'no-store',credentials:'same-origin',signal:current.signal});
     if(response.status===401||response.status===403){data=null;stopped=true;state={updating:false,updatedAt:0,stopped:true};throw Error('Please sign in again.');}
+    if(response.status===429){
+     const header=response.headers.get('Retry-After');
+     const delay=header&&/^\d+$/.test(header)?Number(header)*1000:Date.parse(header??'')-options.now();
+     retryAt=options.now()+(Number.isFinite(delay)&&delay>0?delay:10000);
+    }
     if(!response.ok)throw Error('Reception is updating.');
     const next=await response.json();
     if(!next||!Array.isArray(next.guests)||!Array.isArray(next.tables)||!Array.isArray(next.requests)||!Array.isArray(next.next?.areas)||!['simple','detailed'].includes(next.mode?.mode)||!next.simple||!next.wait)throw Error('Invalid reception response.');
     if(current.signal.aborted)return;
     // Never publish a snapshot started before a mutation invalidated it.
-    if(generation===version){data=next;failures=0;state={updating:false,updatedAt:options.now(),stopped:false};}
+    if(generation===version){data=next;failures=0;retryAt=0;state={updating:false,updatedAt:options.now(),stopped:false};}
    }catch(error){
     if((!current.signal.aborted||timedOut)&&!stopped){failures++;state={...state,updating:true};}
     throw error;
@@ -80,3 +87,4 @@ export function refreshReception(){
  return invalidation;
 }
 export const watchReception=(callback:()=>void)=>receptionFeed().subscribe(callback);
+export const checkReception=()=>receptionFeed().refresh();
