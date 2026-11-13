@@ -1,8 +1,11 @@
 import { ArrowRight, UtensilsCrossed } from 'lucide-react';
+import { Geist } from 'next/font/google';
 import styles from './pilot.module.css';
 
+const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' });
+
 export default function PilotLogin({error=""}:{error?:string}) {
- return <main className={`${styles.page} ${styles.loginPage}`} data-pilot-login><section className={styles.loginCard}>
+ return <main className={`${styles.page} ${styles.loginPage} ${geist.variable}`} data-pilot-login><section className={styles.loginCard}>
   <div className={styles.loginBrand}>
    <span aria-hidden="true"><UtensilsCrossed size={27}/></span>
    <p>MO BISTRO</p>
