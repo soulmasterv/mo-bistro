@@ -193,4 +193,7 @@
 .loginCard .form input { min-height:48px; padding:11px 16px; border-color:transparent; border-radius:12px; background:#f5f1e9; color:#293126; }
 .loginCard .form input::placeholder { color:#62665e; }
 .loginCard .button { display:flex; align-items:center; justify-content:center; gap:8px; min-height:52px; margin-top:8px; border-radius:12px; background:#d6b681; color:#293126; }
+.loginCard .button:disabled { background:#bfc0bf; border-color:#bfc0bf; color:#4d4e4d; opacity:1; cursor:wait; }
+.qrButton { display:inline-flex; align-items:center; justify-content:center; gap:8px; white-space:nowrap; }
+.qrButton svg { flex-shrink:0; }
 @media(max-width:480px) { .loginCard { padding:28px; } .loginCard h1 { font-size:26px; } }
