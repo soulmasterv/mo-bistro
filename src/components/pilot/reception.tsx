@@ -37,7 +37,11 @@ export default function PilotReception({username}:{username:string}){
  const refreshVersion=useRef(0);
  const refreshing=useRef(false);
  const refreshQueued=useRef(false);
+ const retryAt=useRef(0);
+ const scheduleRefresh=useRef<()=>void>(()=>{});
+ const [updatedAt,setUpdatedAt]=useState(0);
  const refresh=useCallback(async(signal?:AbortSignal,afterAction=false):Promise<void>=>{
+  if(signal?.aborted||Date.now()<retryAt.current)return;
   if(refreshing.current){if(afterAction)refreshQueued.current=true;return;}
   refreshing.current=true;
   try{do{
@@ -45,12 +49,41 @@ export default function PilotReception({username}:{username:string}){
    try{
    const r=await fetchWithTimeout('/api/pilot/queue',{cache:'no-store',signal},15000);
    if(r.status===401){router.replace('/login');return;}
+   if(r.status===429){
+    const header=r.headers.get('Retry-After');
+    const delay=header&&/^\d+$/.test(header)?Number(header)*1000:Date.parse(header??'')-Date.now();
+    retryAt.current=Date.now()+(Number.isFinite(delay)&&delay>0?delay:10000);
+    throw Error('Queue refresh paused. Retrying automatically…');
+   }
    const data=await r.json();if(!r.ok)throw Error(data.error||'Queue unavailable.');
-   if(!signal?.aborted&&version===refreshVersion.current){const received_at=Date.now();setParties(data.map((p:Party)=>({...p,received_at})));setNow(received_at);setLoaded(true);setError('');}
+   if(!signal?.aborted&&version===refreshVersion.current){const received_at=Date.now();setParties(data.map((p:Party)=>({...p,received_at})));setNow(received_at);setUpdatedAt(received_at);setLoaded(true);setError('');}
   }catch(e){if(!signal?.aborted&&version===refreshVersion.current)setError(e instanceof Error&&e.name==='TimeoutError'?'Queue update timed out. Retrying…':e instanceof Error?e.message:'Queue unavailable.');}
-  }while(refreshQueued.current&&!signal?.aborted);}finally{refreshing.current=false;}
+  }while(refreshQueued.current&&!signal?.aborted&&Date.now()>=retryAt.current);}finally{refreshing.current=false;scheduleRefresh.current();}
  },[router]);
- useEffect(()=>{const controller=new AbortController();void Promise.resolve().then(()=>refresh(controller.signal));const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refresh(controller.signal);},5000);const clock=window.setInterval(()=>setNow(Date.now()),250);return()=>{controller.abort();window.clearInterval(timer);window.clearInterval(clock);};},[refresh]);
+ useEffect(()=>{
+  const controller=new AbortController();
+  let timer:number|undefined;
+  const schedule=()=>{
+   window.clearTimeout(timer);
+   if(controller.signal.aborted||document.visibilityState!=='visible')return;
+   timer=window.setTimeout(()=>void refresh(controller.signal),Math.max(5000,retryAt.current-Date.now()));
+  };
+  scheduleRefresh.current=schedule;
+  const onVisibility=()=>{
+   if(document.visibilityState==='visible'&&Date.now()>=retryAt.current)void refresh(controller.signal);
+   else schedule();
+  };
+  document.addEventListener('visibilitychange',onVisibility);
+  void Promise.resolve().then(onVisibility);
+  const clock=window.setInterval(()=>setNow(Date.now()),250);
+  return()=>{
+   controller.abort();
+   scheduleRefresh.current=()=>{};
+   window.clearTimeout(timer);
+   window.clearInterval(clock);
+   document.removeEventListener('visibilitychange',onVisibility);
+  };
+ },[refresh]);
  async function action(id:number,value:QueueAction,reason?:string){
   if(pending.current.has(id))return;pending.current.add(id);refreshVersion.current++;setBusy([...pending.current]);setError('');
   try{const undo_token=value==='undo'?parties.find(p=>p.id===id)?.pending_exit_token:undefined;const r=await fetchWithTimeout(`/api/pilot/parties/${id}`,{method:'PATCH',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({action:value,...(undo_token?{undo_token}:{}),...(reason?{reason}:{}),...(['phone_call','retry'].includes(value)?{event_id:eventId()}:{})})},20000);const data=await r.json();if(!r.ok)throw Error(data.error||'Action failed.');await refresh(undefined,true);}catch(e){setError(e instanceof Error&&e.name==='TimeoutError'?'The action is taking longer than expected. The queue will refresh its result.':e instanceof Error?e.message:'Action failed.');}finally{pending.current.delete(id);setBusy([...pending.current]);}
@@ -85,6 +118,7 @@ export default function PilotReception({username}:{username:string}){
   </div>
   {handoff&&<section className={styles.panel}><strong>Ticket #{handoff.id} added</strong><p className={styles.hint}>Ask the guest to scan their private status link.</p><div className={styles.qr}><QRCodeSVG value={PILOT_ORIGIN+'/status?token='+handoff.token} size={130}/><button className={styles.secondary} onClick={()=>setHandoff(null)}>Done</button></div></section>}
   <div className={styles.title}><h1>Waiting queue</h1><button className={styles.secondary} onClick={()=>void refresh()}>Refresh</button></div>
+  {updatedAt>0&&!error&&<p>Last updated {new Date(updatedAt).toLocaleTimeString()}</p>}
   {error&&<p className={styles.notice} role="alert">{error}</p>}
   {!loaded&&!error&&<p role="status">Loading queue…</p>}
   {loaded&&!parties.length&&<p className={styles.empty}>The waiting queue is empty.</p>}
