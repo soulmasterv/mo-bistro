@@ -171,3 +171,26 @@
 .loginBrand { display:flex; flex-direction:column; align-items:center; gap:12px; margin-bottom:16px; color:#D6B681; }
 .loginBrand span { display:grid; place-items:center; width:56px; height:56px; border-radius:16px; background:#393735; }
 .loginBrand p { margin:0; font-size:12px; font-weight:600; letter-spacing:.35em; }
+.page.loginPage {
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ background:#edece5;
+ font-family:var(--font-geist-sans), Arial, sans-serif;
+}
+.loginCard {
+ box-sizing:border-box;
+ width:100%;
+ max-width:448px;
+ padding:40px;
+ border-radius:24px;
+ background:#252525;
+ color:#f5f0e7;
+ box-shadow:0 20px 42px rgba(37,37,37,.18);
+}
+.loginCard h1 { margin:0 0 28px; text-align:center; font-size:30px; font-weight:600; line-height:1.2; }
+.loginCard .form { margin:0; gap:20px; }
+.loginCard .form input { min-height:48px; padding:11px 16px; border-color:transparent; border-radius:12px; background:#f5f1e9; color:#293126; }
+.loginCard .form input::placeholder { color:#62665e; }
+.loginCard .button { display:flex; align-items:center; justify-content:center; gap:8px; min-height:52px; margin-top:8px; border-radius:12px; background:#d6b681; color:#293126; }
+@media(max-width:480px) { .loginCard { padding:28px; } .loginCard h1 { font-size:26px; } }
