@@ -412,9 +412,6 @@ test(
               current_staff_id: 1,
             };
             break;
-          case "/api/management/staff-shifts":
-            data = { shifts: [] };
-            break;
           case "/api/management/tables":
             data = tables;
             break;

@@ -71,21 +71,6 @@ test(
       await db.exec(repair);
       await db.exec(repair);
       const h = routes(db);
-      const response = await h.route("management/staff-shifts").PUT(
-        request("PUT", {
-          staff_id: 2,
-          weekday: 0,
-          is_off: false,
-          start_time: "22:00",
-          end_time: "06:00",
-        }),
-      );
-      assert.equal(response.status, 200);
-      const shifts = await h.route("management/staff-shifts").GET();
-      assert.equal(shifts.status, 200);
-      const data = await shifts.json();
-      assert.equal(data.shifts[0].start_time, "22:00");
-      assert.equal(data.shifts[0].end_time, "06:00");
       const users = await h.route("management/staff-pin/users").GET();
       assert.equal((await users.json()).pin_supported, true);
       await db.exec(

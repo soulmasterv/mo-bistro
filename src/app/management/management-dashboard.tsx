@@ -3,7 +3,6 @@ import WhatsAppPreviewTest from "@/components/whatsapp-preview-test";
 import ManagementDangerZone from "@/components/management-danger-zone";
 import ManagementOperations from "@/components/management-operations";
 import StaffAccountManager from "@/components/staff-account-manager";
-import StaffShiftScheduler from "@/components/staff-shift-scheduler";
 import DemoControls from "@/components/demo-controls";
 import SeatingSettings from "@/components/seating-settings";
 
@@ -272,11 +271,10 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
                 <p className="bistro-eyebrow">PEOPLE MAKE THE EXPERIENCE</p>
                 <h2>Your team, in sync.</h2>
                 <p className="bistro-muted">
-                  Accounts, access, and a well-planned week.
+                  Manage staff accounts and access.
                 </p>
               </div>
               <StaffAccountManager />
-              <StaffShiftScheduler />
             </section>
             <section id="floor-settings" className="bistro-settings-group">
               <div className="bistro-group-heading">

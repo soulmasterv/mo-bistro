@@ -71,8 +71,6 @@ for (const role of [null, "waiter", "reception"]) {
         ["management/staff", "POST", {}],
         ["management/staff", "PATCH", { staff_id: 2, active: 0 }],
         ["management/staff-pin", "PATCH", {}],
-        ["management/staff-shifts", "GET"],
-        ["management/staff-shifts", "PUT", {}],
       ]) {
         const response = await h.route(file)[method](request(method, body));
         assert.equal(response.status, 403, file);
@@ -176,55 +174,6 @@ test("PIN creation/reset requires six nontrivial digits, active account and sess
       .status,
     404,
   );
-});
-
-test("Shift times accept normal and overnight hours; reject invalid/off-day hours", async () => {
-  const h = harness({
-    query: (q) =>
-      q.startsWith("SELECT id FROM staff_users") ? [{ id: 2 }] : [],
-  });
-  const route = h.route("management/staff-shifts");
-  const body = {
-    staff_id: 2,
-    weekday: 0,
-    is_off: false,
-    start_time: "09:30",
-    end_time: "17:00",
-  };
-  assert.equal((await route.PUT(request("PUT", body))).status, 200);
-  assert.equal(
-    (
-      await route.PUT(
-        request("PUT", { ...body, start_time: "22:00", end_time: "06:00" }),
-      )
-    ).status,
-    200,
-  );
-  assert.equal(
-    (
-      await route.PUT(
-        request("PUT", {
-          ...body,
-          is_off: true,
-          start_time: null,
-          end_time: null,
-        }),
-      )
-    ).status,
-    200,
-  );
-  for (const changes of [
-    { start_time: "24:00" },
-    { start_time: "9:30" },
-    { end_time: "17:60" },
-    { is_off: true },
-    { weekday: 7 },
-  ]) {
-    assert.equal(
-      (await route.PUT(request("PUT", { ...body, ...changes }))).status,
-      400,
-    );
-  }
 });
 
 for (const area of ["indoor", "outdoor"]) {
@@ -701,15 +650,13 @@ test("Reception queue badges and QR dialog contain accessible Mo Bistro copy", (
   assert.ok(!markup.includes("Restaurant Concierge"));
 });
 
-test("Staff account and shift operations retain authentication after licensing removal", async () => {
+test("Staff account operations retain authentication after licensing removal", async () => {
   const h = harness({ actor: null });
   for (const [file, method, body] of [
     ["management/staff-pin/users", "GET"],
     ["management/staff", "POST", {}],
     ["management/staff", "PATCH", { staff_id: 2, active: 0 }],
     ["management/staff-pin", "PATCH", {}],
-    ["management/staff-shifts", "GET"],
-    ["management/staff-shifts", "PUT", {}],
   ]) assert.equal((await h.route(file)[method](request(method, body))).status, 403, file);
   assert.equal(h.queries.length, 0);
 });
