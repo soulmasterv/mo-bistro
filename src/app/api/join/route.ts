@@ -135,6 +135,7 @@ export async function POST(request: Request) {
       if ("error" in result)
         return NextResponse.json(
           {
+            ...(result.error === "full" ? { code: "WAITLIST_FULL" } : {}),
             error:
               result.error === "paused"
                 ? "The waitlist is temporarily closed. Please speak with reception."
@@ -212,7 +213,7 @@ export async function POST(request: Request) {
 
     if (id === "full")
       return NextResponse.json(
-        { error: "The waitlist is currently full." },
+        { error: "The waitlist is currently full.", code: "WAITLIST_FULL" },
         { status: 409 },
       );
     if (id === null) {

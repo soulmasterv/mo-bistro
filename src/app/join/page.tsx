@@ -25,16 +25,30 @@ function isValidFullName(value: string) {
 }
 
 export default function JoinPage() {
-  const [publicPaused, setPublicPaused] = useState(false);
+  const [availability, setAvailability] = useState<"checking" | "open" | "paused" | "full" | "unavailable">("checking");
+  const publicPaused = availability === "paused";
   useEffect(() => {
     let active = true;
-    const refresh = () => { void fetch("/api/public/waitlist", {cache:"no-store"})
-      .then(async response => { if (response.ok) { const data = await response.json(); if (active) setPublicPaused(data.paused === true); } })
-      .catch(() => {}); };
+    const controller = new AbortController();
+    let checking = false;
+    const refresh = async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const response = await fetch("/api/public/waitlist", { cache: "no-store", signal: controller.signal });
+        if (!response.ok) throw Error("Waitlist availability unavailable");
+        const data = await response.json();
+        if (active) setAvailability(data.paused ? "paused" : data.full ? "full" : "open");
+      } catch {
+        if (active) setAvailability(current => current === "checking" ? "unavailable" : current);
+      } finally {
+        checking = false;
+      }
+    };
     refresh();
     const timer = setInterval(refresh, 30000);
     window.addEventListener("focus", refresh);
-    return () => { active = false; clearInterval(timer); window.removeEventListener("focus", refresh); };
+    return () => { active = false; controller.abort(); clearInterval(timer); window.removeEventListener("focus", refresh); };
   }, []);
   const [name, setName] = useState("");
   const [nameTouched, setNameTouched] = useState(false);
@@ -135,7 +149,7 @@ export default function JoinPage() {
 
   async function joinWaitlist(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (loading || publicPaused) return;
+    if (loading || availability !== "open") return;
 
     setNameTouched(true);
     if (!isValidFullName(name)) {
@@ -164,6 +178,10 @@ export default function JoinPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        if (data.code === "WAITLIST_FULL") {
+          setAvailability("full");
+          return;
+        }
         throw new Error(
           data.error || data.message || "Unable to join the waitlist."
         );
@@ -316,11 +334,17 @@ export default function JoinPage() {
                 <h3 className="font-serif text-2xl">Waitlist temporarily closed</h3>
                 <p className="mt-3 text-sm">Please speak with reception. Existing bookings are still active.</p>
               </div>}
-              {qrState === "valid" && !publicPaused && (
+              {qrState === "valid" && (availability === "full" || availability === "checking" || availability === "unavailable") && (
+                <div role="status" className="rounded-2xl border border-[#E4DCD0] bg-[#FFFDF9] p-6">
+                  <h3 className="font-serif text-2xl">{availability === "full" ? "The waitlist is full" : availability === "checking" ? "Checking availability…" : "Couldn’t check availability"}</h3>
+                  {availability !== "checking" && <p className="mt-3 text-sm">Please check back shortly or speak with reception.</p>}
+                </div>
+              )}
+              {qrState === "valid" && availability === "open" && (
               <RestaurantWaitDisplay />
               )}
 
-              {qrState === "valid" && !publicPaused && (
+              {qrState === "valid" && availability === "open" && (
               <form onSubmit={joinWaitlist} className="space-y-5">
                 <div>
                   <label
