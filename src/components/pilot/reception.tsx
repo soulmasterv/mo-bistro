@@ -108,7 +108,6 @@ export default function PilotReception({username}:{username:string}){
    <details ref={menu} className={styles.menu} onKeyDown={event=>{if(event.key==='Escape'){event.currentTarget.open=false;event.currentTarget.querySelector('summary')?.focus();}}}>
     <summary aria-label="Reception menu" title="Reception menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></summary>
     <nav className={styles.menuItems} aria-label="Reception options">
-     <a href="/api/pilot/export" onClick={event=>{const details=event.currentTarget.closest('details');if(details)details.open=false;}}>Export CSV</a>
      <button onClick={()=>void fetch('/api/auth/logout',{method:'POST'}).then(()=>{router.replace('/login');router.refresh();})}>Sign out</button>
     </nav>
    </details>
