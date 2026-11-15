@@ -535,7 +535,7 @@ export default function Home() {
                         )}
                       </span>
                       <div className="bistro-guest-actions">
-                        {dialHref && (
+                        {dialHref ? (
                           <a
                             href={dialHref}
                             aria-label={"Call " + guest.name}
@@ -543,6 +543,15 @@ export default function Home() {
                           >
                             <Phone size={15} /> Call
                           </a>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled
+                            aria-label={"No callable phone number for " + guest.name}
+                            className="bistro-button bistro-button-secondary"
+                          >
+                            <Phone size={15} /> Call
+                          </button>
                         )}
                         <button
                           disabled={busy || guest.status === "seated"}
