@@ -18,6 +18,13 @@
 .panel summary { cursor:pointer; font-weight:700; min-height:30px; }
 .title { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:28px 0 16px; }
 .title h1 { font-size:26px; font-weight:700; margin:0; }
+.receptionStats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:12px 0 0; }
+.receptionStats > div { min-width:0; border:1px solid var(--line); border-radius:12px; background:#191a1a; padding:clamp(10px,2vw,20px); }
+.receptionStats dt { color:var(--muted); font-size:13px; }
+.receptionStats dd { margin:4px 0 0; font-size:clamp(18px,3vw,28px); font-weight:700; font-variant-numeric:tabular-nums; }
+.receptionQueue { margin-top:20px; border:1px solid var(--line); border-radius:14px; background:#171818; padding:clamp(10px,2vw,20px); }
+.receptionQueue .title { margin:0 0 14px; }
+.queueCount { display:inline-block; vertical-align:middle; margin-left:4px; padding:2px 8px; border:1px solid var(--line); border-radius:20px; color:var(--muted); font-size:13px; }
 .count { display:inline-block; background:#e6c58a; color:#181818; padding:4px 12px; border-radius:7px; margin-left:10px; }
 .list { list-style:none; margin:0; padding:0; display:grid; gap:10px; }
 .party { display:grid; grid-template-columns:50px minmax(0,1fr) auto; gap:16px; align-items:center; padding:16px; background:#191a1a; border:1px solid var(--line); border-radius:12px; }

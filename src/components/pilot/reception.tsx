@@ -116,21 +116,23 @@ export default function PilotReception({username,role="reception"}:{username:str
   <div className={styles.entryTools}>
    <div className={styles.entryBar}>
     <button type="button" className={styles.button} aria-expanded={showWalkIn} aria-controls="pilot-walk-in" onClick={()=>setShowWalkIn(!showWalkIn)}>Add walk-in</button>
-    <dl className={styles.queueStats} aria-label="Queue stats">
+   </div>
+    <dl className={styles.receptionStats} aria-label="Queue stats">
      <div><dt>Waiting</dt><dd>{loaded?waiting.length:'—'}</dd></div>
      <div><dt>Called</dt><dd>{loaded?called:'—'}</dd></div>
      <div><dt>Oldest wait</dt><dd>{waiting.length?oldest+' min':'—'}</dd></div>
     </dl>
-   </div>
    <section id="pilot-walk-in" aria-label="Walk-in form" className={styles.panel} hidden={!showWalkIn}><PartyForm staff onCreated={party=>{setHandoff(party);void refresh(undefined,true);}}/></section>
   </div>
   {handoff&&<section className={styles.panel}><strong>Ticket #{handoff.id} added</strong><p className={styles.hint}>Ask the guest to scan their private status link.</p><div className={styles.qr}><QRCodeSVG value={PILOT_ORIGIN+'/status?token='+handoff.token} size={130}/><button className={styles.secondary} onClick={()=>setHandoff(null)}>Done</button></div></section>}
-  <div className={styles.title}><h1>Waiting queue</h1><button className={styles.secondary} onClick={()=>void refresh()}>Refresh</button></div>
-  {updatedAt>0&&!error&&<p>Last updated {new Date(updatedAt).toLocaleTimeString()}</p>}
+  <section className={styles.receptionQueue} aria-labelledby="pilot-queue-title">
+  <div className={styles.title}><div><h1 id="pilot-queue-title">Waiting queue <span className={styles.queueCount}>{loaded?parties.length:'—'}</span></h1>
+  {updatedAt>0&&!error&&<p className={styles.hint}>Last updated {new Date(updatedAt).toLocaleTimeString()}</p>}</div><button className={styles.secondary} onClick={()=>void refresh()}>Refresh</button></div>
   {error&&<p className={styles.notice} role="alert">{error}</p>}
   {!loaded&&!error&&<p role="status">Loading queue…</p>}
   {loaded&&!parties.length&&<p className={styles.empty}>The waiting queue is empty.</p>}
   {!!parties.length&&<PilotQueue parties={parties} now={now} busy={busy} onAction={(id,value,reason)=>void action(id,value,reason)} onOpen={setOpenParty}/>}
+  </section>
   {selected&&<PilotDrawer key={selected.id} party={selected} now={now} busy={busy.includes(selected.id)} onAction={(id,value,reason)=>void action(id,value,reason)} onClose={()=>setOpenParty(null)}/>}
   {showQR&&<JoinQR onClose={()=>setShowQR(false)}/>}
  </div></main>;
