@@ -46,6 +46,12 @@ export async function transition(id:number,action:PilotAction,reason?:z.infer<ty
   const normalized=action==='call'?'notify':action==='remove'?reason:action==='left'?'left_unannounced':action==='cancel'?'guest_cancelled':action==='no_show'?'no_response':action;
   if(!normalized)return {error:'Choose a removal reason.',status:400};
   const exiting=ExitReason.safeParse(normalized).success;
+  if (action === 'cancel' || action === 'no_show') {
+   if (!['waiting','called'].includes(party.status)) return {error:'This party has already left the waiting queue.',status:409};
+   await tx`UPDATE public.pilot_parties SET status='left',left_at=clock_timestamp(),
+    exit_state=status,exit_reason=${normalized},pending_exit_kind=NULL,pending_exit_at=NULL,pending_exit_token=NULL WHERE id=${id}`;
+   return {success:true};
+  }
   if(party.pending_exit_kind){
    if(party.pending_exit_kind===normalized)return {success:true,undo_token:party.pending_exit_token,undo_until:party.pending_exit_at};
    return {error:'Undo the pending removal before taking another action.',status:409};
@@ -98,8 +104,13 @@ export async function listQueue() {
  await observeOptInReplies();
  return getPostgres()`SELECT clock_timestamp() AS server_now,p.id,p.name,p.phone,p.party_size,p.preference,p.source,p.status,p.joined_at,
  p.called_at,p.whatsapp_consent_at IS NOT NULL AS whatsapp_consent,p.pending_exit_kind,p.pending_exit_at,p.pending_exit_token,
- p.phone_call_taps,p.informed_via,p.whatsapp_inbound_after_opt_in_at,m.status AS message_status,m.last_error AS message_error
- FROM public.pilot_parties p LEFT JOIN LATERAL (SELECT status,last_error FROM public.pilot_ready_messages WHERE party_id=p.id ORDER BY created_at DESC,id DESC LIMIT 1) m ON TRUE
+ p.phone_call_taps,p.informed_via,p.whatsapp_inbound_after_opt_in_at,m.status AS message_status,m.last_error AS message_error,
+ CASE WHEN p.whatsapp_consent_at IS NULL OR (NOT ${usesKapso()} AND pref.opted_out_at >= p.whatsapp_consent_at) THEN 'not_subscribed'
+      WHEN p.whatsapp_inbound_after_opt_in_at IS NULL THEN 'awaiting_reply'
+      ELSE 'subscribed' END AS whatsapp_subscription
+ FROM public.pilot_parties p
+ LEFT JOIN public.whatsapp_contact_preferences pref ON pref.phone='2'||p.phone
+ LEFT JOIN LATERAL (SELECT status,last_error FROM public.pilot_ready_messages WHERE party_id=p.id ORDER BY created_at DESC,id DESC LIMIT 1) m ON TRUE
  WHERE p.status IN ('waiting','called') ORDER BY p.joined_at,p.id`;
 }
 export async function partyStatus(token:string) {
@@ -111,6 +122,12 @@ export async function partyStatus(token:string) {
  WHERE ahead.status='waiting' AND (ahead.joined_at,ahead.id)<=(p.joined_at,p.id)) ELSE NULL END AS position
  FROM public.pilot_parties p WHERE p.tracking_hash=${tokenHash(token)}`;
  return party??null;
+}
+export async function leaveWaitlist(token: string) {
+ const rows = await getPostgres()`UPDATE public.pilot_parties SET status='left',left_at=clock_timestamp(),
+  exit_state=status,exit_reason='guest_cancelled',pending_exit_kind=NULL,pending_exit_at=NULL,pending_exit_token=NULL
+  WHERE tracking_hash=${tokenHash(token)} AND status IN ('waiting','called') RETURNING id`;
+ return rows.length > 0;
 }
 export async function enableReadyAlert(token:string) {
  const rows=await getPostgres()`UPDATE public.pilot_parties SET whatsapp_consent_at=COALESCE(whatsapp_consent_at,clock_timestamp())

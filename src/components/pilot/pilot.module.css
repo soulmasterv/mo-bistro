@@ -197,3 +197,9 @@
 .qrButton { display:inline-flex; align-items:center; justify-content:center; gap:8px; white-space:nowrap; }
 .qrButton svg { flex-shrink:0; }
 @media(max-width:480px) { .loginCard { padding:28px; } .loginCard h1 { font-size:26px; } }
+.menu summary.accountTrigger { width:auto; gap:8px; padding:0 10px; }
+.accountTrigger span { display:grid; text-align:left; line-height:1.2; font-size:12px; }
+.accountTrigger small { text-transform:capitalize; color:var(--muted); }
+@media(max-width:380px) {
+ .header:has(.accountTrigger) { flex-wrap:wrap; }
+}

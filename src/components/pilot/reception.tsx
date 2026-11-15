@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import { QrCode } from 'lucide-react';
 import { PILOT_ORIGIN } from '@/lib/pilot/config';
+import { retryAfterMilliseconds } from '@/lib/retry-after';
 import PartyForm from './party-form';
 import JoinQR from './join-qr';
 import {PilotQueue,PilotDrawer,observedPartyTime,type Party,type QueueAction} from './queue';
@@ -27,7 +28,7 @@ function eventId(){
  const hex=Array.from(b,n=>('0'+n.toString(16)).slice(-2)).join('');
  return [hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-');
 }
-export default function PilotReception({username}:{username:string}){
+export default function PilotReception({username,role="reception"}:{username:string;role?:string}){
  const router=useRouter();const [now,setNow]=useState(0);
  const [parties,setParties]=useState<Party[]>([]),[error,setError]=useState(''),[loaded,setLoaded]=useState(false);
  const [busy,setBusy]=useState<number[]>([]),[handoff,setHandoff]=useState<{id:number;token:string}|null>(null);
@@ -59,9 +60,8 @@ export default function PilotReception({username}:{username:string}){
    const r=await fetchWithTimeout('/api/pilot/queue',{cache:'no-store',signal},15000);
    if(r.status===401){router.replace('/login');return;}
    if(r.status===429){
-    const header=r.headers.get('Retry-After');
-    const delay=header&&/^\d+$/.test(header)?Number(header)*1000:Date.parse(header??'')-Date.now();
-    retryAt.current=Date.now()+(Number.isFinite(delay)&&delay>0?delay:10000);
+    const now=Date.now();
+    retryAt.current=now+(retryAfterMilliseconds(r.headers.get('Retry-After'),now)||10000);
     throw Error('Queue refresh paused. Retrying automatically…');
    }
    const data=await r.json();if(!r.ok)throw Error(data.error||'Queue unavailable.');
@@ -102,11 +102,11 @@ export default function PilotReception({username}:{username:string}){
  const oldest=waiting.reduce((max,p)=>Math.max(max,Math.floor((observedPartyTime(p,now)-Date.parse(p.joined_at))/60000)),0);
  const selected=parties.find(p=>p.id===openParty);
  return <main className={`${styles.page} ${styles.receptionPage}`} data-pilot-reception><div className={styles.wrap}>
-  <header className={styles.header}><div><p className={styles.brand}>Mo Bistro - District 5</p><small>Reception · {username}</small></div>
+  <header className={styles.header}><div><p className={styles.brand}>Mo Bistro - District 5</p></div>
    <div className={styles.headerActions}>
     <button type="button" className={`${styles.secondary} ${styles.qrButton}`} onClick={()=>setShowQR(true)} aria-haspopup="dialog"><QrCode size={18} aria-hidden="true"/> QR Code</button>
    <details ref={menu} className={styles.menu} onKeyDown={event=>{if(event.key==='Escape'){event.currentTarget.open=false;event.currentTarget.querySelector('summary')?.focus();}}}>
-    <summary aria-label="Reception menu" title="Reception menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></summary>
+    <summary aria-label="Reception menu" title="Reception menu" className={styles.accountTrigger}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span><strong>{username}</strong><small>{role}</small></span></summary>
     <nav className={styles.menuItems} aria-label="Reception options">
      <button onClick={()=>void fetch('/api/auth/logout',{method:'POST'}).then(()=>{router.replace('/login');router.refresh();})}>Sign out</button>
     </nav>

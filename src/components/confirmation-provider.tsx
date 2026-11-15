@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useId, useRef, useSt
 import { createPortal } from "react-dom";
 import { useStaffDialog } from "@/lib/use-staff-dialog";
 
-type Confirmation = { title: string; message: string; confirmLabel?: string; destructive?: boolean };
+type Confirmation = { title: string; message: string; confirmLabel?: string; destructive?: boolean; container?: HTMLElement };
 type Confirm = (options: Confirmation) => Promise<boolean>;
 const ConfirmationContext = createContext<Confirm | null>(null);
 
@@ -25,7 +25,7 @@ function ConfirmationDialog({ options, onDecision }: { options: Confirmation; on
           <button type="button" className={options.destructive ? "confirmation-destructive" : "confirmation-primary"} onClick={() => onDecision(true)}>{options.confirmLabel || "Confirm"}</button>
         </div>
       </div>
-    </div>, document.body,
+    </div>, options.container ?? document.body,
   );
 }
 

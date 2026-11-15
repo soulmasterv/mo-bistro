@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { createHmac } from 'node:crypto';
 import {load,harness,request,context,requireDependency} from './handler-harness.mjs';
 const {PGlite}=requireDependency('@electric-sql/pglite');
 function adapter(db){const sql=async(strings,...values)=>{let q='';strings.forEach((s,i)=>{q+=s;if(i<values.length)q+='$'+(i+1);});return(await db.query(q,values)).rows;};sql.begin=cb=>db.transaction(tx=>cb(adapter(tx)));return sql;}
@@ -10,6 +11,50 @@ async function setup(){const db=new PGlite();await db.exec(fs.readFileSync('migr
  h.mocks['@/lib/pilot/whatsapp']={publishPilotCalls:async()=>{}};
  return {db,h,store:load('src/lib/pilot/store.ts',h.mocks)};}
 const input={name:'Synthetic Guest',phone:'01000000001',party_size:2,preference:'indoor',whatsapp_consent:true};
+test('Pilot Kapso webhook binds signed consent to the configured number and exact ticket', async () => {
+ const {db,h}=await setup();
+ const env={MO_BISTRO_DB:'postgres',VERCEL_ENV:'preview',WHATSAPP_ENABLED:'true',WHATSAPP_PROVIDER:'kapso',KAPSO_PHONE_NUMBER_ID:'456',KAPSO_WEBHOOK_SECRET:'synthetic-test-secret'};
+ const globals={process:{env}};
+ const store=load('src/lib/pilot/store.ts',h.mocks,globals);
+ try {
+  await db.exec('ALTER TABLE whatsapp_customer_windows ADD UNIQUE(phone,phone_number_id)');
+  const party=await store.createParty(input,'qr');
+  const webhook=load('src/app/api/pilot/whatsapp/webhook/route.ts',h.mocks,globals);
+  const timestamp=String(Math.floor(Date.now()/1000));
+  async function post(phoneId,text,sign=true) {
+   const body=JSON.stringify({object:'whatsapp_business_account',entry:[{changes:[{field:'messages',value:{metadata:{phone_number_id:phoneId},messages:[{type:'text',from:'201000000001',timestamp,text:{body:text}}]}}]}]});
+   const headers=sign?{'x-webhook-signature':createHmac('sha256',env.KAPSO_WEBHOOK_SECRET).update(body).digest('hex')}:{};
+   return webhook.POST(new Request('https://example.test',{method:'POST',body,headers}));
+  }
+  const optIn=`Please send my table-ready message for Mo Bistro pilot ticket #${party.id}.`;
+  assert.equal((await post('456',optIn,false)).status,401);
+  assert.equal((await post('123',optIn)).status,200);
+  assert.equal((await post('456','Hello')).status,200);
+  assert.equal((await store.partyStatus(party.token)).whatsapp_reply_observed,false);
+  assert.equal((await post('456',optIn)).status,200);
+  assert.equal((await store.partyStatus(party.token)).whatsapp_reply_observed,true);
+  assert.equal((await post('456','STOP')).status,200);
+  assert.equal((await store.partyStatus(party.token)).whatsapp_consent,false);
+ } finally {
+  await db.close();
+ }
+});
+test('Confirmed staff cancellation and guest leave remove parties immediately', async () => {
+ const {db,h,store}=await setup();
+ try {
+  const first=await store.createParty(input,'qr');
+  const staff=h.route('pilot/parties/[id]');
+  const cancelled=await staff.PATCH(request('PATCH',{action:'cancel'}),context(first.id));
+  assert.equal(cancelled.status,200);
+  assert.deepEqual(await cancelled.json(),{success:true});
+  assert.equal((await store.listQueue()).length,0);
+  const second=await store.createParty(input,'qr');
+  const status=h.route('pilot/status');
+  assert.equal((await status.DELETE(request('DELETE',{token:second.token}))).status,200);
+  assert.equal((await store.partyStatus(second.token)).status,'left');
+  assert.equal((await store.listQueue()).length,0);
+ } finally { await db.close(); }
+});
 test('Undo countdown uses database time even when the reception device clock is ahead',()=>{
  const {observedPartyTime}=load('src/components/pilot/queue.tsx');const server=Date.parse('2026-10-17T12:00:00Z');
  const party={server_now:new Date(server).toISOString(),received_at:server+28000};
@@ -162,19 +207,19 @@ test('Removal has a durable five-second undo, keeps timestamps on undo, and reco
  const {db,h,store}=await setup();try{
  const party=await store.createParty(input,'qr');const api=h.route('pilot/parties/[id]');
  assert.equal((await api.PATCH(request('PATCH',{action:'remove'}),context(party.id))).status,400);
- const begin=await api.PATCH(request('PATCH',{action:'cancel'}),context(party.id));assert.equal(begin.status,200);const pending=await begin.json();assert.ok(pending.undo_token&&pending.undo_until);
- const repeat=await(await api.PATCH(request('PATCH',{action:'cancel'}),context(party.id))).json();assert.equal(repeat.undo_token,pending.undo_token);assert.equal(repeat.undo_until,pending.undo_until);
+ const begin=await api.PATCH(request('PATCH',{action:'remove',reason:'guest_cancelled'}),context(party.id));assert.equal(begin.status,200);const pending=await begin.json();assert.ok(pending.undo_token&&pending.undo_until);
+ const repeat=await(await api.PATCH(request('PATCH',{action:'remove',reason:'guest_cancelled'}),context(party.id))).json();assert.equal(repeat.undo_token,pending.undo_token);assert.equal(repeat.undo_until,pending.undo_until);
  assert.equal((await api.PATCH(request('PATCH',{action:'notify'}),context(party.id))).status,409);
  assert.equal((await api.PATCH(request('PATCH',{action:'undo',undo_token:'11111111-1111-4111-8111-111111111111'}),context(party.id))).status,409);
  assert.equal((await api.PATCH(request('PATCH',{action:'undo',undo_token:pending.undo_token}),context(party.id))).status,200);
  let row=(await db.query('SELECT * FROM pilot_parties WHERE id=$1',[party.id])).rows[0];assert.equal(row.status,'waiting');assert.equal(row.left_at,null);assert.equal(row.exit_reason,null);
  assert.equal((await api.PATCH(request('PATCH',{action:'notify'}),context(party.id))).status,200);
  await db.query("UPDATE pilot_parties SET status='called',called_at=clock_timestamp() WHERE id=$1",[party.id]);
- const noShow=await(await api.PATCH(request('PATCH',{action:'no_show'}),context(party.id))).json();
+ const noShow=await(await api.PATCH(request('PATCH',{action:'remove',reason:'no_response'}),context(party.id))).json();
  assert.equal((await store.listQueue()).length,1);await db.query("UPDATE pilot_parties SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[party.id]);
  assert.equal((await api.PATCH(request('PATCH',{action:'undo',undo_token:noShow.undo_token}),context(party.id))).status,409);
  assert.equal((await store.listQueue()).length,0);row=(await store.exportRows())[0];assert.equal(row.exit_reason,'no_response');assert.equal(row.exit_state,'called');assert.ok(row.called_at&&row.left_at);
- const second=await store.createParty(input,'qr');await store.transition(second.id,'cancel');await db.query("UPDATE pilot_parties SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[second.id]);
+ const second=await store.createParty(input,'qr');await store.transition(second.id,'remove','guest_cancelled');await db.query("UPDATE pilot_parties SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[second.id]);
  const csv=store.csv(await store.exportRows());assert.match(csv,/no_response/);assert.match(csv,/guest_cancelled/);assert.doesNotMatch(csv,/Synthetic Guest|01000000001/);
  }finally{await db.close();}
 });
@@ -185,7 +230,7 @@ test('Notify requires an inbound window and holds delivery during a pending no-s
  const env={MO_BISTRO_DB:'postgres',WHATSAPP_ENABLED:'true',WHATSAPP_MODE:'live',WHATSAPP_ALLOW_LIVE_SEND:'true',WHATSAPP_WINDOW_TEXT_ENABLED:'true',VERCEL_ENV:'preview',WHATSAPP_TEST_RECIPIENT:input.phone};
  const sender=load('src/lib/pilot/whatsapp.ts',h.mocks,{process:{env}});
  const party=await store.createParty(input,'qr');await store.transition(party.id,'notify');const id=(await db.query('SELECT id FROM pilot_ready_messages')).rows[0].id;
- const pending=await store.transition(party.id,'no_show');await sender.deliverPilotCall(id);assert.equal(sends,0);assert.equal((await db.query('SELECT status FROM pilot_ready_messages')).rows[0].status,'pending');
+ const pending=await store.transition(party.id,'remove','no_response');await sender.deliverPilotCall(id);assert.equal(sends,0);assert.equal((await db.query('SELECT status FROM pilot_ready_messages')).rows[0].status,'pending');
  await store.undoExit(party.id,pending.undo_token);await sender.deliverPilotCall(id);assert.equal(sends,0);assert.equal((await db.query('SELECT last_error FROM pilot_ready_messages')).rows[0].last_error,'customer_service_window_closed');
  }finally{await db.close();}
 });

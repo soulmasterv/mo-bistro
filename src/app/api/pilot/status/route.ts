@@ -1,5 +1,5 @@
 import { checkRateLimit } from '@/lib/api-rate-limit';
-import { validToken,partyStatus,enableReadyAlert,readyAlertLink } from '@/lib/pilot/store';
+import { validToken,partyStatus,enableReadyAlert,readyAlertLink,leaveWaitlist } from '@/lib/pilot/store';
 import { pilotUnavailable,privateHeaders,pilotOrigin } from '@/lib/pilot/http';
 import { timedPilotRoute } from '@/lib/pilot/timing';
 export async function GET(request:Request){
@@ -20,4 +20,17 @@ export async function POST(request:Request){
  try{const limited=await checkRateLimit(request,'pilot-consent',10,60);if(limited)return limited;
   return await enableReadyAlert(body.token)?Response.json({success:true},{headers:privateHeaders}):Response.json({error:'This booking is no longer waiting.'},{status:409});
  }catch{return pilotUnavailable();}
+}
+export async function DELETE(request: Request) {
+ const origin = pilotOrigin(request);
+ if (origin) return origin;
+ const body = await request.json().catch(() => null);
+ if (!validToken(body?.token)) return Response.json({error:'Invalid private link.'},{status:400,headers:privateHeaders});
+ try {
+  const limited = await checkRateLimit(request,'pilot-leave',10,60,body.token);
+  if (limited) return limited;
+  return await leaveWaitlist(body.token)
+   ? Response.json({success:true},{headers:privateHeaders})
+   : Response.json({error:'This booking is no longer on the waitlist.'},{status:409,headers:privateHeaders});
+ } catch { return pilotUnavailable(); }
 }
