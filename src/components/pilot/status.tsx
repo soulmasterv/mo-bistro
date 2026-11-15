@@ -117,7 +117,7 @@ export default function PilotStatus(){
       ? <button type="button" className="guest-outline-button" onClick={()=>refreshNow.current()}><RefreshCw size={16} aria-hidden="true"/> Refresh status</button>
       : <a className="guest-outline-button" href="/join">Start a new registration</a>}
      <a className="guest-outline-button" href="/menu">Explore Mo Bistro’s menu</a>
-     {(status==='waiting'||status==='called')&&<button type="button" className="guest-outline-button" disabled={busy} onClick={()=>void leave()}>Leave waitlist</button>}
+     {(status==='waiting'||status==='called')&&<button type="button" className="guest-leave-button" disabled={busy} onClick={()=>void leave()}>Leave waitlist</button>}
     </div>
    </>}
   </section><aside className="guest-status-aside">
