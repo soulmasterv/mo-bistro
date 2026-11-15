@@ -5,6 +5,7 @@ import { liveSendingEnabled, normalizePhone, whatsappEnabled } from '@/lib/whats
 import { requestMetaTemplate as sendMetaMessage } from '@/lib/whatsapp/transport';
 import { PILOT_ORIGIN, PILOT_JOB_PATH } from './config';
 import { finalizePendingExits } from '@/lib/pilot/store';
+import { usesKapso, whatsappPhoneId } from '@/lib/whatsapp/kapso';
 
 export async function verifyPilotJob(raw:string,signature:string|null) {
  const current=process.env.QSTASH_CURRENT_SIGNING_KEY,next=process.env.QSTASH_NEXT_SIGNING_KEY;
@@ -41,15 +42,16 @@ export async function deliverPilotCall(id:string) {
   else if(!party.whatsapp_consent_at)error='guest_not_opted_in';
   else if(!whatsappEnabled())error='whatsapp_disabled';
   else if(!liveSendingEnabled())state='simulated';
+  else if(usesKapso()&&!party.whatsapp_inbound_after_opt_in_at)error='guest_reply_required';
   else {
    const phone=normalizePhone(party.phone);
    await tx`SELECT pg_advisory_xact_lock(hashtext(${phone}))`;
-   const [stop]=await tx`SELECT opted_out_at FROM public.whatsapp_contact_preferences WHERE phone=${phone}`;
+   const [stop]=usesKapso()?[]:await tx`SELECT opted_out_at FROM public.whatsapp_contact_preferences WHERE phone=${phone}`;
    if(stop?.opted_out_at && new Date(stop.opted_out_at)>=new Date(party.whatsapp_consent_at))error='guest_unsubscribed';
    else if(process.env.VERCEL_ENV!=='production'&&(!process.env.WHATSAPP_TEST_RECIPIENT||phone!==safeTestPhone()))error='preview_recipient_not_allowed';
    else {
     const [window]=await tx`SELECT last_inbound_at FROM public.whatsapp_customer_windows WHERE phone=${phone}
-     AND phone_number_id=${process.env.META_WHATSAPP_PHONE_NUMBER_ID||''}
+     AND phone_number_id=${whatsappPhoneId()||''}
      AND last_inbound_at>clock_timestamp()-INTERVAL '24 hours'+INTERVAL '10 seconds'
      AND last_inbound_at<=clock_timestamp()`;
     const result=!window?{state:'skipped',error:'customer_service_window_closed',messageId:undefined}

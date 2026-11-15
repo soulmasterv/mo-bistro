@@ -1,3 +1,4 @@
+import { usesKapso, whatsappPhoneId } from "@/lib/whatsapp/kapso";
 import "server-only";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -83,10 +84,11 @@ export async function transition(id:number,action:PilotAction,reason?:z.infer<ty
  });
 }
 export async function observeOptInReplies() {
+ if (usesKapso()) return; // The signed Pilot webhook verifies the exact ticket.
  // Evidence of an inbound message after this booking's consent; not proof the prepared text was sent.
  await getPostgres()`UPDATE public.pilot_parties p SET whatsapp_inbound_after_opt_in_at=w.last_inbound_at
  FROM public.whatsapp_customer_windows w WHERE w.phone='2'||p.phone
- AND w.phone_number_id=${process.env.META_WHATSAPP_PHONE_NUMBER_ID||''}
+ AND w.phone_number_id=${whatsappPhoneId()||''}
  AND p.whatsapp_consent_at IS NOT NULL AND p.whatsapp_inbound_after_opt_in_at IS NULL
  AND w.last_inbound_at>=p.whatsapp_consent_at AND w.last_inbound_at<=clock_timestamp()
  AND (COALESCE(p.left_at,p.seated_at) IS NULL OR w.last_inbound_at<=COALESCE(p.left_at,p.seated_at))`;
