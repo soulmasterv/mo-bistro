@@ -21,7 +21,7 @@ export async function GET() {
     const actor = await currentStaff();
     if (actor?.role !== "manager") return NextResponse.json({ error: "Manager access required" }, { status: 403 });
     const users = process.env.MO_BISTRO_DB === "postgres"
-      ? await getPostgres()`SELECT id, username, role, active FROM staff_users ORDER BY LOWER(username)`
+      ? await getPostgres()`SELECT id, username, role, active FROM staff_users u WHERE to_jsonb(u)->>'deleted_at' IS NULL ORDER BY LOWER(username)`
       : db.prepare("SELECT id, username, role, active FROM staff_users ORDER BY LOWER(username)").all();
     return NextResponse.json({ users, current_staff_id: actor.id }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
@@ -142,8 +142,8 @@ async function updateStaff(request: Request, deleting: boolean) {
 
       const target = await tx<{ id: number; role: string; active: number }[]>`
         SELECT id, role, active
-        FROM staff_users
-        WHERE id = ${id}
+        FROM staff_users u
+        WHERE id = ${id} AND to_jsonb(u)->>'deleted_at' IS NULL
         FOR UPDATE
       `;
 
@@ -168,7 +168,12 @@ async function updateStaff(request: Request, deleting: boolean) {
       if (active === 0) {
         await tx`DELETE FROM staff_sessions WHERE staff_id = ${id}`;
       }
-      if (deleting) await tx`DELETE FROM staff_users WHERE id = ${id}`;
+      if (deleting) await tx`
+        UPDATE staff_users
+        SET active = 0, deleted_at = CURRENT_TIMESTAMP,
+            credential_hash = ${hashCredential(crypto.randomUUID())}
+        WHERE id = ${id}
+      `;
 
       return "updated";
     });
@@ -186,8 +191,8 @@ async function updateStaff(request: Request, deleting: boolean) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    if (deleting && databaseErrorCode(error) === "23503") {
-      return NextResponse.json({ error: "This account is linked to operational records. Disable it to revoke access while keeping those records." }, { status: 409 });
+    if (deleting && databaseErrorCode(error) === "42703") {
+      return NextResponse.json({ error: "Apply the staff account deletion migration, then retry." }, { status: 503 });
     }
     console.error("Staff activation update failed:", error);
     return NextResponse.json(

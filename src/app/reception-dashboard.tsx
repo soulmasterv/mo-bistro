@@ -741,14 +741,14 @@ export default function Home() {
         )}
 
       {showAdd && (
-        <div className="bistro-dialog-scope fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+        <div className="bistro-dialog-scope fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4">
           <div
             ref={addDialog}
             tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-label="Add guest"
-            className="bistro-add-card w-full max-w-md rounded-2xl border border-white/10 bg-[#17202A] p-6 shadow-2xl"
+            className="bistro-add-card max-h-full w-full max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-[#17202A] p-6 shadow-2xl"
           >
             <div className="mb-6 flex items-center justify-between">
               <h2 className="text-xl font-semibold">Add guest</h2>

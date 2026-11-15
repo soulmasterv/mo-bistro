@@ -277,8 +277,10 @@ export default function ManagementPage() {
               <SeatingSettings />
 
             </section>
-            <ManagementOperations />
+            <div className="grid gap-4">
+              <ManagementOperations />
               <WhatsAppPreviewTest />
+            </div>
             <ManagementDangerZone />
           </div>
         </div>

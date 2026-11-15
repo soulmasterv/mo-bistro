@@ -413,6 +413,15 @@ summary {
   padding: 12px 14px;
   color: var(--tone-89927d, #89927d);
 }
+.bistro-dialog-scope .bistro-add-card :is(input, select) {
+  background: #252525 !important;
+  border-color: #77716a !important;
+  color: #faf6ee !important;
+}
+.bistro-dialog-scope .bistro-add-card :is(input, select):focus-visible {
+  outline: 2px solid #d4b47b;
+  outline-offset: 2px;
+}
 .bistro-search input {
   width: 100%;
   min-width: 0;
@@ -1133,6 +1142,7 @@ html[data-theme="dark"] #danger-zone .bistro-button-danger { color:#f3a6a0; bord
   border-radius: 5px;
 }
 .bistro-add-card {
+  color-scheme: dark;
   padding: 28px;
 }
 .bistro-notices {
