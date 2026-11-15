@@ -1,4 +1,5 @@
 import 'server-only';
+import { whatsappPhoneId } from "@/lib/whatsapp/kapso";
 import {randomUUID} from 'node:crypto';
 import type {TransactionSql} from 'postgres';
 import {getPostgres} from '@/lib/postgres-db';
@@ -56,7 +57,7 @@ export async function deliverReminder(id:string) {
    await tx`SELECT pg_advisory_xact_lock(hashtext(${booking.phone}))`;
    const [stop]=await tx`SELECT opted_out_at FROM whatsapp_contact_preferences WHERE phone=${booking.phone}`;
    const [window]=await tx`SELECT last_inbound_at FROM whatsapp_customer_windows WHERE phone=${booking.phone}
-    AND phone_number_id=${process.env.META_WHATSAPP_PHONE_NUMBER_ID||''}
+    AND phone_number_id=${whatsappPhoneId()||''}
     AND last_inbound_at>clock_timestamp()-INTERVAL '24 hours'+INTERVAL '10 seconds' AND last_inbound_at<=clock_timestamp()`;
    if(stop?.opted_out_at)reason='opted_out';
    else if(!window)reason='customer_window_closed';

@@ -1,4 +1,5 @@
 import "server-only";
+import { whatsappPhoneId } from "@/lib/whatsapp/kapso";
 import {confirmationEstimate} from '@/lib/advanced/estimates';
 import type { Sql, TransactionSql } from "postgres";
 import {
@@ -21,7 +22,7 @@ export async function recordCustomerWindow(
   timestamp: number,
 ) {
   if (!customerWindowEnabled() || timestamp * 1000 > Date.now()) return;
-  const business = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
+  const business = whatsappPhoneId();
   if (!business) throw Error("Business number missing");
   await sql`INSERT INTO whatsapp_customer_windows (phone,phone_number_id,last_inbound_at)
  VALUES (${phone},${business},${new Date(timestamp * 1000)})
@@ -47,7 +48,7 @@ export async function sendWindowNotification(
   }
   if (!customerWindowEnabled())
     return sendTemplate(templatePayload(job, booking, code));
-  const business = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
+  const business = whatsappPhoneId();
   if (!business)
     return { state: "skipped", error: "business_number_not_configured" };
   let open = false;
