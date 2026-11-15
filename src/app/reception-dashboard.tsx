@@ -28,6 +28,7 @@ import {
   Bell,
   Search,
   QrCode,
+  ArrowUp,
   ArrowUpRight,
   XCircle,
   RefreshCw,
@@ -91,6 +92,14 @@ export default function Home() {
   const [showQR, setShowQR] = useState(false);
   useStaffDialog(showQR, qrDialog, () => setShowQR(false));
   const [headerTools, setHeaderTools] = useState<HTMLElement | null>(null);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  useEffect(() => {
+    const update = () => setShowBackToTop(window.scrollY > 240);
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    return () => window.removeEventListener("scroll", update);
+  }, []);
+
   useEffect(() => {
     const timer = window.setTimeout(() => setHeaderTools(document.getElementById("reception-header-tools")), 0);
     return () => window.clearTimeout(timer);
@@ -604,6 +613,13 @@ export default function Home() {
           <span>Thoughtful service, from arrival to goodbye.</span>
         </footer>
       </div>
+      {showBackToTop && (
+        <button type="button" className="reception-back-to-top" onClick={() => {
+          window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+        }}>
+          <ArrowUp size={16} aria-hidden="true" /> Back to top
+        </button>
+      )}
       <nav className="queue-bottom-bar" aria-label="Queue tools">
         <button type="button" onClick={() => setShowTables(true)}>
           <Armchair size={20} />

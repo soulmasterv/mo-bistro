@@ -2785,6 +2785,7 @@ html[data-theme="light"] .bistro-qr-overlay { background:#faf7f1!important; }
 #reception-header-tools .bistro-toolbar { position:static; display:flex; flex-wrap:nowrap; margin:0; }
 #reception-header-tools .bistro-live { display:none; }
 #reception-header-tools .bistro-button:not(.bistro-button-secondary) { background:#dfbd84; border-color:#dfbd84; color:#222; }
+.reception-back-to-top { display:none; }
 .reception-reference .bistro-count { display:inline-flex; align-items:center; justify-content:center; min-width:42px; min-height:36px; margin-left:8px; padding:4px 10px; border-radius:10px; background:var(--staff-action); color:var(--staff-inverse); font-size:20px; font-weight:750; }
 .reception-reference .bistro-guest-list { min-height:0; max-height:clamp(180px,calc(100dvh - 330px),650px); overflow-y:auto; overscroll-behavior-y:auto; touch-action:pan-y; }
 .reception-reference .bistro-guest-card.is-next-guest { background:var(--staff-soft); box-shadow:inset 4px 0 #be934e; }
@@ -2843,17 +2844,19 @@ html[data-theme="dark"] .confirmation-actions button:not(.confirmation-primary):
 .staff-login [aria-busy="true"] > button:disabled { background:#bfc0bf; border-color:#bfc0bf; color:#4d4e4d; opacity:1; cursor:wait; transition:none; }
 .staff-login [aria-disabled="true"] { pointer-events:none; opacity:.5; }
 @media(max-width:900px) {
- body:has(.reception-reference) { height:100dvh; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+ body:has(.reception-reference) { min-height:100dvh; }
+ .reception-back-to-top { display:inline-flex; align-items:center; gap:7px; position:fixed; z-index:84; right:16px; bottom:calc(76px + env(safe-area-inset-bottom)); min-height:44px; padding:0 14px; border:1px solid var(--line); border-radius:999px; background:var(--staff-surface); color:var(--ink); font-size:13px; font-weight:650; box-shadow:0 4px 16px #0004; }
  body:has(.reception-reference) > .bistro-workspace-header { flex-shrink:0; }
- .bistro-app.reception-reference { flex:1; height:auto; min-height:0; padding:0; overflow:hidden; }
+ .bistro-app.reception-reference { height:auto; min-height:0; padding:0; overflow:visible; }
  .reception-reference .bistro-container { padding:8px 0 calc(76px + env(safe-area-inset-bottom)); }
- .reception-reference .bistro-reception-grid { min-height:0; }
- .reception-reference .bistro-guest-list { min-height:0; overscroll-behavior-y:contain; }
+ .reception-reference .bistro-reception-grid { flex:none; min-height:0; }
+ .reception-reference .bistro-container,.reception-reference .bistro-queue { height:auto; }
+ .reception-reference .bistro-guest-list { flex:none; min-height:0; max-height:none; overflow:visible; }
  .reception-reference .bistro-guest-card { flex:0 0 auto; min-height:92px; padding:4px 8px; }
  .reception-reference .bistro-guest-copy h3 { font-size:15px; line-height:1.4; }
  .reception-reference .bistro-guest-copy p { font-size:12px; line-height:1.5; }
  .reception-reference .bistro-panel-footer { display:none; }
- .reception-reference .next-guest-panel { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:0 16px 4px; max-height:112px; overflow-y:auto; }
+ .reception-reference .next-guest-panel { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:0 16px 4px; }
  .reception-reference .next-guest-panel:empty { display:none; }
  .reception-reference .next-guest-panel article { min-width:0; padding:9px 10px; font-size:11px; line-height:1.45; overflow-wrap:anywhere; }
  .reception-reference .next-guest-panel article p { margin-top:4px; }
