@@ -141,7 +141,7 @@ export default function PilotReception({username,role="reception",children}:{use
   {error&&<p className={styles.notice} role="alert">{error}</p>}
   {!loaded&&!error&&<p role="status">Loading queue…</p>}
   {loaded&&!visible.length&&<div className={styles.receptionEmpty}><Users size={26} aria-hidden="true"/><p>{parties.length?'No guests match.':'Queue is empty.'}</p>{!parties.length&&<small>New arrivals will appear here.</small>}</div>}
-  {!!visible.length&&<PilotQueue parties={visible} nextPartyId={waiting[0]?.id} now={now} busy={busy} onAction={(id,value,reason)=>void action(id,value,reason)} onOpen={setOpenParty}/>}
+  {!!visible.length&&<PilotQueue parties={visible} nextPartyId={parties[0]?.id} now={now} busy={busy} onAction={(id,value,reason)=>void action(id,value,reason)} onOpen={setOpenParty}/>}
   </section>
   {children}
   </div></div>
