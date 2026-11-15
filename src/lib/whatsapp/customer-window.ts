@@ -69,16 +69,20 @@ export async function sendWindowNotification(
   const text = subscribedConfirmation
     ? "You're on the Mo Bistro waitlist (booking #{booking_id}). We'll message you here when your table is nearly ready."
     : process.env[prefix + "_TEXT"] ?? (job.kind === "eta_update"
-    ? "Mo Bistro update: your table is expected to be ready at {eta_time}. This is an estimate; reception will confirm when your table is ready."
+    ? "Mo Bistro update: we expect your table to be ready in about {eta_minutes} minutes. Reception will confirm when your table is ready."
     : job.kind === "almost_ready"
     ? "Hi {name}, your table for Mo Bistro booking #{booking_id} is expected to be ready in about 10 minutes. Please stay nearby; reception will confirm when your table is ready."
     : job.kind === "review"
     ? "Thank you for joining us at Mo Bistro, {name}! We hope you're enjoying your visit. Our review page is coming soon."
     : undefined);
   if (open && text) {
+    const etaMinutes = booking.eta_at
+      ? String(Math.max(1, Math.ceil((new Date(booking.eta_at).getTime() - Date.now()) / 60_000)))
+      : "";
     let body = text
       .replaceAll("{name}", booking.name)
       .replaceAll("{booking_id}", String(job.guest_id))
+      .replaceAll("{eta_minutes}", etaMinutes)
       .replaceAll("{eta_time}", booking.eta_at ? new Intl.DateTimeFormat("en-GB", { timeZone:"Africa/Cairo",hour:"numeric",minute:"2-digit",hour12:true }).format(new Date(booking.eta_at)) : "")
       .replaceAll("{subscribe_command}", `SUBSCRIBE ${job.guest_id} ${code}`);
     if(job.kind==='confirmation'){
@@ -87,7 +91,7 @@ export async function sendWindowNotification(
     }
     if (
       body.length > 4096 ||
-      /\{(?:name|booking_id|subscribe_command|eta_time)\}/.test(body)
+      /\{(?:name|booking_id|subscribe_command|eta_time|eta_minutes)\}/.test(body)
     )
       return { state: "skipped", error: "notification_text_invalid" };
     // Confirmation must preserve the explicit reply path when the guest is not yet subscribed.

@@ -168,6 +168,18 @@ export async function deliverNotification(id: string, revision: number): Promise
       await tx`UPDATE whatsapp_notifications SET status='skipped',last_error='consent_or_booking_ineligible',updated_at=NOW() WHERE id=${id}`;
       return "done";
     }
+    if ((kind === "almost_ready" || kind === "eta_update") && booking.eta_snapshot_at) {
+      const otherKind = kind === "almost_ready" ? "eta_update" : "almost_ready";
+      const [prior] = await tx`SELECT 1 FROM whatsapp_notifications previous
+        WHERE previous.guest_id=${booking.guest_id} AND previous.kind=${otherKind}
+          AND previous.status IN ('sent','unknown')
+          AND to_jsonb(previous)->>'eta_snapshot_at'=${booking.eta_snapshot_at}
+        LIMIT 1`;
+      if (prior) {
+        await tx`UPDATE whatsapp_notifications SET status='skipped',last_error='eta_already_communicated',updated_at=NOW() WHERE id=${id}`;
+        return "done";
+      }
+    }
     if(kind!=='review'&&booking.guest_status==='waiting'&&!await preNotifyBudget(tx,booking.guest_id,id)){
       await tx`UPDATE whatsapp_notifications SET status='skipped',last_error='pre_notify_budget_exhausted',updated_at=NOW() WHERE id=${id}`;
       await tx`INSERT INTO whatsapp_delivery_logs(notification_id,event_key,event,error_code) VALUES(${id},${'budget:'+id+':'+booking.attempts},'skipped','pre_notify_budget_exhausted') ON CONFLICT(event_key) DO NOTHING`;
