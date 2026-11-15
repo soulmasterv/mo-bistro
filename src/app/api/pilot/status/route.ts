@@ -18,7 +18,8 @@ export async function POST(request:Request){
  const body=await request.json().catch(()=>null);
  if(!validToken(body?.token)||body?.consent!==true)return Response.json({error:'Please confirm your choice.'},{status:400});
  try{const limited=await checkRateLimit(request,'pilot-consent',10,60);if(limited)return limited;
-  return await enableReadyAlert(body.token)?Response.json({success:true},{headers:privateHeaders}):Response.json({error:'This booking is no longer waiting.'},{status:409});
+  const id = await enableReadyAlert(body.token);
+  return id ? Response.json({success:true,whatsapp_url:readyAlertLink(id)},{headers:privateHeaders}) : Response.json({error:'This booking is no longer waiting.'},{status:409});
  }catch{return pilotUnavailable();}
 }
 export async function DELETE(request: Request) {

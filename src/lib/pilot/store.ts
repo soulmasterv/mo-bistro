@@ -116,7 +116,7 @@ export async function listQueue() {
 export async function partyStatus(token:string) {
  await finalizePendingExits();
  await observeOptInReplies();
- const [party]=await getPostgres()`SELECT p.id,p.status,p.whatsapp_consent_at IS NOT NULL AS whatsapp_consent,
+ const [party]=await getPostgres()`SELECT p.id,p.name,p.party_size,p.preference,p.status,p.whatsapp_consent_at IS NOT NULL AS whatsapp_consent,
  p.whatsapp_inbound_after_opt_in_at IS NOT NULL AS whatsapp_reply_observed,
  CASE WHEN p.status='waiting' THEN (SELECT count(*)::integer FROM public.pilot_parties ahead
  WHERE ahead.status='waiting' AND (ahead.joined_at,ahead.id)<=(p.joined_at,p.id)) ELSE NULL END AS position
@@ -132,7 +132,7 @@ export async function leaveWaitlist(token: string) {
 export async function enableReadyAlert(token:string) {
  const rows=await getPostgres()`UPDATE public.pilot_parties SET whatsapp_consent_at=COALESCE(whatsapp_consent_at,clock_timestamp())
  WHERE tracking_hash=${tokenHash(token)} AND status='waiting' RETURNING id`;
- return rows.length>0;
+ return rows[0]?.id as number | undefined;
 }
 export function readyAlertLink(id:number) {
  const number=(process.env.WHATSAPP_BUSINESS_NUMBER||'').replace(/[^0-9]/g,'');

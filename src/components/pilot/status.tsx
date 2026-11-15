@@ -4,14 +4,31 @@ import { useSearchParams } from 'next/navigation';
 import {Bell,CheckCircle2,MessageCircle,Phone,RefreshCw,UtensilsCrossed,XCircle} from 'lucide-react';
 import { pollRetryDelay } from '@/lib/pilot/polling';
 import { useConfirmation } from '@/components/confirmation-provider';
-type Status={id:number;status:string;position:number|null;whatsapp_consent:boolean;whatsapp_reply_observed:boolean;whatsapp_url?:string|null};
+type Status={id:number;name:string;party_size:number;preference:string;status:string;position:number|null;whatsapp_consent:boolean;whatsapp_reply_observed:boolean;whatsapp_url?:string|null};
 export default function PilotStatus(){
  const confirm = useConfirmation();
  const refreshNow = useRef<() => void>(() => {});
  const leaving = useRef(false);
  const leftToken = useRef<string | null>(null);
  const token=useSearchParams().get('token')||'';const [party,setParty]=useState<Status|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[updating,setUpdating]=useState(false);
- async function enable(){if(busy)return;setBusy(true);try{const r=await fetch('/api/pilot/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,consent:true})});if(!r.ok)throw Error('Could not enable your message. Please try again.');const next=await fetch('/api/pilot/status?token='+encodeURIComponent(token),{cache:'no-store'});if(!next.ok)throw Error('Please refresh your status.');setParty(await next.json());setError('');}catch(e){setError(e instanceof Error?e.message:'Please try again.');}finally{setBusy(false);}}
+ async function enable(){
+  if(busy)return;
+  const tab=window.open('about:blank','_blank');
+  if(tab)tab.opener=null;
+  setBusy(true);
+  try{
+   const response=await fetch('/api/pilot/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,consent:true})});
+   if(!response.ok)throw Error('Could not enable your message. Please try again.');
+   const {whatsapp_url}=await response.json();
+   setParty(current=>current&&{...current,whatsapp_consent:true,whatsapp_url});
+   if(tab&&whatsapp_url)tab.location.replace(whatsapp_url);
+   else tab?.close();
+   setError('');
+  }catch(err){
+   tab?.close();
+   setError(err instanceof Error?err.message:'Please try again.');
+  }finally{setBusy(false);}
+ }
  useEffect(()=>{
   let stopped=false,failures=0,cooldownUntil=0,timer:ReturnType<typeof setTimeout>|undefined;
   let active:AbortController|null=null;
@@ -85,17 +102,20 @@ export default function PilotStatus(){
      <p>{party.whatsapp_reply_observed?"You're all set!":"WhatsApp updates"}</p>
      <p className="guest-small-note">{party.whatsapp_reply_observed?"We'll message you here when your table is ready.":"Get one WhatsApp alert when your table is ready."}</p>
      {!party.whatsapp_consent&&<button disabled={busy} className="pilot-status-whatsapp-button" onClick={()=>void enable()}><WhatsAppIcon/>{busy?'Enabling…':'Get WhatsApp updates'}</button>}
-     {party.whatsapp_consent&&!party.whatsapp_reply_observed&&party.whatsapp_url&&<><p className="guest-small-note">Send the prepared message to finish setting up your alert.</p><a className="pilot-status-whatsapp-button" href={party.whatsapp_url} rel="noreferrer"><WhatsAppIcon/>Open WhatsApp</a></>}
+     {party.whatsapp_consent&&!party.whatsapp_reply_observed&&party.whatsapp_url&&<a className="pilot-status-whatsapp-button" href={party.whatsapp_url} target="_blank" rel="noopener noreferrer"><WhatsAppIcon/>Open WhatsApp</a>}
      {party.whatsapp_consent&&!party.whatsapp_reply_observed&&!party.whatsapp_url&&<p className="guest-small-note">Your choice is saved. Please keep this page open for updates.</p>}
     </section>}
     <dl className="guest-booking-facts">
-     <div><dt>Booking number</dt><dd>#{party.id}</dd></div>
-     <div><dt>Status</dt><dd>{status==='waiting'?'Waiting':status==='called'?'Called':status==='seated'?'Seated':'Closed'}</dd></div>
+     <div><dt>Guest</dt><dd>{party.name}</dd></div>
+     <div><dt>Party size</dt><dd>{party.party_size}</dd></div>
+     <div><dt>Seating preference</dt><dd>{party.preference==='indoor'?'Indoor':party.preference==='outdoor'?'Outdoor':'No preference'}</dd></div>
      {status==='waiting'&&<><div><dt>Queue position</dt><dd>#{party.position}</dd></div><div><dt>Parties ahead</dt><dd>{Math.max(0,(party.position||1)-1)}</dd></div></>}
     </dl>
-    <p className="guest-small-note">Queue information refreshes automatically. Keep your private booking link to yourself.</p>
+    {(status==='waiting'||status==='called')&&<p className="guest-small-note">Queue information refreshes automatically. Keep your private booking link to yourself.</p>}
     <div className="space-y-3">
-     <button type="button" className="guest-outline-button" onClick={()=>refreshNow.current()}><RefreshCw size={16} aria-hidden="true"/> Refresh status</button>
+     {status==='waiting'||status==='called'
+      ? <button type="button" className="guest-outline-button" onClick={()=>refreshNow.current()}><RefreshCw size={16} aria-hidden="true"/> Refresh status</button>
+      : <a className="guest-outline-button" href="/join">Start a new registration</a>}
      <a className="guest-outline-button" href="/menu">Explore Mo Bistro’s menu</a>
      {(status==='waiting'||status==='called')&&<button type="button" className="guest-outline-button" disabled={busy} onClick={()=>void leave()}>Leave waitlist</button>}
     </div>

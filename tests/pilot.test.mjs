@@ -162,7 +162,7 @@ test('Pilot records lifecycle, arrival position, source, private status and anon
  assert.equal((await store.partyStatus(second.token)).position,2);
  assert.equal((await store.partyStatus(second.token)).whatsapp_consent,false);
  assert.equal((await store.partyStatus(first.token)).whatsapp_consent,true);
- assert.equal(await store.enableReadyAlert(second.token),true);
+ assert.ok(await store.enableReadyAlert(second.token));
  assert.equal((await db.query('SELECT count(*)::int n FROM pilot_ready_messages')).rows[0].n,0);
  const action=h.route('pilot/parties/[id]');
  assert.equal((await action.PATCH(request('PATCH',{action:'call'}),context(first.id))).status,200);
