@@ -61,11 +61,21 @@ export async function POST(request: Request) {
 
   if (process.env.MO_BISTRO_DB === "postgres") {
     try {
-      const [row] = await getPostgres()`
-        INSERT INTO staff_users(username,role,credential_hash)
-        VALUES (${username},${role},${hashCredential(credential)})
-        RETURNING id
-      `;
+      const credentialHash = hashCredential(credential);
+      const [row] = await getPostgres().begin(async tx => {
+        // Free the login name while preserving references to the old staff ID.
+        await tx`
+          UPDATE staff_users u
+          SET username = '~deleted:' || u.id::text || ':' || u.username
+          WHERE LOWER(u.username) = LOWER(${username}) AND u.active = 0
+            AND to_jsonb(u)->>'deleted_at' IS NOT NULL
+        `;
+        return tx`
+          INSERT INTO staff_users(username,role,credential_hash)
+          VALUES (${username},${role},${credentialHash})
+          RETURNING id
+        `;
+      });
       return NextResponse.json({ id: row.id, username, role }, { status: 201 });
     } catch (error) {
       if (databaseErrorCode(error) === "23505") {
