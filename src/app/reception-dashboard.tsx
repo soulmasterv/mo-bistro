@@ -491,7 +491,6 @@ export default function Home() {
                         {guest.status === "called" && (
                           <span className="queue-called-marker">{calledLabel(guest.called_at, queueClock)}</span>
                         )}
-                        <span className="bistro-phone">{guest.phone}</span>
                       </div>
                       <span
                         className={`bistro-status ${guest.status === "called" ? "status-called" : guest.status === "seated" ? "status-seated" : "status-waiting"}`}
