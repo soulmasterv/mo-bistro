@@ -25,6 +25,35 @@ export default function StaffAccountManager() {
   const [staffMessage, setStaffMessage] = useState("");
   const [updatingId, setUpdatingId] = useState<number | null>(null);
 
+  async function deleteEmployee(employee: Employee) {
+    if (updatingId !== null || employee.id === currentStaffId) return;
+    if (!await confirmAction({
+      title: "Delete staff account?",
+      message: `Permanently delete ${employee.username} and end their sessions?`,
+      confirmLabel: "Delete account",
+      destructive: true,
+    })) return;
+
+    setUpdatingId(employee.id);
+    setStaffError("");
+    setStaffMessage("");
+    try {
+      const response = await fetch("/api/management/staff", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ staff_id: employee.id }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Unable to delete employee.");
+      setEmployees(current => current.filter(user => user.id !== employee.id));
+      setStaffMessage(`Deleted ${employee.username}.`);
+    } catch (error) {
+      setStaffError(error instanceof Error ? error.message : "Unable to delete employee.");
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
   const loadEmployees = useCallback(async () => {
     try {
       const response = await fetch("/api/management/staff", {
@@ -161,6 +190,14 @@ export default function StaffAccountManager() {
                   {updatingId === employee.id
                     ? "Updating..."
                     : employee.active === 1 ? "Disable" : "Reactivate"}
+                </button>
+                <button
+                  type="button"
+                  disabled={updatingId !== null || employee.id === currentStaffId}
+                  onClick={() => void deleteEmployee(employee)}
+                  className="rounded-lg border border-red-400/60 px-3 py-2 text-xs font-medium disabled:opacity-50"
+                >
+                  Delete
                 </button>
               </div>
             </div>

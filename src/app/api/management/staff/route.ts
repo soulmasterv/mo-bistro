@@ -97,6 +97,14 @@ export async function POST(request: Request) {
 
 
 export async function PATCH(request: Request) {
+  return updateStaff(request, false);
+}
+
+export async function DELETE(request: Request) {
+  return updateStaff(request, true);
+}
+
+async function updateStaff(request: Request, deleting: boolean) {
   const staff = await currentStaff();
   if (!staff || staff.role !== "manager") {
     return NextResponse.json({ error: "Manager access required." }, { status: 403 });
@@ -112,7 +120,7 @@ export async function PATCH(request: Request) {
 
   const body = await request.json().catch(() => null);
   const id = body?.staff_id;
-  const active = body?.active;
+  const active = deleting ? 0 : body?.active;
 
   if (!Number.isSafeInteger(id) || id < 1 || (active !== 0 && active !== 1)) {
     return NextResponse.json({ error: "Invalid staff ID or status." }, { status: 400 });
@@ -120,7 +128,7 @@ export async function PATCH(request: Request) {
 
   if (id === staff.id && active === 0) {
     return NextResponse.json(
-      { error: "You cannot disable your own account." },
+      { error: deleting ? "You cannot delete your own account." : "You cannot disable your own account." },
       { status: 400 }
     );
   }
@@ -151,7 +159,7 @@ export async function PATCH(request: Request) {
         if (managers[0].count <= 1) return "last_manager";
       }
 
-      await tx`
+      if (!deleting) await tx`
         UPDATE staff_users
         SET active = ${active}
         WHERE id = ${id}
@@ -160,6 +168,7 @@ export async function PATCH(request: Request) {
       if (active === 0) {
         await tx`DELETE FROM staff_sessions WHERE staff_id = ${id}`;
       }
+      if (deleting) await tx`DELETE FROM staff_users WHERE id = ${id}`;
 
       return "updated";
     });
@@ -170,13 +179,16 @@ export async function PATCH(request: Request) {
 
     if (result === "last_manager") {
       return NextResponse.json(
-        { error: "Cannot disable the last active Manager." },
+        { error: deleting ? "Cannot delete the last active Manager." : "Cannot disable the last active Manager." },
         { status: 409 }
       );
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (deleting && databaseErrorCode(error) === "23503") {
+      return NextResponse.json({ error: "This account is linked to operational records. Disable it to revoke access while keeping those records." }, { status: 409 });
+    }
     console.error("Staff activation update failed:", error);
     return NextResponse.json(
       { error: "Unable to update staff account." },

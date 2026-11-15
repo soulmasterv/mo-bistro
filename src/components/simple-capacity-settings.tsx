@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 type Capacity = {
   area: "indoor" | "outdoor";
   total_tables: number;
@@ -10,7 +10,11 @@ export default function SimpleCapacitySettings() {
   const [areas, setAreas] = useState<Capacity[]>([]),
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
-    [busy, setBusy] = useState<string | null>(null);
+    [busy, setBusy] = useState<Capacity["area"][]>([]);
+  const saving = useRef(new Set<Capacity["area"]>());
+  const queued = useRef(new Map<Capacity["area"], Capacity>());
+  const saved = useRef(new Map<Capacity["area"], string>());
+  const capacityKey = (area: Capacity) => JSON.stringify([area.total_tables, area.max_party_size]);
   useEffect(() => {
     let active = true;
     fetch("/api/simple-tables", { cache: "no-store" })
@@ -23,6 +27,7 @@ export default function SimpleCapacitySettings() {
       .then((data) => {
         if (active) {
           setAreas(data.areas);
+          for (const area of data.areas as Capacity[]) saved.current.set(area.area, capacityKey(area));
           if (data.warning) setError(data.warning);
         }
       })
@@ -34,8 +39,13 @@ export default function SimpleCapacitySettings() {
     };
   }, []);
   async function save(area: Capacity) {
-    if (busy) return;
-    setBusy(area.area);
+    if (saving.current.has(area.area)) {
+      queued.current.set(area.area, area);
+      return;
+    }
+    if (saved.current.get(area.area) === capacityKey(area)) return;
+    saving.current.add(area.area);
+    setBusy([...saving.current]);
     setError("");
     setMessage("");
     try {
@@ -51,6 +61,7 @@ export default function SimpleCapacitySettings() {
       const data = await response.json();
       if (!response.ok)
         throw new Error(data.error || "Unable to save area capacity.");
+      saved.current.set(area.area, capacityKey(area));
       setMessage(
         `${area.area === "indoor" ? "Indoor" : "Outdoor"} capacity saved.`,
       );
@@ -59,15 +70,21 @@ export default function SimpleCapacitySettings() {
         err instanceof Error ? err.message : "Unable to save area capacity.",
       );
     } finally {
-      setBusy(null);
+      saving.current.delete(area.area);
+      setBusy([...saving.current]);
+      const next = queued.current.get(area.area);
+      queued.current.delete(area.area);
+      if (next) void save(next);
     }
   }
-  function update(area: string, changes: Partial<Capacity>) {
-    setAreas((current) =>
-      current.map((item) =>
-        item.area === area ? { ...item, ...changes } : item,
-      ),
-    );
+  function saveForm(form: HTMLFormElement, area: Capacity) {
+    if (!form.reportValidity()) return;
+    const values = new FormData(form);
+    void save({
+      ...area,
+      total_tables: Number(values.get("total_tables")),
+      max_party_size: Number(values.get("max_party_size")),
+    });
   }
   return (
     <section className="mt-6 rounded-xl border border-white/10 p-4">
@@ -82,7 +99,10 @@ export default function SimpleCapacitySettings() {
             key={area.area}
             onSubmit={(event) => {
               event.preventDefault();
-              void save(area);
+              saveForm(event.currentTarget, area);
+            }}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) saveForm(event.currentTarget, area);
             }}
             className="rounded-xl bg-[#0D1218] p-4"
           >
@@ -97,13 +117,7 @@ export default function SimpleCapacitySettings() {
                 required
                 min={area.occupied_tables}
                 max={500}
-                value={area.total_tables}
-                disabled={busy !== null}
-                onChange={(event) =>
-                  update(area.area, {
-                    total_tables: Number(event.target.value),
-                  })
-                }
+                name="total_tables" defaultValue={area.total_tables}
                 className="mt-2 min-h-11 w-full rounded-lg border border-white/15 p-3"
               />
             </label>
@@ -114,22 +128,11 @@ export default function SimpleCapacitySettings() {
                 required
                 min={1}
                 max={30}
-                value={area.max_party_size}
-                disabled={busy !== null}
-                onChange={(event) =>
-                  update(area.area, {
-                    max_party_size: Number(event.target.value),
-                  })
-                }
+                name="max_party_size" defaultValue={area.max_party_size}
                 className="mt-2 min-h-11 w-full rounded-lg border border-white/15 p-3"
               />
             </label>
-            <button
-              disabled={busy !== null}
-              className="mt-4 min-h-11 rounded-lg bg-[#C5A77B] px-4 font-semibold text-[#101820] disabled:opacity-40"
-            >
-              {busy === area.area ? "Saving…" : "Save capacity"}
-            </button>
+            {busy.includes(area.area) && <p role="status">Saving…</p>}
           </form>
         ))}
       </div>

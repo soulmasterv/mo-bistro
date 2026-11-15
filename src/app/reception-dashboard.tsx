@@ -1,4 +1,5 @@
 "use client";
+import { calledLabel } from "@/lib/called-label";
 import {checkReception,receptionRead,refreshReception,watchReception} from "@/lib/reception-feed";
 
 import { useConfirmation } from "@/components/confirmation-provider";
@@ -36,6 +37,7 @@ import {
 type GuestStatus = "waiting" | "called" | "seated" | "no_show" | "cancelled";
 
 type Guest = {
+  called_at?: string | null;
   id: number;
   name: string;
   phone: string;
@@ -479,7 +481,7 @@ export default function Home() {
                               : "Outdoor"}
                         </p>
                         {guest.status === "called" && (
-                          <span className="queue-called-marker">Called</span>
+                          <span className="queue-called-marker">{calledLabel(guest.called_at, queueClock)}</span>
                         )}
                         <span className="bistro-phone">{guest.phone}</span>
                       </div>

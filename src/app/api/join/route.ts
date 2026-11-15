@@ -11,6 +11,7 @@ import { NextResponse, after } from "next/server";
 import { dispatchOutbox } from "@/lib/whatsapp/service";
 import { whatsappEnabled } from "@/lib/whatsapp/policy";
 import { z } from "zod";
+import { egyptianMobilePattern, normalizeEgyptianMobile } from "@/lib/guest-phone";
 import db from "@/lib/db";
 import {
   initializeTracking,
@@ -37,9 +38,9 @@ const schema = z.object({
     }, "Please enter your first and last name."),
   phone: z
     .string()
-    .transform((value) => value.replace(/[\s()-]/g, "").replace(/^(?:\+20|0020|20)(?=1[0125]\d{8}$)/, "0"))
+    .transform(normalizeEgyptianMobile)
     .pipe(z.string().regex(
-      /^01[0125][0-9]{8}$/,
+      egyptianMobilePattern,
       "Enter an Egyptian mobile number like 010 1234 5678 or +20 10 1234 5678.",
     )),
   party_size: z.number().int().min(1).max(30),

@@ -1,0 +1,13 @@
+html:not([data-theme="light"]) :is(.bistro-app.bistro-management, [aria-label="Edit tables"])
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]), select, textarea) {
+  color-scheme: dark;
+  color: #f5f0e7 !important;
+  background-color: #2b2d2c !important;
+  border: 1px solid #8a877f !important;
+}
+html:not([data-theme="light"]) :is(.bistro-app.bistro-management, [aria-label="Edit tables"])
+  :is(input, textarea)::placeholder { color: #b6b3ac; }
+html:not([data-theme="light"]) :is(.bistro-app.bistro-management, [aria-label="Edit tables"])
+  :is(input, select, textarea):focus-visible { outline: 2px solid #d6b681; outline-offset: 2px; }
+
+.bistro-management [aria-label="Public waitlist"] { margin-bottom: 20px; }

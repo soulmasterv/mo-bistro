@@ -1,10 +1,12 @@
 "use client";
 
 import SimpleCapacitySettings from "@/components/simple-capacity-settings";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function SeatingSettings() {
-  const [override, setOverride] = useState(true);
+  const [override, setOverride] = useState<boolean | null>(null);
+  const [savingOverride, setSavingOverride] = useState(false);
+  const overridePending = useRef(false);
   const [message, setMessage] = useState("");
   const [tableMode, setTableMode] = useState<"simple" | "detailed">("detailed");
   const [modeBusy, setModeBusy] = useState(false);
@@ -59,18 +61,31 @@ export default function SeatingSettings() {
     }
   }
 
-  async function save() {
-    setMessage("");
+  async function saveOverride(value: boolean) {
+    if (override === null || overridePending.current) return;
+    overridePending.current = true;
+    setSavingOverride(true);
+    setOverride(value);
+    setMessage("Saving…");
 
-    const response = await fetch("/api/management/seating-settings", {
+    try {
+      const response = await fetch("/api/management/seating-settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        allow_area_override: override
+        allow_area_override: value
       })
     });
 
-    setMessage(response.ok ? "Settings saved." : "Could not save settings.");
+      if (!response.ok) throw new Error("Could not save seating settings.");
+      setMessage("Seating settings saved.");
+    } catch {
+      setOverride(override);
+      setMessage("Could not save seating settings. Try again.");
+    } finally {
+      overridePending.current = false;
+      setSavingOverride(false);
+    }
   }
 
   return (
@@ -106,20 +121,14 @@ export default function SeatingSettings() {
       <label className="mt-4 flex items-center gap-3 text-sm">
         <input
           type="checkbox"
-          checked={override}
-          onChange={e => setOverride(e.target.checked)}
+          checked={override ?? false}
+          disabled={override === null || savingOverride}
+          onChange={e => void saveOverride(e.target.checked)}
         />
         Allow seating in a different area if preferred area is unavailable
       </label>
 
-      <button
-        onClick={() => void save()}
-        className="mt-5 rounded-xl bg-[#C5A77B] px-5 py-3 font-semibold text-[#101820]"
-      >
-        Save seating settings
-      </button>
-
-      {message && <p className="mt-3 text-sm">{message}</p>}
+      {message && <p role="status" className="mt-3 text-sm">{message}</p>}
     </section>
   );
 }

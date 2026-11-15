@@ -1,17 +1,18 @@
 "use client";
+import WaitlistControls from "@/components/waitlist-controls";
 import WhatsAppPreviewTest from "@/components/whatsapp-preview-test";
 import ManagementDangerZone from "@/components/management-danger-zone";
 import ManagementOperations from "@/components/management-operations";
 import StaffAccountManager from "@/components/staff-account-manager";
-import DemoControls from "@/components/demo-controls";
+
 import SeatingSettings from "@/components/seating-settings";
 
 import ManagementExtras from "@/components/management-extras";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Settings2,
-  Save,
+
   Users,
   SlidersHorizontal,
   Armchair,
@@ -27,7 +28,7 @@ type Settings = {
   restaurant_name: string;
 };
 
-export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
+export default function ManagementPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -48,8 +49,15 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
     refreshStaff();
   }, []);
 
-  async function save() {
-    if (!settings) return;
+  const pending = useRef(Promise.resolve());
+  const saveVersion = useRef(0);
+
+  function save(changes: Partial<Settings>) {
+    const version = ++saveVersion.current;
+    pending.current = pending.current.then(() => persist(changes, version));
+  }
+
+  async function persist(changes: Partial<Settings>, version: number) {
 
     setBusy(true);
     setError("");
@@ -59,7 +67,7 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
       const response = await fetch("/api/management", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(changes),
       });
 
       if (!response.ok) throw new Error("Could not save settings.");
@@ -68,7 +76,7 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed.");
     } finally {
-      setBusy(false);
+      if (version === saveVersion.current) setBusy(false);
     }
   }
 
@@ -85,7 +93,7 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
             <i /> Manager workspace
           </span>
         </header>
-        <WhatsAppPreviewTest />
+        <WaitlistControls management />
         <section className="bistro-management-overview">
           <article>
             <span className="bistro-overview-icon">
@@ -182,6 +190,7 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
                   Restaurant name
                   <input
                     value={settings.restaurant_name}
+                    onBlur={(e) => { if (e.target.value.trim().length >= 2 && e.target.value.trim().length <= 80) save({ restaurant_name: e.target.value }); else setError("Enter a name between 2 and 80 characters."); }}
                     onChange={(e) =>
                       setSettings({
                         ...settings,
@@ -196,12 +205,7 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
                   QR rotation interval
                   <select
                     value={settings.qr_rotation_seconds}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        qr_rotation_seconds: e.target.value,
-                      })
-                    }
+                    onChange={(e) => { const changes = { qr_rotation_seconds: e.target.value }; setSettings({ ...settings, ...changes }); save(changes); }}
                     className="mt-2 w-full rounded-xl border border-white/10 bg-[#0D1218] p-3"
                   >
                     <option value="60">Every minute</option>
@@ -215,12 +219,7 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
                   <input
                     type="checkbox"
                     checked={settings.qr_required}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        qr_required: e.target.checked,
-                      })
-                    }
+                    onChange={(e) => { const changes = { qr_required: e.target.checked }; setSettings({ ...settings, ...changes }); save(changes); }}
                   />
                   Require a valid rotating QR to register
                 </label>
@@ -229,12 +228,7 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
                   <input
                     type="checkbox"
                     checked={settings.approval_required}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        approval_required: e.target.checked,
-                      })
-                    }
+                    onChange={(e) => { const changes = { approval_required: e.target.checked }; setSettings({ ...settings, ...changes }); save(changes); }}
                   />
                   Require reception confirmation
                 </label>
@@ -245,7 +239,8 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
                     type="number"
                     min={1}
                     max={500}
-                    value={settings.queue_capacity}
+                    value={settings.queue_capacity || ""}
+                    onBlur={(e) => { if (Number.isInteger(e.target.valueAsNumber) && e.target.validity.valid) save({ queue_capacity: e.target.valueAsNumber }); else setError("Enter a capacity between 1 and 500."); }}
                     onChange={(e) =>
                       setSettings({
                         ...settings,
@@ -256,13 +251,7 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
                   />
                 </label>
 
-                <button
-                  onClick={() => void save()}
-                  disabled={busy}
-                  className="flex items-center gap-2 rounded-xl bg-[#C5A77B] px-5 py-3 font-semibold text-[#101820] disabled:opacity-50"
-                >
-                  <Save size={17} /> {busy ? "Saving..." : "Save settings"}
-                </button>
+                {busy && <p role="status">Saving settings…</p>}
               </section>
             )}
 
@@ -286,9 +275,10 @@ export default function ManagementPage({showDemo=false}:{showDemo?:boolean}) {
               </div>
               <ManagementExtras />
               <SeatingSettings />
-              {showDemo && <DemoControls />}
+
             </section>
             <ManagementOperations />
+              <WhatsAppPreviewTest />
             <ManagementDangerZone />
           </div>
         </div>

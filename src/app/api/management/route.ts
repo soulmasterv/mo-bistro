@@ -17,7 +17,7 @@ const schema = z.object({
   approval_required: z.boolean(),
   queue_capacity: z.number().int().min(1).max(500),
   restaurant_name: z.string().trim().min(2).max(80),
-});
+}).partial().refine(settings => Object.keys(settings).length > 0);
 
 async function managerOnly() {
   const staff = await currentStaff();

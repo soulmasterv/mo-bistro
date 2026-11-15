@@ -1,3 +1,12 @@
+/** Egyptian mobile numbers are stored in their local, 11-digit format. */
+export const egyptianMobilePattern = /^01[0125][0-9]{8}$/;
+
+export function normalizeEgyptianMobile(value: string): string {
+  return value
+    .replace(/[\s()-]/g, "")
+    .replace(/^(?:\+20|0020|20)(?=1[0125]\d{8}$)/, "0");
+}
+
 /** Validate stored numbers without inventing a country code. */
 export function guestDialHref(value: unknown): string | null {
   if (typeof value !== "string") return null;

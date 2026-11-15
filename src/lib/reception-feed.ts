@@ -1,4 +1,5 @@
 'use client';
+import { retryAfterMilliseconds } from '@/lib/retry-after';
 const sections:Record<string,string>={
  '/api/guests':'guests','/api/tables':'tables','/api/reception/table-requests':'requests',
  '/api/reception/next-guest?areas=all':'next','/api/table-view-mode':'mode','/api/wait-estimate':'wait','/api/simple-tables':'simple',
@@ -38,9 +39,8 @@ export function createReceptionFeed(options:Options){
     const response=await options.fetch('/api/reception/dashboard',{cache:'no-store',credentials:'same-origin',signal:current.signal});
     if(response.status===401||response.status===403){data=null;stopped=true;state={updating:false,updatedAt:0,stopped:true};throw Error('Please sign in again.');}
     if(response.status===429){
-     const header=response.headers.get('Retry-After');
-     const delay=header&&/^\d+$/.test(header)?Number(header)*1000:Date.parse(header??'')-options.now();
-     retryAt=options.now()+(Number.isFinite(delay)&&delay>0?delay:10000);
+     const now=options.now();
+     retryAt=now+(retryAfterMilliseconds(response.headers.get('Retry-After'),now)||10000);
     }
     if(!response.ok)throw Error('Reception is updating.');
     const next=await response.json();

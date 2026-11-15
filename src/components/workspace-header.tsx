@@ -5,6 +5,7 @@ import { Menu, Bell, LogOut, UtensilsCrossed } from "lucide-react";
 import type { StaffRole } from "@/lib/staff-session-shared";
 
 import { ThemeSwitcher } from "@/components/theme-preference";
+import WaitlistControls from "@/components/waitlist-controls";
 
 const workspaces = [
   { label: "Management", href: "/management" },
@@ -150,6 +151,7 @@ export default function WorkspaceHeader({
                     {item.label}
                   </Link>
                 ))}
+              {workspace === "Reception" && <WaitlistControls />}
               <ThemeSwitcher />
               <button
                 type="button"

@@ -52,7 +52,6 @@ export async function GET() {
   try {
     const sql = getPostgres();
     const [schema] = await sql`SELECT
-      to_regclass('public.staff_activity_events') IS NOT NULL AS activity,
       to_regclass('public.wait_accuracy_samples') IS NOT NULL AS accuracy,
       to_regclass('public.whatsapp_notifications') IS NOT NULL AS notifications,
       to_regclass('public.whatsapp_delivery_logs') IS NOT NULL AS delivery,
@@ -68,9 +67,6 @@ export async function GET() {
       ROUND(AVG(eta_error_minutes)::numeric,1) AS signed_error,
       COUNT(*) FILTER (WHERE ABS(eta_error_minutes)<=10)::integer AS within_ten
       FROM public.wait_accuracy_samples WHERE seated_at>=NOW()-INTERVAL '30 days'`)[0] : null;
-    const activity = schema.activity ? await sql`SELECT e.id,e.event,e.guest_id,e.details,e.created_at,
-      u.username AS actor FROM public.staff_activity_events e LEFT JOIN public.staff_users u ON u.id=e.actor_id
-      ORDER BY e.created_at DESC,e.id DESC LIMIT 100` : [];
     let callbackValid = false;
     try { callbackUrl("/api/whatsapp/jobs"); callbackValid = true; } catch {}
     const configured: Record<string,boolean> = {
@@ -103,7 +99,7 @@ export async function GET() {
         LEFT JOIN public.whatsapp_contact_preferences p ON p.phone=c.phone
         ORDER BY n.created_at DESC,n.id LIMIT 50` : [];
     return Response.json({ available: true, paused: setting?.value === "true", accuracy,
-      activityAvailable: !!schema.activity, activity, whatsapp: { configured, blockers,
+      whatsapp: { configured, blockers,
         jobs: jobs.map(({last_error, ...job}) => ({...job, reason:safeReason(last_error)})) } }, { headers });
   } catch { return Response.json({ error: "Operations data unavailable; check database schema and connectivity" }, { status: 503, headers }); }
 }

@@ -1,10 +1,12 @@
 'use client';
 import {useCallback,useEffect,useState} from 'react';
+import { useConfirmation } from '@/components/confirmation-provider';
 import styles from './advanced-table-controls.module.css';
 type Table={id:number;name:string;seats:number;area:'indoor'|'outdoor';status:string;advanced_revision:number};
 type Override={area:'indoor'|'outdoor';available_count:number;revision:number};
 const empty={name:'',seats:2,area:'indoor' as 'indoor'|'outdoor'};
 export default function AdvancedTableControls({editor=false}:{editor?:boolean}){
+ const confirm = useConfirmation();
  const [tables,setTables]=useState<Table[]>([]),[counts,setCounts]=useState<Override[]>([]);
  const [draft,setDraft]=useState(empty),[editing,setEditing]=useState<Table|null>(null);
  const [notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
@@ -28,22 +30,36 @@ export default function AdvancedTableControls({editor=false}:{editor?:boolean}){
   <p>{editor?'Changes are recorded with your staff account. Only free tables can be changed.':'Manual counts by location. Highlighted parties fit a configured table size; counts do not assign or reserve tables.'}</p>
   {!editor?(['indoor','outdoor'] as const).map(area=>{
    const row=counts.find(r=>r.area===area);
-   return <form key={area+':'+(row?.revision??0)} className={styles.row} onSubmit={e=>{e.preventDefault();void save('PUT',{area,available_count:Number(new FormData(e.currentTarget).get('count')),revision:row?.revision??0});}}>
+   function saveCount(form: HTMLFormElement) {
+    if (busy || !form.reportValidity()) return;
+    const count = Number(new FormData(form).get('count'));
+    if (count !== (row?.available_count ?? 0)) void save('PUT', {area, available_count: count, revision: row?.revision ?? 0});
+   }
+   return <form key={area+':'+(row?.revision??0)} className={styles.row} onSubmit={e=>{e.preventDefault();saveCount(e.currentTarget);}} onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget))saveCount(e.currentTarget);}}>
     <label>{area==='indoor'?'Indoor':'Outdoor'} <input aria-label={area+' available tables'} name="count" type="number" min="0" max="500" required defaultValue={row?.available_count??0}/></label>
-    <button disabled={busy}>Save count</button>
    </form>;
   }):<>
-   <form className={styles.row} onSubmit={e=>{e.preventDefault();void save(editing?'PATCH':'POST',{...draft,...(editing?{id:editing.id,revision:editing.advanced_revision}:{})});}}>
+   <form className={styles.row} onSubmit={e=>{e.preventDefault();void save(editing?'PATCH':'POST',{...draft,...(editing?{id:editing.id,revision:editing.advanced_revision}:{})});}}
+    onBlur={e=>{
+     if (!editing || e.currentTarget.contains(e.relatedTarget) || !e.currentTarget.reportValidity()) return;
+     if (draft.name !== editing.name || draft.seats !== editing.seats || draft.area !== editing.area) {
+      void save('PATCH', {...draft, id: editing.id, revision: editing.advanced_revision});
+     }
+    }}>
     <label>Name<input required maxLength={40} value={draft.name} onChange={e=>setDraft({...draft,name:e.target.value})}/></label>
     <label>Capacity<input required type="number" min="1" max="30" value={draft.seats} onChange={e=>setDraft({...draft,seats:Number(e.target.value)})}/></label>
     <label>Location<select value={draft.area} onChange={e=>setDraft({...draft,area:e.target.value as Table['area']})}><option value="indoor">Indoor</option><option value="outdoor">Outdoor</option></select></label>
-    <button disabled={busy}>{editing?'Save table':'Add table'}</button>
+    {!editing&&<button disabled={busy}>Add table</button>}
     {editing&&<button type="button" onClick={()=>{setEditing(null);setDraft(empty);}}>Cancel edit</button>}
    </form>
    <ul>{tables.map(table=><li key={table.id} className={styles.row}>
     <span>{table.name} · {table.seats} seats · {table.area} · {table.status}</span>
     <button disabled={busy||table.status!=='free'} onClick={()=>{setEditing(table);setDraft({name:table.name,seats:table.seats,area:table.area});}}>Edit</button>
-    <button disabled={busy||table.status!=='free'} onClick={()=>{if(window.confirm('Remove '+table.name+' from available tables? Its history will be retained.'))void save('DELETE',{id:table.id,revision:table.advanced_revision});}}>Delete</button>
+    <button disabled={busy||table.status!=='free'} onClick={async()=>{
+     if (await confirm({title:'Remove table?',message:`Remove ${table.name} from available tables? Its history will be retained.`,confirmLabel:'Remove table',destructive:true})) {
+      await save('DELETE',{id:table.id,revision:table.advanced_revision});
+     }
+    }}>Delete</button>
    </li>)}</ul>
   </>}
   <p role="status">{notice}</p>

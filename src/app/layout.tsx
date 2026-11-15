@@ -1,6 +1,8 @@
+import FormValidation from "@/components/form-validation";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "./management-controls.css";
 import { ThemePreference } from "@/components/theme-preference";
 import { ConfirmationProvider } from "@/components/confirmation-provider";
 
@@ -35,6 +37,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <ThemePreference />
         <ConfirmationProvider>{children}</ConfirmationProvider>
+        <FormValidation />
       </body>
     </html>
   );

@@ -78,6 +78,16 @@ export async function PATCH(
     const actor = await currentStaff();
     const updated = await sql.begin(async tx => {
       await setActivityActor(tx, actor?.id);
+      if (action === "call") {
+        const [schema] = await tx`SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'guests' AND column_name = 'called_at'
+        ) AS has_called_at`;
+        if (schema?.has_called_at) return tx`
+          UPDATE guests SET status = 'called', called_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ${guestId} AND status = 'waiting' RETURNING id
+        `;
+      }
       return action === "confirm" ? await tx`
       UPDATE guests SET confirmed = 1, updated_at = CURRENT_TIMESTAMP
       WHERE id = ${guestId} AND status=ANY(${allowed}::text[]) RETURNING id

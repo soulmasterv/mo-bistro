@@ -90,15 +90,18 @@ test(
         },
       ],
     });
+    const preview = process.env.MO_BISTRO_LOCAL_PREVIEW === "1";
+    const assets = preview && process.env.MO_BISTRO_PREVIEW_ASSETS || ".next";
+    const staticAssets = path.join(assets, "static");
     const css = fs
-      .readdirSync(".next/static", { recursive: true })
+      .readdirSync(staticAssets, { recursive: true })
       .filter((file) => file.endsWith(".css"))
       .map((file) =>
-        fs.readFileSync(path.join(".next/static", file), "utf8"),
+        fs.readFileSync(path.join(staticAssets, file), "utf8"),
       )
       .join("\n");
     assert.ok(css.length > 0, "Production CSS must exist for either supported compiler");
-    const html = fs.readFileSync(".next/server/app/join.html", "utf8");
+    const html = fs.readFileSync(path.join(assets, "server/app/join.html"), "utf8");
     const viewport = html.match(/<meta name="viewport"[^>]*>/)?.[0];
     assert.ok(viewport);
     assert.ok(!viewport.includes("user-scalable=no"));
@@ -107,7 +110,7 @@ test(
       occupied = 1;
     let trackingStatus = "waiting";
     let trackingEta = null;
-    let subscriptionSubscribed = true;
+    let subscriptionSubscribed = !preview;
     let feedbackEditable = true;
     let feedbackConsent = true;
     let staffUsername = "manager";
@@ -209,7 +212,7 @@ test(
         max_party_size: 4,
       },
     ];
-    let publicPaused=false;
+    let publicPaused=false, receptionAllowed=false;
     const server = http.createServer(async (req, res) => {
       if(/^\/menus\/menu-page-\d{2}\.jpg$/.test(req.url)) {
         res.setHeader("content-type","image/jpeg");res.end(fs.readFileSync("public"+req.url));return;
@@ -225,7 +228,8 @@ test(
       }
       if (url.pathname === "/app.css") {
         res.setHeader("content-type", "text/css");
-        res.end(css);
+        const managementControls = fs.readFileSync("src/app/management-controls.css", "utf8");
+        res.end(preview ? css + "\n" + managementControls : css);
         return;
       }
       if (url.pathname.startsWith("/api/")) {
@@ -398,6 +402,13 @@ test(
           case "/api/public/waitlist":
             data={paused:publicPaused};
             break;
+          case "/api/staff/waitlist":
+            if (req.method === "PATCH") {
+              if (typeof body.paused === "boolean") publicPaused = body.paused;
+              if (typeof body.receptionAllowed === "boolean") receptionAllowed = body.receptionAllowed;
+            }
+            data = { paused: publicPaused, canPause: role === "manager" || receptionAllowed, ...(role === "manager" ? { receptionAllowed } : {}) };
+            break;
           case "/api/management/operations":
             if(req.method==="PATCH") { assert.deepEqual(body,{paused:!publicPaused,confirm:true});publicPaused=body.paused; }
             data={available:true,paused:publicPaused,accuracy:{samples:12,estimated_samples:8,average_wait:"30",average_error:"5",signed_error:"3",within_ten:7},
@@ -443,8 +454,14 @@ test(
           '<link rel="stylesheet" href="/app.css"></head><body><div id="root" style="display:contents"></div><script src="/app.js"></script></body></html>',
       );
     });
-    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-    const origin = "http://127.0.0.1:" + server.address().port;
+    const host = preview ? process.env.MO_BISTRO_PREVIEW_HOST || "127.0.0.1" : "127.0.0.1";
+    await new Promise((resolve) => server.listen(preview ? 8770 : 0, host, resolve));
+    const origin = "http://" + host + ":" + server.address().port;
+    if (preview) {
+      console.log(origin + "/status?token=" + "a".repeat(64));
+      await new Promise((resolve) => server.once("close", resolve));
+      return;
+    }
     const candidates = [
       process.env.MO_BISTRO_TEST_BROWSER,
       chromium.executablePath(),
@@ -1407,23 +1424,24 @@ test(
         }
       });
       await testPage.goto(origin+"/management");
+      const waitlist=testPage.getByRole("region",{name:"Public waitlist",exact:true});
       const controls=testPage.getByRole("region",{name:"Service controls",exact:true});
-      await controls.getByRole("button",{name:"Pause public registrations",exact:true}).click();
-      let pauseDialog=testPage.getByRole("alertdialog",{name:"Pause public waitlist?",exact:true});
+      await waitlist.getByRole("button",{name:"Pause registrations",exact:true}).click();
+      let pauseDialog=testPage.getByRole("alertdialog",{name:"Pause public registrations?",exact:true});
       await pauseDialog.getByRole("button",{name:"Cancel",exact:true}).click();assert.equal(publicPaused,false);
-      await controls.getByRole("button",{name:"Pause public registrations",exact:true}).click();
-      pauseDialog=testPage.getByRole("alertdialog",{name:"Pause public waitlist?",exact:true});
+      await waitlist.getByRole("button",{name:"Pause registrations",exact:true}).click();
+      pauseDialog=testPage.getByRole("alertdialog",{name:"Pause public registrations?",exact:true});
       await pauseDialog.getByRole("button",{name:"Pause registrations",exact:true}).click();
-      await controls.getByText("Paused — new public registrations are closed",{exact:true}).waitFor();
+      await waitlist.getByText("Registrations paused",{exact:true}).waitFor();
       const pausedGuest=await testContext.newPage();await pausedGuest.goto(origin+"/join?code=test-qr");
       await pausedGuest.getByRole("heading",{name:"Waitlist temporarily closed",exact:true}).waitFor();
       assert.equal(await pausedGuest.getByRole("button",{name:"Join the waitlist",exact:true}).count(),0);
       await controls.getByRole("heading",{name:"WhatsApp health",exact:true}).waitFor();
       await controls.getByText("Delivery: not confirmed",{exact:false}).waitFor();
       if(screenshots) await controls.screenshot({path:path.join(screenshots,"service-controls-mobile.png")});
-      await controls.getByRole("button",{name:"Reopen public waitlist",exact:true}).click();
-      await testPage.getByRole("alertdialog",{name:"Reopen public waitlist?",exact:true}).getByRole("button",{name:"Reopen waitlist",exact:true}).click();
-      await controls.getByText("Open — guests can join the waitlist",{exact:true}).waitFor();
+      await waitlist.getByRole("button",{name:"Reopen registrations",exact:true}).click();
+      await testPage.getByRole("alertdialog",{name:"Reopen public registrations?",exact:true}).getByRole("button",{name:"Reopen registrations",exact:true}).click();
+      await waitlist.getByText("Registrations open",{exact:true}).waitFor();
       await pausedGuest.reload();await pausedGuest.getByRole("button",{name:"Join the waitlist",exact:true}).waitFor();await pausedGuest.close();
       const sendTest = testPage.getByRole("button",{name:"Send Test WhatsApp",exact:true});
       await testPage.getByText(/Setup check 1 complete/).waitFor();

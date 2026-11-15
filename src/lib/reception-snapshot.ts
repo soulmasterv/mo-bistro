@@ -15,7 +15,8 @@ export async function receptionSnapshot(){
   const mode=value('table_view_mode')==='simple'?'simple':'detailed';
   const required=resolveConfirmation({approval_required:value('approval_required'),require_confirmation:value('require_confirmation')});
   const rawGuests=await tx`SELECT g.id,g.name,g.phone,g.party_size,g.seating_preference,g.status,g.confirmed,g.table_id,
-   g.created_at,g.updated_at,to_jsonb(g)->>'eta_at' AS eta_at FROM guests g ORDER BY g.created_at,g.id`;
+   g.created_at,g.updated_at,to_jsonb(g)->>'eta_at' AS eta_at,
+   to_jsonb(g)->>'called_at' AS called_at FROM guests g ORDER BY g.created_at,g.id`;
   const tables=await tx`SELECT id,name,seats,area,status,updated_at FROM restaurant_tables
    WHERE (to_jsonb(restaurant_tables)->>'advanced_archived_at') IS NULL ORDER BY id`;
   const pools=mode==='simple'?await tx`SELECT area,total_tables,occupied_tables,max_party_size,

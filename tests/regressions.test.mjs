@@ -461,10 +461,11 @@ test("Reception request polling skips overlaps and ignores an aborted late respo
     {
       react,
       "@/components/seat-guest-modal": () => null,
-    },
-    {
-      fetch: (url, options) =>
-        new Promise((resolve) => pending.push({ url, options, resolve })),
+      "@/lib/reception-feed": {
+        receptionRead: (url, options) =>
+          new Promise((resolve) => pending.push({ url, options, resolve })),
+        refreshReception: async () => {},
+      },
     },
   ).default;
   Component();
@@ -473,6 +474,7 @@ test("Reception request polling skips overlaps and ignores an aborted late respo
   await refresh();
   assert.equal(pending.length, 1);
   const fresh = refresh(true);
+  await new Promise((resolve) => setImmediate(resolve));
   assert.equal(pending.length, 2);
   assert.equal(pending[0].options.signal.aborted, true);
   pending[1].resolve(Response.json([]));

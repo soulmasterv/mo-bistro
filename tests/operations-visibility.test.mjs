@@ -70,8 +70,7 @@ test('migration-backed wait samples, staff attribution, pause enforcement and se
     assert.equal(body.whatsapp.jobs[0].delivery,null);
     assert.equal(JSON.stringify(body).includes('secret-do-not-expose'),false);
     assert.equal(JSON.stringify(body).includes('201012345678'),false);
-    const pauseEvent=body.activity.find(e=>e.event==='public_waitlist_changed');
-    assert.equal(pauseEvent.actor,'Test manager');
+    assert.equal(Object.hasOwn(body, "activity"), false);
     assert.equal((await route.PATCH(request('PATCH',{paused:false,confirm:true}))).status,200);
     assert.equal((await (await route.GET()).json()).paused,false);
     // Raw guest cleanup does not erase non-identifying accuracy samples.
@@ -106,6 +105,6 @@ test('operations endpoint rejects unauthorized users, cross-origin mutations and
 test('missing operations migration reports unavailable sections without claiming historic activity',async()=>{
   const h=harness({query:q=>q.includes('to_regclass')?[{activity:false,accuracy:false,notifications:false,delivery:false,consents:false,windows:false}]:[]});
   const response=await h.route('management/operations').GET();assert.equal(response.status,200);
-  const body=await response.json();assert.equal(body.accuracy,null);assert.equal(body.activityAvailable,false);assert.deepEqual(body.activity,[]);
+  const body=await response.json();assert.equal(body.accuracy,null);assert.equal(Object.hasOwn(body,"activity"),false);
   assert.equal(h.queries.some(q=>q.query.includes('FROM public.wait_accuracy_samples')),false);
 });
