@@ -1,7 +1,7 @@
 "use client";
 import { useEffect,useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import {Bell,CheckCircle2,Clock3,UtensilsCrossed,XCircle} from 'lucide-react';
+import {Bell,CheckCircle2,MessageCircle,Phone,UtensilsCrossed,XCircle} from 'lucide-react';
 import { pollRetryDelay } from '@/lib/pilot/polling';
 type Status={id:number;status:string;position:number|null;whatsapp_consent:boolean;whatsapp_reply_observed:boolean;whatsapp_url?:string|null};
 export default function PilotStatus(){
@@ -36,18 +36,25 @@ export default function PilotStatus(){
  const status=party?.status;
  const labels:Record<string,string>={waiting:"You're on the waitlist",called:'Reception is calling you!',seated:"You're seated!",left:'Booking closed'};
  return <main className="guest-status-page"><div className="guest-status-shell">
-  <header className="guest-brand"><UtensilsCrossed size={28}/><span>MO BISTRO · DISTRICT 5</span></header>
+  <header className="guest-brand"><UtensilsCrossed size={28}/><span>MO BISTRO</span></header>
   <div className="guest-status-layout"><section className="guest-status-main">
-   <h1>{status==='seated'?"You’re seated!":status==='left'?'Thank you for visiting':'Your table is worth the wait'}</h1>
-   <p className="guest-intro">{status==='called'?'Please make your way to reception.':status==='seated'?'Enjoy your visit.':status==='left'?'This booking is closed. Please speak with reception if you need help.':'Follow your place in the queue here.'}</p>
+   <h1>{status==='waiting'?"You're on the waitlist":status==='called'?'Your table is ready':status==='seated'?"You’re seated!":status==='left'?'Thank you for visiting':'Your booking'}</h1>
+   <p className="guest-intro">{status==='called'?'Please make your way to reception.':status==='seated'?'Enjoy your visit.':status==='left'?'This booking is closed. Please speak with reception if you need help.':"We'll let you know when your table is ready."}</p>
    {error&&<p role="alert" className="guest-small-note">{error}</p>}
    {updating&&<p role="status" className="guest-small-note">Updating…{party?' Showing your last known status.':''}</p>}
    {!party&&!error&&!updating&&<p role="status">Loading your booking…</p>}
    {party&&<>
-    <div className={`guest-current-status ${status==='seated'?'is-seated':''}`} role="status">
-     {status==='seated'?<CheckCircle2 size={32}/>:status==='called'?<Bell size={30}/>:status==='waiting'?<Clock3 size={28}/>:<XCircle size={28}/>}
-     <div><h2>{labels[party.status]||'Your booking'}</h2><p>{status==='waiting'?'Your place is saved. This page updates when reception calls you.':status==='called'?'Your table is ready. Please come to reception.':status==='seated'?'Our team has seated you. Enjoy your meal!':'This booking is now closed.'}</p></div>
-    </div>
+    {status!=='waiting'&&<div className={`guest-current-status ${status==='seated'?'is-seated':''}`} role="status">
+     {status==='seated'?<CheckCircle2 size={32}/>:status==='called'?<Bell size={30}/>:<XCircle size={28}/>}
+     <div><h2>{labels[party.status]||'Your booking'}</h2><p>{status==='called'?'Your table is ready. Please come to reception.':status==='seated'?'Our team has seated you. Enjoy your meal!':'This booking is now closed.'}</p></div>
+    </div>}
+    {status==='waiting'&&<section className="guest-whatsapp-card pilot-status-whatsapp space-y-3 rounded-xl" aria-label="WhatsApp table-ready alert">
+     <p>{party.whatsapp_reply_observed?"You're all set!":"WhatsApp updates"}</p>
+     <p className="guest-small-note">{party.whatsapp_reply_observed?"We'll message you here when your table is ready.":"Get one WhatsApp alert when your table is ready."}</p>
+     {!party.whatsapp_consent&&<button disabled={busy} className="pilot-status-whatsapp-button" onClick={()=>void enable()}><WhatsAppIcon/>{busy?'Enabling…':'Get WhatsApp updates'}</button>}
+     {party.whatsapp_consent&&!party.whatsapp_reply_observed&&party.whatsapp_url&&<><p className="guest-small-note">Send the prepared message to finish setting up your alert.</p><a className="pilot-status-whatsapp-button" href={party.whatsapp_url} rel="noreferrer"><WhatsAppIcon/>Open WhatsApp</a></>}
+     {party.whatsapp_consent&&!party.whatsapp_reply_observed&&!party.whatsapp_url&&<p className="guest-small-note">Your choice is saved. Please keep this page open for updates.</p>}
+    </section>}
     <dl className="guest-booking-facts">
      <div><dt>Booking number</dt><dd>#{party.id}</dd></div>
      <div><dt>Status</dt><dd>{status==='waiting'?'Waiting':status==='called'?'Called':status==='seated'?'Seated':'Closed'}</dd></div>
@@ -56,16 +63,11 @@ export default function PilotStatus(){
     <p className="guest-small-note">Queue information refreshes automatically. Keep your private booking link to yourself.</p>
    </>}
   </section><aside className="guest-status-aside">
-   <div className="guest-welcome-card"><UtensilsCrossed size={38}/><p>MO BISTRO · DISTRICT 5</p><h2>Good food.<br/>Good company.</h2><p>A little time, well spent.</p></div>
-   {party&&status==='waiting'&&<section className="guest-whatsapp-card space-y-3 rounded-xl" aria-label="WhatsApp table-ready alert">
-    <p>Get your table-ready message</p>
-    <p className="guest-small-note">Optional: receive one WhatsApp message when reception calls your party. No marketing.</p>
-    {!party.whatsapp_consent&&<button disabled={busy} className="guest-subscription-refresh" onClick={()=>void enable()}>{busy?'Enabling…':'Enable WhatsApp alert'}</button>}
-    {party.whatsapp_consent&&party.whatsapp_url&&<><p className="guest-small-note">Open WhatsApp and send the prepared message to receive your alert.</p><a className="block rounded-xl bg-[#34382E] px-4 py-3 text-center font-medium text-white" href={party.whatsapp_url} rel="noreferrer">Open WhatsApp</a></>}
-    {party.whatsapp_reply_observed&&<p className="guest-small-note" role="status">Your WhatsApp message has been received.</p>}
-    {party.whatsapp_consent&&!party.whatsapp_url&&<p className="guest-small-note">Your choice is saved. Please keep this page open for updates.</p>}
-    <p className="guest-small-note">To unsubscribe, reply STOP on WhatsApp.</p>
-   </section>}
+   <div className="guest-welcome-card"><UtensilsCrossed size={38}/><p>MO BISTRO · DISTRICT 5</p><h2>Goodness since 2022.</h2><p>Quality dishes cooked with passion &amp; served with a smile.</p></div>
   </aside></div>
  </div></main>;
+}
+
+function WhatsAppIcon() {
+ return <span className="pilot-status-whatsapp-icon" aria-hidden="true"><MessageCircle size={19}/><Phone size={9}/></span>;
 }

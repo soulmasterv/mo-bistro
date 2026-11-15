@@ -54,7 +54,7 @@ export async function deliverPilotCall(id:string) {
      AND last_inbound_at<=clock_timestamp()`;
     const result=!window?{state:'skipped',error:'customer_service_window_closed',messageId:undefined}
      :process.env.WHATSAPP_WINDOW_TEXT_ENABLED==='true'?await sendMetaMessage({messaging_product:'whatsapp',to:phone,type:'text',biz_opaque_callback_data:id,
-       text:{body:`Mo Bistro - District 5\n\nHi ${party.name}, your table is ready. Please come to reception for booking #${party.id}.\n\nTo unsubscribe, reply STOP.`}})
+       text:{body:`Hi ${party.name}, your table is ready at Mo Bistro. Please come to reception for booking #${party.id}.`}})
      :{state:'skipped',error:'window_text_disabled',messageId:undefined};
     state=result.state==='pending'?'failed':result.state;error=result.error??null;messageId=result.messageId??null;
    }

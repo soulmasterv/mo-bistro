@@ -2956,3 +2956,12 @@ html[data-theme="dark"] .reception-reference .bistro-guest-copy h3 .queue-next-b
  .reception-reference .reception-service-strip dd { font-size:16px; }
  .reception-reference .reception-service-strip small { font-size:11px; }
 }
+.pilot-status-whatsapp { margin-bottom: 20px; }
+.guest-whatsapp-card .pilot-status-whatsapp-button {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; min-height: 44px; padding: 10px 14px; border-radius: 12px;
+  border: 0; background: #242424; color: #fff; font-weight: 600;
+}
+.pilot-status-whatsapp-button:disabled { opacity: .65; cursor: wait; }
+.pilot-status-whatsapp-icon { position: relative; display: inline-grid; place-items: center; color: #25d366; }
+.pilot-status-whatsapp-icon svg + svg { position: absolute; }
