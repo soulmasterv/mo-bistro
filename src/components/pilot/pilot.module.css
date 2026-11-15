@@ -254,3 +254,7 @@
 @media(max-width:380px) {
  .header:has(.accountTrigger) { flex-wrap:wrap; }
 }
+.drawer :global(.confirmation-card) { background:#1b1c1c; color:#f5f0e7; border-color:#3b3c3c; }
+.drawer :global(.confirmation-card .confirmation-brand) { color:#dfbd84; }
+.drawer :global(.confirmation-card > p:last-of-type) { color:#bdb8ae; }
+.drawer :global(.confirmation-actions button:not(.confirmation-destructive):not(.confirmation-primary)) { border-color:#525352; }
