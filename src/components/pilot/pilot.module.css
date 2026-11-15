@@ -119,6 +119,17 @@
 .inline { display:inline-flex; gap:6px; align-items:center; }
 .statusCell { display:grid; gap:6px; justify-items:start; }
 .statusCell small { font-size:10px; line-height:1.5; }
+.queueTable .guestCell > div { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; min-width:0; }
+.queueTable .guestName { margin:0; }
+@media(min-width:901px) {
+ .queueTable th:first-child { width:100%; }
+ .queueTable :is(th,td):not(:first-child) { white-space:nowrap; }
+ .queueTable .guestCell { display:table-cell; }
+ .queueTable .guestCell > div { display:inline-flex; vertical-align:middle; }
+ .queueTable .rowNumber { display:inline-block; margin-right:12px; vertical-align:middle; }
+ .queueTable .statusCell { gap:3px; }
+ .queueTable .rowActions .actions { flex-wrap:nowrap; justify-content:flex-start; }
+}
 .pill { display:inline-flex; align-items:center; min-height:29px; padding:6px 12px; border-radius:99px; background:#fff0d5; color:#9b540b; font-size:11px; white-space:nowrap; }
 .pillNotified { background:#2c3540; color:#c3d9ee; }
 .queueTable .rowActions { text-align:right; }

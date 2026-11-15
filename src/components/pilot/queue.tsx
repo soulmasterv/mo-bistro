@@ -48,7 +48,7 @@ function Primary({party,busy,onAction}:{party:Party;busy:boolean;onAction:Action
  </button>;
 }
 function Seat({party,busy,onAction,compact=false}:{party:Party;busy:boolean;onAction:ActionHandler;compact?:boolean}){
- return <button className={styles.button} disabled={busy||!!party.pending_exit_kind} onClick={()=>onAction(party.id,'seated')} aria-label={`Seat guest ${party.name}`}>{busy?'Saving…':compact?'Seat':'Seat guest'}{!compact&&<ArrowUpRight size={15}/>}</button>;
+ return <button className={styles.button} disabled={busy||!!party.pending_exit_kind} onClick={()=>onAction(party.id,'seated')} aria-label={`Seat guest ${party.name}`}>{busy?'Saving…':compact?'Seat':'Seat guest'}<ArrowUpRight size={15} aria-hidden="true"/></button>;
 }
 function Undo({party,now,busy,onAction}:{party:Party;now:number;busy:boolean;onAction:ActionHandler}){
  if(!party.pending_exit_kind)return null;
@@ -63,7 +63,7 @@ export function PilotQueue({parties,nextPartyId,now,busy,onAction,onOpen}:{parti
   <tbody>{parties.map((p,index)=>{const disabled=busy.includes(p.id)||!!p.pending_exit_kind;const minutes=wait(p,now);return <tr key={p.id} className={p.id===nextPartyId?styles.nextRow:''}>
    <td className={styles.guestCell}><span className={styles.rowNumber}>{String(index+1).padStart(2,'0')}</span><div><div className={styles.guestName}><button onClick={()=>onOpen(p.id)}>{p.name}</button>{p.id===nextPartyId&&<span className={styles.nextTag}>Next</span>}</div><a className={styles.rowPhone} href={'tel:'+p.phone} onClick={e=>{if(disabled)e.preventDefault();else onAction(p.id,'phone_call');}}>{p.phone}</a></div></td>
    <td data-label="Party"><span className={styles.inline}><Users size={14}/>{p.party_size}</span></td>
-   <td data-label="Preference">{p.preference==='indoor'?'Indoor':'Outdoor'}</td>
+   <td data-label="Preference">{p.preference==='indoor'?'Indoor':p.preference==='outdoor'?'Outdoor':'Any'}</td>
    <td data-label="Wait time"><span className={waitStyle(minutes)}>{minutes} min</span></td>
    <td data-label="Status"><div className={styles.statusCell}><span className={`${styles.pill} ${p.status==='called'?styles.pillNotified:''}`}>{p.status==='called'?calledLabel(p.called_at,observedPartyTime(p,now)):'Waiting'}</span><small className={styles.hint}>{subscriptionLabel(p)}</small>{p.message_status&&<small title={messageLabel(p)} className={messageFailed(p)?styles.failed:styles.hint}>{messageLabel(p,true)}</small>}</div></td>
    <td className={styles.rowActions}><div className={styles.actions} aria-busy={busy.includes(p.id)}>
