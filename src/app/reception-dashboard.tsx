@@ -91,7 +91,6 @@ export default function Home() {
   const [showQR, setShowQR] = useState(false);
   useStaffDialog(showQR, qrDialog, () => setShowQR(false));
   const [headerTools, setHeaderTools] = useState<HTMLElement | null>(null);
-  const [nextGuestIds, setNextGuestIds] = useState<number[]>([]);
   useEffect(() => {
     const timer = window.setTimeout(() => setHeaderTools(document.getElementById("reception-header-tools")), 0);
     return () => window.clearTimeout(timer);
@@ -379,7 +378,7 @@ export default function Home() {
             <button onClick={() => setError("")}>Dismiss</button>
           </div>
         )}
-        <NextGuestPanel onRecommendations={setNextGuestIds} />
+        <NextGuestPanel />
         <div className="bistro-reception-grid">
           <section id="reception-queue" className="bistro-panel bistro-queue">
             <div className="bistro-panel-heading reception-queue-heading">
@@ -449,7 +448,7 @@ export default function Home() {
                 return (
                   <article
                     key={guest.id}
-                    className={`bistro-guest-card ${guest.status === "called" ? "is-called" : ""} ${nextGuestIds.includes(guest.id) && ["waiting", "called"].includes(guest.status) ? "is-next-guest" : ""}`}
+                    className={`bistro-guest-card ${guest.status === "called" ? "is-called" : ""} ${active[0]?.id === guest.id ? "is-next-guest" : ""}`}
                   >
                     <div className="bistro-guest-main">
                       <span
@@ -469,7 +468,7 @@ export default function Home() {
                             {guest.name}
                           </button>
                           {guest.fits_available&&<span className="queue-next-badge">Table fits</span>}
-                          {nextGuestIds.includes(guest.id) && ["waiting", "called"].includes(guest.status) && <span className="queue-next-badge" aria-label="Next guest">Next</span>}
+                          {active[0]?.id === guest.id && <span className="queue-next-badge" aria-label="Next guest">Next</span>}
                         </h3>
                         <p>
                           <Users size={13} /> {guest.party_size} guests{" "}
