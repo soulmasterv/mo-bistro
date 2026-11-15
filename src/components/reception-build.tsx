@@ -1,0 +1,12 @@
+import "server-only";
+
+export default function ReceptionBuild({ environment }: { environment: "Development" | "Preview" }) {
+  const version = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "Local";
+  const branch = process.env.VERCEL_GIT_COMMIT_REF;
+  return (
+    <footer style={{ color: "#aaa59b", fontSize: 11, padding: "14px 20px", textAlign: "right" }}>
+      Version {version} · {process.env.VERCEL_ENV === "production" ? "Production" : environment}
+      {branch ? ` · ${branch}` : ""}
+    </footer>
+  );
+}

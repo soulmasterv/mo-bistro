@@ -57,11 +57,11 @@ function Undo({party,now,busy,onAction}:{party:Party;now:number;busy:boolean;onA
   <button className={styles.secondary} disabled={busy||!seconds} onClick={()=>onAction(party.id,'undo')}>Undo{seconds?` (${seconds}s)`:''}</button>
  </div>;
 }
-export function PilotQueue({parties,now,busy,onAction,onOpen}:{parties:Party[];now:number;busy:number[];onAction:ActionHandler;onOpen:(id:number)=>void}){
+export function PilotQueue({parties,nextPartyId,now,busy,onAction,onOpen}:{parties:Party[];nextPartyId?:number;now:number;busy:number[];onAction:ActionHandler;onOpen:(id:number)=>void}){
  return <div className={styles.tableWrap} role="region" aria-label="Scrollable reception queue" tabIndex={0}><table className={styles.queueTable} aria-label="Reception queue">
   <thead><tr><th># · Guest</th><th>Party size</th><th>Preference</th><th>Wait time</th><th>Status</th><th>Actions</th></tr></thead>
-  <tbody>{parties.map((p,index)=>{const disabled=busy.includes(p.id)||!!p.pending_exit_kind;const minutes=wait(p,now);return <tr key={p.id} className={index===0?styles.nextRow:''}>
-   <td className={styles.guestCell}><span className={styles.rowNumber}>{String(index+1).padStart(2,'0')}</span><div><div className={styles.guestName}><button onClick={()=>onOpen(p.id)}>{p.name}</button>{index===0&&<span className={styles.nextTag}>Next</span>}</div><a className={styles.rowPhone} href={'tel:'+p.phone} onClick={e=>{if(disabled)e.preventDefault();else onAction(p.id,'phone_call');}}>{p.phone}</a></div></td>
+  <tbody>{parties.map((p,index)=>{const disabled=busy.includes(p.id)||!!p.pending_exit_kind;const minutes=wait(p,now);return <tr key={p.id} className={p.id===nextPartyId?styles.nextRow:''}>
+   <td className={styles.guestCell}><span className={styles.rowNumber}>{String(index+1).padStart(2,'0')}</span><div><div className={styles.guestName}><button onClick={()=>onOpen(p.id)}>{p.name}</button>{p.id===nextPartyId&&<span className={styles.nextTag}>Next</span>}</div><a className={styles.rowPhone} href={'tel:'+p.phone} onClick={e=>{if(disabled)e.preventDefault();else onAction(p.id,'phone_call');}}>{p.phone}</a></div></td>
    <td data-label="Party"><span className={styles.inline}><Users size={14}/>{p.party_size}</span></td>
    <td data-label="Preference">{p.preference==='indoor'?'Indoor':'Outdoor'}</td>
    <td data-label="Wait time"><span className={waitStyle(minutes)}>{minutes} min</span></td>
