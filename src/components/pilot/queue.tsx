@@ -65,7 +65,7 @@ export function PilotQueue({parties,nextPartyId,now,busy,onAction,onOpen}:{parti
    <td data-label="Party"><span className={styles.inline}><Users size={14}/>{p.party_size}</span></td>
    <td data-label="Preference">{p.preference==='indoor'?'Indoor':p.preference==='outdoor'?'Outdoor':'Any'}</td>
    <td data-label="Wait time"><span className={waitStyle(minutes)}>{minutes} min</span></td>
-   <td data-label="Status"><div className={styles.statusCell}><span className={`${styles.pill} ${p.status==='called'?styles.pillNotified:''}`}>{p.status==='called'?calledLabel(p.called_at,observedPartyTime(p,now)):'Waiting'}</span><small className={styles.hint}>{subscriptionLabel(p)}</small>{p.message_status&&<small title={messageLabel(p)} className={messageFailed(p)?styles.failed:styles.hint}>{messageLabel(p,true)}</small>}</div></td>
+   <td data-label="Status"><div className={styles.statusCell}><span className={`${styles.pill} ${p.status==='called'?styles.pillNotified:''}`}>{p.status==='called'?calledLabel(p.called_at,observedPartyTime(p,now)):'Waiting'}</span>{messageFailed(p)&&<small title={messageLabel(p)} className={styles.failed}>{messageLabel(p,true)}</small>}</div></td>
    <td className={styles.rowActions}><div className={styles.actions} aria-busy={busy.includes(p.id)}>
     <a href={'tel:'+p.phone} aria-label={`Call ${p.name}`} className={`${styles.secondary} ${needsPhone(p)?styles.callProminent:''}`} aria-disabled={disabled} onClick={e=>{if(disabled)e.preventDefault();else onAction(p.id,'phone_call');}}><Phone size={15}/>Call</a>
     <Seat party={p} busy={busy.includes(p.id)} onAction={onAction} compact/>
