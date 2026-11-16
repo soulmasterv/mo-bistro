@@ -17,10 +17,12 @@ export default function WorkspaceHeader({
   role,
   workspace,
   username,
+  showWaiter = true,
 }: {
   role: StaffRole;
   workspace: string;
   username?: string;
+  showWaiter?: boolean;
 }) {
   const selector = useRef<HTMLDetailsElement>(null);
   const [busy, setBusy] = useState(false);
@@ -138,7 +140,7 @@ export default function WorkspaceHeader({
             </summary>
             <nav aria-label="Workspace menu" className="workspace-menu">
               {role === "manager" && workspace !== "Workspaces" &&
-                workspaces.map((item) => (
+                workspaces.filter((item) => showWaiter || item.href !== "/waiter").map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}

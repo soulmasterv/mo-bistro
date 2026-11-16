@@ -1,3 +1,4 @@
+import { waiterEnabled } from "@/lib/feature-settings";
 import { NextResponse } from "next/server";
 import { currentStaff } from "@/lib/staff-auth";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
@@ -22,6 +23,7 @@ export async function POST(
   if (originError) return originError;
 
 
+  if (!await waiterEnabled()) return NextResponse.json({ error: "Waiter workspace is disabled." }, { status: 404 });
   if (process.env.MO_BISTRO_DB !== "postgres") {
     return NextResponse.json(
       { error: "Table requests require PostgreSQL" },

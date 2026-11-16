@@ -1,3 +1,4 @@
+import { waiterEnabled } from "@/lib/feature-settings";
 import { NextResponse } from "next/server";
 import { currentStaff } from "@/lib/staff-auth";
 import { getPostgres } from "@/lib/postgres-db";
@@ -10,6 +11,7 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  if (!await waiterEnabled()) return NextResponse.json({ error: "Waiter workspace is disabled." }, { status: 404 });
   if (process.env.MO_BISTRO_DB !== "postgres") {
     return NextResponse.json({ error: "PostgreSQL required" }, { status: 503 });
   }

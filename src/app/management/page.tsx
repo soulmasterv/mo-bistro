@@ -1,3 +1,4 @@
+import { waiterEnabled } from "@/lib/feature-settings";
 
 import ManagementDashboard from "./management-dashboard";
 import WorkspaceHeader from "@/components/workspace-header";
@@ -7,5 +8,5 @@ import AdvancedTableControls from '@/components/advanced-table-controls';
 
 export default async function Page() {
   const staff = await requireStaffPage(["manager"]);
-  return <><WorkspaceHeader username={staff.username} role={staff.role} workspace="Management" />{advancedEnabled('tableEditor')&&<AdvancedTableControls editor/>}<ManagementDashboard /></>;
+  return <><WorkspaceHeader showWaiter={await waiterEnabled()} username={staff.username} role={staff.role} workspace="Management" />{advancedEnabled('tableEditor')&&<AdvancedTableControls editor/>}<ManagementDashboard /></>;
 }
