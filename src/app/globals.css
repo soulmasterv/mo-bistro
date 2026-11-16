@@ -2891,6 +2891,18 @@ html[data-theme="dark"] .confirmation-actions button:not(.confirmation-primary):
 .reception-reference .reception-queue-heading h2 { display:flex; align-items:center; gap:8px; }
 .reception-reference .reception-queue-heading .bistro-tabs { margin:0; gap:5px; }
 .reception-reference .reception-queue-heading .bistro-tabs button { font-size:12px; padding:10px 14px; }
+.reception-reference .reception-queue-heading .bistro-tabs .reception-requests-tab {
+  background: #e5edf3;
+  color: #314b61;
+}
+.reception-reference .reception-queue-heading .bistro-tabs .reception-requests-tab[aria-pressed="true"] {
+  background: #a9c7df;
+  color: #172c3c;
+}
+html[data-theme="dark"] .reception-reference .reception-queue-heading .bistro-tabs .reception-requests-tab[aria-pressed="false"] {
+  background: #253a4a;
+  color: #d8eaf8;
+}
 .reception-reference .reception-queue-toolbar { display:flex; flex-direction:row; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; padding:0 24px 20px; }
 .reception-reference .reception-queue-toolbar .bistro-search { position:static; flex:1; min-width:240px; max-width:420px; width:auto; margin:0; }
 .reception-reference .reception-queue-toolbar .reception-service-strip { flex:1; min-width:350px; max-width:500px; margin:0; border:0; border-radius:0; background:transparent; }

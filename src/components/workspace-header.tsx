@@ -28,6 +28,12 @@ export default function WorkspaceHeader({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [pendingCount, setPendingCount] = useState(0);
+  const [requestsOpen, setRequestsOpen] = useState(false);
+  useEffect(() => {
+    const update = (event: Event) => setRequestsOpen((event as CustomEvent<boolean>).detail);
+    window.addEventListener("mo-bistro-requests-view", update);
+    return () => window.removeEventListener("mo-bistro-requests-view", update);
+  }, []);
   useEffect(() => {
     let controller: AbortController | null = null;
     async function checkSession() {
@@ -105,17 +111,19 @@ export default function WorkspaceHeader({
         </div>
         <div className="workspace-header-actions">
           {workspace === "Reception" && <div id="reception-header-tools" />}
-          {workspace === "Reception" && pendingCount > 0 && (
+          {workspace === "Reception" && (
             <button
               type="button"
               className="queue-request-bell"
-              aria-label={`Open table requests (${pendingCount})`}
+              aria-label={`${requestsOpen ? "Hide" : "Show"} table requests (${pendingCount})`}
+              aria-expanded={requestsOpen}
+              aria-controls="table-request-notifications"
               onClick={() =>
                 window.dispatchEvent(new Event("mo-bistro-open-requests"))
               }
             >
               <Bell size={20} />
-              <span>{pendingCount}</span>
+              {pendingCount > 0 && <span>{pendingCount}</span>}
             </button>
           )}
           <details

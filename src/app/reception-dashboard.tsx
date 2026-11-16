@@ -7,7 +7,6 @@ import TrackingHandoff from "@/components/tracking-handoff";
 import NextGuestPanel from "@/components/next-guest-panel";
 import ReceptionServiceStrip from "@/components/reception-service-strip";
 import ReceptionTableRequests from "@/components/reception-table-requests";
-import TableReadyNotifications from "@/components/table-ready-notifications";
 
 import GuestDetailSheet from "@/components/guest-detail-sheet";
 import SeatGuestModal from "@/components/seat-guest-modal";
@@ -81,8 +80,23 @@ export default function Home() {
   const [seatingGuest, setSeatingGuest] = useState<Guest | null>(null);
   const [search, setSearch] = useState("");
   const [queueFilter, setQueueFilter] = useState<
-    "all" | "waiting" | "called" | "seated"
+    "all" | "waiting" | "seated"
   >("all");
+  const [showRequests, setShowRequests] = useState(false);
+  const [requestCount, setRequestCount] = useState(0);
+  useEffect(() => {
+    const toggle = () => setShowRequests(open => !open);
+    const update = (event: Event) => setRequestCount((event as CustomEvent<number>).detail);
+    window.addEventListener("mo-bistro-open-requests", toggle);
+    window.addEventListener("mo-bistro-requests-changed", update);
+    return () => {
+      window.removeEventListener("mo-bistro-open-requests", toggle);
+      window.removeEventListener("mo-bistro-requests-changed", update);
+    };
+  }, []);
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("mo-bistro-requests-view", { detail: showRequests }));
+  }, [showRequests]);
   const [openGuestMenu, setOpenGuestMenu] = useState<number | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [trackingUrl,setTrackingUrl]=useState("");
@@ -289,8 +303,6 @@ export default function Home() {
           className="bistro-notification-center"
           aria-label="Service notifications"
         >
-          <ReceptionTableRequests />
-          <TableReadyNotifications />
         </section>
         <header className="bistro-page-heading">
           <div>
@@ -402,28 +414,30 @@ export default function Home() {
                   [
                     ["all", "All guests"],
                     ["waiting", "Waiting"],
-                    ["called", "Called"],
                     ["seated", "Seated"],
                   ] as const
                 ).map(([value, label]) => (
                   <button
                     key={value}
-                    aria-pressed={queueFilter === value}
-                    onClick={() => setQueueFilter(value)}
+                    aria-pressed={!showRequests && queueFilter === value}
+                    onClick={() => { setShowRequests(false); setQueueFilter(value); }}
                   >
                     {label} (
                     {!guestsLoaded ? "—" : value === "all"
                       ? active.length
                       : value === "waiting"
                         ? waiting
-                        : value === "called"
-                          ? called
-                          : seated}
+                        : seated}
                     )
                   </button>
                 ))}
+                <button type="button" className="reception-requests-tab" aria-pressed={showRequests} aria-controls="table-request-notifications" onClick={() => setShowRequests(true)}>
+                  Table Requests ({requestCount})
+                </button>
               </div>
             </div>
+            <ReceptionTableRequests open={showRequests} />
+            {!showRequests && <>
             <div className="bistro-queue-controls reception-queue-toolbar">
               <div className="bistro-search">
                 <Search size={18} />
@@ -603,6 +617,7 @@ export default function Home() {
                 <i className="bistro-dot" /> Refreshes every 5 seconds
               </span>
             </footer>
+            </>}
           </section>
         </div>
         <footer className="bistro-page-footer">

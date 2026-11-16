@@ -24,15 +24,10 @@ type SuggestedGuest = {
 };
 type ApprovedTable = { name: string; guest: SuggestedGuest | null };
 
-export default function ReceptionTableRequests() {
+export default function ReceptionTableRequests({ open }: { open: boolean }) {
   const [requests, setRequests] = useState<RequestItem[]>([]);
-  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
-  const [unreadRequestIds, setUnreadRequestIds] = useState<Set<number>>(
-    new Set(),
-  );
   const unreadIdsRef = useRef(new Set<number>());
   const refreshController = useRef<AbortController | null>(null);
-  const unreadRequestCount = unreadRequestIds.size;
   const knownRequestIds = useRef<Set<number> | null>(null);
   const notificationPanelOpenRef = useRef(false);
   const [tables, setTables] = useState<
@@ -47,6 +42,11 @@ export default function ReceptionTableRequests() {
     {},
   );
   const [approved, setApproved] = useState<ApprovedTable | null>(null);
+  useEffect(() => {
+    if (!approved) return;
+    const timer = window.setTimeout(() => setApproved(null), 15000);
+    return () => window.clearTimeout(timer);
+  }, [approved]);
   const [seatingGuest, setSeatingGuest] = useState<SuggestedGuest | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -65,7 +65,7 @@ export default function ReceptionTableRequests() {
       oscillator.frequency.value = frequency;
       oscillator.type = "sine";
       gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.3, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.72, start + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.25);
       oscillator.connect(gain).connect(ctx.destination);
       oscillator.start(start);
@@ -137,7 +137,6 @@ export default function ReceptionTableRequests() {
       );
       if (reconciled.added.length > 0) chime();
       unreadIdsRef.current = reconciled.unread;
-      setUnreadRequestIds(reconciled.unread);
       knownRequestIds.current = currentIds;
       setRequests(list);
       window.dispatchEvent(
@@ -187,19 +186,9 @@ export default function ReceptionTableRequests() {
   }, [refresh]);
 
   useEffect(() => {
-    function openRequests() {
-      notificationPanelOpenRef.current = true;
-      setNotificationPanelOpen(true);
-      unreadIdsRef.current = new Set();
-      setUnreadRequestIds(new Set());
-      document
-        .querySelector(".bistro-notification-center")
-        ?.scrollIntoView({ block: "start" });
-    }
-    window.addEventListener("mo-bistro-open-requests", openRequests);
-    return () =>
-      window.removeEventListener("mo-bistro-open-requests", openRequests);
-  }, []);
+    notificationPanelOpenRef.current = open;
+    if (open) unreadIdsRef.current = new Set();
+  }, [open]);
 
   useEffect(() => {
     if (localStorage.getItem("mo-bistro-reception-sound") !== "on") return;
@@ -369,28 +358,25 @@ export default function ReceptionTableRequests() {
         <aside
           role="status"
           aria-live="polite"
-          className="mb-4 w-full rounded-2xl border border-[#D6B681] bg-[#FFFCF7] p-5 text-[#293126] shadow-2xl"
+          className="mx-3 my-2 min-w-0 rounded-lg border border-[#D6B681] bg-[#FFFCF7] px-3 py-2 text-[#293126]"
         >
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="font-serif text-2xl">Table is free!</h2>
-              <p className="mt-1 text-sm">
-                {approved.name} is available for the next guest.
-              </p>
+            <div className="min-w-0 self-center break-words">
+              <h2 className="text-sm font-semibold">{approved.name} is ready</h2>
             </div>
 
             <button
               type="button"
               onClick={() => setApproved(null)}
               aria-label="Close confirmation"
-              className="rounded-lg border border-[#C9C8BD] px-3 py-1.5 text-sm"
+              className="shrink-0 rounded-lg px-3 py-2 text-sm"
             >
               ✕
             </button>
           </div>
 
           {approved.guest ? (
-            <div className="mt-4 rounded-xl bg-[#F1EBDF] p-4">
+            <div className="mt-2 rounded-lg bg-[#F1EBDF] p-2">
               <p className="text-xs font-semibold uppercase tracking-wider">
                 Next eligible guest
               </p>
@@ -433,67 +419,17 @@ export default function ReceptionTableRequests() {
         />
       )}
 
-      {requests.length === 0 && error && (
-        <p role="alert" className="bistro-alert">
-          {error}
+      {open && requests.length === 0 && (
+        <p role="status" className="px-5 py-4 text-sm">
+          {error || "No pending table requests."}
         </p>
       )}
-      {requests.length > 0 && (
-        <div className="bistro-panel bistro-readiness-heading">
-          {error && !notificationPanelOpen && (
-            <p
-              role="alert"
-              className="max-w-xs rounded-lg bg-[#17202A] p-3 text-sm text-red-200"
-            >
-              {error}
-            </p>
-          )}
-          <div>
-            <h2 className="font-semibold">Table readiness</h2>
-            <p className="mt-1 text-sm text-slate-400">
-              Review waiter requests and keep the floor moving.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              const next = !notificationPanelOpenRef.current;
-              notificationPanelOpenRef.current = next;
-              setNotificationPanelOpen(next);
-
-              if (next) {
-                unreadIdsRef.current = new Set();
-                setUnreadRequestIds(new Set());
-              }
-            }}
-            aria-label={`Table requests: ${requests.length} pending, ${unreadRequestCount} unread`}
-            aria-controls="table-request-notifications"
-            aria-expanded={notificationPanelOpen}
-            className="flex min-h-12 items-center gap-3 rounded-xl border border-[#C5A77B] bg-[#17202A] px-4 py-3 text-base font-semibold text-white shadow-xl"
-          >
-            <span className="relative" aria-hidden="true">
-              🔔
-              {unreadRequestCount > 0 && (
-                <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
-                  {unreadRequestCount > 9 ? "9+" : unreadRequestCount}
-                </span>
-              )}
-            </span>
-            <span>
-              {requests.length > 0
-                ? `${requests.length} pending`
-                : "Table-ready requests"}
-            </span>
-          </button>
-        </div>
-      )}
-
-      {requests.length > 0 && notificationPanelOpen && (
+      {open && requests.length > 0 && (
         <section
           id="table-request-notifications"
-          className="bistro-panel bistro-request-panel"
+          className="bistro-panel bistro-request-panel mx-3 mt-3"
         >
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <h2 className="font-semibold">
               Table-ready requests ({requests.length})
             </h2>
