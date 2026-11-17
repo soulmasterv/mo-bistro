@@ -2768,6 +2768,16 @@ html[data-theme="dark"] .bistro-dialog-scope .bistro-add-card #staff-add-guest-f
   outline: 2px solid #d4b47b !important;
   outline-offset: 2px;
 }
+html[data-theme="dark"] .bistro-dialog-scope .queue-booking-details input.guest-eta-minutes {
+  background: #292a29 !important;
+  border: 1px solid #8c857b !important;
+  color: #faf6ee !important;
+  color-scheme: dark;
+}
+html[data-theme="dark"] .bistro-dialog-scope .queue-booking-details input.guest-eta-minutes:focus-visible {
+  outline: 2px solid #d4b47b !important;
+  outline-offset: 2px;
+}
 html[data-theme="dark"] .bistro-qr-overlay { background:#101111!important; }
 html[data-theme="light"] .bistro-qr-overlay { background:#faf7f1!important; }
 .bistro-qr-card { background:var(--staff-surface)!important; color:var(--ink)!important; }

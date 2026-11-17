@@ -63,7 +63,7 @@ export default function GuestEtaEditor({
             required
             value={minutes}
             onChange={(e) => setMinutes(e.target.value)}
-            className="mt-2 w-full rounded-xl border p-3"
+            className="guest-eta-minutes mt-2 w-full rounded-xl border p-3"
           />
         </label>
         <div className="mt-3 flex gap-3">
