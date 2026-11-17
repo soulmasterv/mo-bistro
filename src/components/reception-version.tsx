@@ -37,7 +37,8 @@ export default function ReceptionVersion({ deployment, endpoint }: { deployment:
       document.removeEventListener("visibilitychange", focus);
     };
   }, [deployment, endpoint]);
-  return <div className="mt-1" role="status">
+  return <div style={{display:"inline-flex",alignItems:"center",gap:6}} role="status">
+    {status === "latest" && <span aria-hidden="true" style={{width:7,height:7,borderRadius:"50%",background:"#36b873",flexShrink:0}} />}
     {status === "update" ? <>Update available · <button type="button" className="underline underline-offset-2" onClick={() => window.location.reload()}>Refresh</button></>
       : status === "latest" ? "Latest version" : status === "checking" ? "Checking version…" : "Couldn’t check version"}
   </div>;
