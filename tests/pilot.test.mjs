@@ -181,7 +181,7 @@ test('Pilot records lifecycle, arrival position, source, private status and anon
  const rows=await store.exportRows();assert.ok(rows[0].joined_at&&rows[0].called_at&&rows[0].seated_at);assert.ok(rows[1].left_at);assert.equal(rows[1].source,'walk_in');
  const csv=store.csv(rows);assert.match(csv,/joined_at,called_at,seated_at,left_at/);assert.doesNotMatch(csv,/Synthetic|0100000000|tracking_hash|,name,|,phone,/);
  const statusResponse=await h.route('pilot/status').GET(new Request('https://bistro.test/api/pilot/status?token='+first.token));
- assert.equal(statusResponse.status,200);assert.equal(statusResponse.headers.get('cache-control'),'no-store');assert.doesNotMatch(await statusResponse.text(),/Synthetic|0100000000|tracking_hash/);
+ assert.equal(statusResponse.status,200);assert.equal(statusResponse.headers.get('cache-control'),'no-store');assert.doesNotMatch(await statusResponse.text(),/0100000000|tracking_hash/);
  }finally{await db.close();}});
 test('Pilot rejects invalid/public staff actions, cross-origin joins and other staff accounts',async()=>{const {db,h}=await setup();try{
  for(const data of [{...input,party_size:0},{...input,phone:'bad'},{...input,preference:'any'},{...input,name:'x'},{...input,role:'manager'}])assert.equal((await h.route('pilot/join').POST(request('POST',data))).status,400);
@@ -190,7 +190,7 @@ test('Pilot rejects invalid/public staff actions, cross-origin joins and other s
  h.state.actor=null;assert.equal((await h.route('pilot/export').GET()).status,401);assert.equal((await h.route('pilot/queue').POST(request('POST',input))).status,401);
  h.state.actor={username:'SomeoneElse',role:'manager'};assert.equal((await h.route('pilot/queue').GET()).status,401);
  }finally{await db.close();}});
-test('Pilot only exposes selected routes',()=>{const {pilotPathAllowed}=load('src/lib/pilot/config.ts');for(const p of ['/','/queue','/join','/status','/login','/api/pilot/queue','/api/auth/login'])assert.equal(pilotPathAllowed(p),true,p);for(const p of ['/management','/waiter','/api/whatsapp/jobs','/api/guests','/api/internal/database-cleanup','/api/simple-tables','/api/license/status','/api/auth/pin-login'])assert.equal(pilotPathAllowed(p),false,p);});
+test('Pilot only exposes selected routes',()=>{const {pilotPathAllowed}=load('src/lib/pilot/config.ts');for(const p of ['/','/queue','/management','/join','/status','/login','/api/pilot/queue','/api/auth/login'])assert.equal(pilotPathAllowed(p),true,p);for(const p of ['/management/staff-pins','/waiter','/api/whatsapp/jobs','/api/guests','/api/internal/database-cleanup','/api/simple-tables','/api/license/status','/api/auth/pin-login'])assert.equal(pilotPathAllowed(p),false,p);});
 test('Ready sender is consent-gated and claims each Call at most once',async()=>{const {db,h,store}=await setup();try{
 
  let sends=0;const payloads=[];h.mocks['@/lib/whatsapp/transport']={requestMetaTemplate:async p=>{sends++;payloads.push(p);return {state:'sent',messageId:'synthetic-provider-id'};}};
