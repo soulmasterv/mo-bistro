@@ -27,6 +27,7 @@ function isValidFullName(value: string) {
 export default function JoinPage() {
   const [availability, setAvailability] = useState<"checking" | "open" | "paused" | "full" | "unavailable">("checking");
   const publicPaused = availability === "paused";
+  const [closedMessage,setClosedMessage] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
@@ -38,7 +39,10 @@ export default function JoinPage() {
         const response = await fetch("/api/public/waitlist", { cache: "no-store", signal: controller.signal });
         if (!response.ok) throw Error("Waitlist availability unavailable");
         const data = await response.json();
-        if (active) setAvailability(data.paused ? "paused" : data.full ? "full" : "open");
+        if (active) {
+          setClosedMessage(data.closedMessage ?? null);
+          setAvailability(data.paused ? "paused" : data.full ? "full" : "open");
+        }
       } catch {
         if (active) setAvailability(current => current === "checking" ? "unavailable" : current);
       } finally {
@@ -332,7 +336,7 @@ export default function JoinPage() {
 
               {publicPaused && <div role="status" className="rounded-2xl border border-[#E4DCD0] bg-[#FFFDF9] p-6">
                 <h3 className="font-serif text-2xl">Waitlist temporarily closed</h3>
-                <p className="mt-3 text-sm">Please speak with reception. Existing bookings are still active.</p>
+                <p className="mt-3 text-sm">{closedMessage || "Please speak with reception. Existing bookings are still active."}</p>
               </div>}
               {qrState === "valid" && (availability === "full" || availability === "checking" || availability === "unavailable") && (
                 <div role="status" className="rounded-2xl border border-[#E4DCD0] bg-[#FFFDF9] p-6">

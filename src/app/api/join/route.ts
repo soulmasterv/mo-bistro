@@ -50,6 +50,8 @@ const schema = z.object({
   whatsapp_feedback_consent: z.boolean().default(false),
 });
 
+import {readSchedule,scheduleState} from "@/lib/waitlist-schedule";
+
 export async function POST(request: Request) {
   if (!isAllowedQROrigin(request)) {
     return NextResponse.json(
@@ -63,6 +65,8 @@ export async function POST(request: Request) {
 
 
   try {
+    const closedMessage = scheduleState(await readSchedule());
+    if (closedMessage) return NextResponse.json({error:closedMessage},{status:409});
     const body = schema.safeParse(await request.json());
 
     if (!body.success) {

@@ -1,6 +1,7 @@
 import { getPostgres } from "@/lib/postgres-db";
 import { getSetting } from "@/lib/staff-auth";
 import db from "@/lib/db";
+import {readSchedule,scheduleState} from "@/lib/waitlist-schedule";
 export async function GET() {
   const headers = { "Cache-Control": "no-store" };
   try {
@@ -16,6 +17,7 @@ export async function GET() {
         }))();
     const capacity = Number(state.capacity);
     if (!Number.isInteger(capacity) || capacity < 1 || capacity > 500) throw Error("Invalid capacity");
-    return Response.json({ paused: state.paused === "true", full: Number(state.active) >= capacity }, { headers });
+    const closedMessage = scheduleState(await readSchedule());
+    return Response.json({ paused: state.paused === "true" || !!closedMessage, closedMessage, full: Number(state.active) >= capacity }, { headers });
   } catch { return Response.json({ error: "Waitlist availability unavailable" }, { status: 503, headers }); }
 }

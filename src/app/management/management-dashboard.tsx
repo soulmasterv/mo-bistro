@@ -1,6 +1,7 @@
 "use client";
 import WaitlistControls from "@/components/waitlist-controls";
 import WhatsAppPreviewTest from "@/components/whatsapp-preview-test";
+import WaitlistSchedule from "@/components/waitlist-schedule";
 import ManagementDangerZone from "@/components/management-danger-zone";
 import ManagementOperations from "@/components/management-operations";
 import StaffAccountManager from "@/components/staff-account-manager";
@@ -252,6 +253,9 @@ export default function ManagementPage() {
                 </label>
 
                 {busy && <p role="status">Saving settings…</p>}
+                <div className="mt-5 border-t border-[#817b71] pt-5">
+                  <WaitlistSchedule endpoint="/api/public/waitlist-hours" />
+                </div>
               </section>
             )}
 
