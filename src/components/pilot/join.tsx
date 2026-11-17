@@ -1,5 +1,5 @@
 "use client";
-import {useRef,useState,type FormEvent} from 'react';
+import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {useRouter} from 'next/navigation';
 import {ArrowRight,ArrowUpRight,Check,ChevronDown,Camera,MapPin,Users,UtensilsCrossed} from 'lucide-react';
 type Seating='indoor'|'outdoor';
@@ -9,6 +9,14 @@ export default function PilotJoin(){
  const [name,setName]=useState(''),[nameTouched,setNameTouched]=useState(false),[phone,setPhone]=useState('');
  const [partySize,setPartySize]=useState(2),[seatingPreference,setSeatingPreference]=useState<Seating>('indoor');
  const [loading,setLoading]=useState(false),[error,setError]=useState('');
+ const [availability,setAvailability]=useState<string|null|undefined>(undefined);
+ useEffect(()=>{
+  const controller=new AbortController();
+  fetch('/api/pilot/waitlist-hours',{cache:'no-store',signal:controller.signal})
+   .then(async response=>{if(!response.ok)throw Error();const data=await response.json();setAvailability(data.closedMessage??null);})
+   .catch(()=>{if(!controller.signal.aborted)setAvailability('Could not check waitlist availability. Please refresh or speak with reception.');});
+  return ()=>controller.abort();
+ },[]);
  async function joinWaitlist(event:FormEvent<HTMLFormElement>){
   event.preventDefault();if(pending.current)return;setNameTouched(true);
   if(!isValidFullName(name)){setError('Please enter your name.');return;}
@@ -115,7 +123,7 @@ export default function PilotJoin(){
                 </p>
               </div>
 
-              <form onSubmit={joinWaitlist} className="space-y-5" aria-busy={loading}>
+              {availability === null ? <form onSubmit={joinWaitlist} className="space-y-5" aria-busy={loading}>
                 <div>
                   <label
                     htmlFor="guest-name"
@@ -250,7 +258,7 @@ export default function PilotJoin(){
                     />
                   )}
                 </button>
-              </form>
+              </form> : <p role="status">{availability ?? 'Checking availability…'}</p>}
 
               <div className="mt-9 flex items-center justify-center gap-5 border-t border-[#EAE4DA] pt-6 text-[12px] text-[#777064]">
 

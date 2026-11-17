@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import { PILOT_ORIGIN } from '@/lib/pilot/config';
 import { retryAfterMilliseconds } from '@/lib/retry-after';
 import PartyForm from './party-form';
+import WaitlistSchedule from '@/components/waitlist-schedule';
 import JoinQR from './join-qr';
 import {PilotQueue,PilotDrawer,type Party,type QueueAction} from './queue';
 import styles from './pilot.module.css';
@@ -124,6 +125,7 @@ export default function PilotReception({username,role="reception",children}:{use
   <div className={styles.receptionLayout}>
   <aside className={styles.receptionSidebar}><a href="/queue" aria-current="page"><Users size={18} aria-hidden="true"/> Queue</a></aside>
   <div className={styles.receptionContent}>
+  {role==='manager'&&<WaitlistSchedule endpoint="/api/pilot/waitlist-hours" />}
   <div className={styles.entryTools}>
    <section id="pilot-walk-in" aria-label="Walk-in form" className={styles.panel} hidden={!showWalkIn}><PartyForm staff onCreated={party=>{setHandoff(party);void refresh(undefined,true);}}/></section>
   </div>
