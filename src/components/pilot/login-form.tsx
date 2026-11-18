@@ -18,7 +18,11 @@ export default function LoginForm({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <form className={styles.form} method="post" action="/api/auth/login" aria-busy={busy}
+    <form
+      className={styles.form}
+      method="post"
+      action="/api/auth/login"
+      aria-busy={busy}
       onSubmit={(event) => {
         if (submitting.current) {
           event.preventDefault();
@@ -26,10 +30,17 @@ export default function LoginForm({ children }: { children: ReactNode }) {
         }
         submitting.current = true;
         setBusy(true);
-      }}>
+      }}
+    >
       {children}
       <button className={styles.button} type="submit" disabled={busy}>
-        {busy ? "Signing in…" : <>Sign in <ArrowRight size={19} aria-hidden="true" /></>}
+        {busy ? (
+          "Signing in…"
+        ) : (
+          <>
+            Sign in <ArrowRight size={19} aria-hidden="true" />
+          </>
+        )}
       </button>
     </form>
   );

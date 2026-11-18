@@ -1,33 +1,87 @@
 "use client";
-import {useEffect,useRef,useState,type FormEvent} from 'react';
-import {useRouter} from 'next/navigation';
-import {ArrowRight,ArrowUpRight,Check,ChevronDown,Camera,MapPin,Users,UtensilsCrossed} from 'lucide-react';
-type Seating='indoor'|'outdoor';
-function isValidFullName(value:string){return value.trim().length>=2;}
-export default function PilotJoin(){
- const router=useRouter(),pending=useRef(false);
- const [name,setName]=useState(''),[nameTouched,setNameTouched]=useState(false),[phone,setPhone]=useState('');
- const [partySize,setPartySize]=useState(2),[seatingPreference,setSeatingPreference]=useState<Seating>('indoor');
- const [loading,setLoading]=useState(false),[error,setError]=useState('');
- const [availability,setAvailability]=useState<string|null|undefined>(undefined);
- useEffect(()=>{
-  const controller=new AbortController();
-  fetch('/api/pilot/waitlist-hours',{cache:'no-store',signal:controller.signal})
-   .then(async response=>{if(!response.ok)throw Error();const data=await response.json();setAvailability(data.closedMessage??null);})
-   .catch(()=>{if(!controller.signal.aborted)setAvailability('Could not check waitlist availability. Please refresh or speak with reception.');});
-  return ()=>controller.abort();
- },[]);
- async function joinWaitlist(event:FormEvent<HTMLFormElement>){
-  event.preventDefault();if(pending.current)return;setNameTouched(true);
-  if(!isValidFullName(name)){setError('Please enter your name.');return;}
-  pending.current=true;setLoading(true);setError('');
-  try{
-   const response=await fetch('/api/pilot/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),phone:phone.trim(),party_size:partySize,preference:seatingPreference,whatsapp_consent:false})});
-   const data=await response.json();if(!response.ok)throw Error(data.error||'Unable to join the waitlist.');
-   if(typeof data.token!=='string'||!/^[a-f0-9]{64}$/.test(data.token))throw Error('Please ask reception for your booking status.');
-   router.push('/status?token='+encodeURIComponent(data.token));
-  }catch(e){setError(e instanceof Error?e.message:'Unable to join the waitlist.');pending.current=false;setLoading(false);}
- }
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Check,
+  ChevronDown,
+  Camera,
+  MapPin,
+  Users,
+  UtensilsCrossed,
+} from "lucide-react";
+type Seating = "indoor" | "outdoor";
+function isValidFullName(value: string) {
+  return value.trim().length >= 2;
+}
+export default function PilotJoin() {
+  const router = useRouter(),
+    pending = useRef(false);
+  const [name, setName] = useState(""),
+    [nameTouched, setNameTouched] = useState(false),
+    [phone, setPhone] = useState("");
+  const [partySize, setPartySize] = useState(2),
+    [seatingPreference, setSeatingPreference] = useState<Seating>("indoor");
+  const [loading, setLoading] = useState(false),
+    [error, setError] = useState("");
+  const [availability, setAvailability] = useState<string | null | undefined>(
+    undefined,
+  );
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/pilot/waitlist-hours", {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw Error();
+        const data = await response.json();
+        setAvailability(data.closedMessage ?? null);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setAvailability(
+            "Could not check waitlist availability. Please refresh or speak with reception.",
+          );
+      });
+    return () => controller.abort();
+  }, []);
+  async function joinWaitlist(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending.current) return;
+    setNameTouched(true);
+    if (!isValidFullName(name)) {
+      setError("Please enter your name.");
+      return;
+    }
+    pending.current = true;
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/pilot/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          phone: phone.trim(),
+          party_size: partySize,
+          preference: seatingPreference,
+          whatsapp_consent: false,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok)
+        throw Error(data.error || "Unable to join the waitlist.");
+      if (typeof data.token !== "string" || !/^[a-f0-9]{64}$/.test(data.token))
+        throw Error("Please ask reception for your booking status.");
+      router.push("/status?token=" + encodeURIComponent(data.token));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to join the waitlist.");
+      pending.current = false;
+      setLoading(false);
+    }
+  }
   const inputClass =
     "w-full rounded-xl border border-[#E4DCD0] bg-[#FFFDF9] px-4 py-3.5 text-[15px] text-[#302D28] outline-none transition placeholder:text-[#A69F95] focus:border-[#AD8A5B] focus:ring-2 focus:ring-[#AD8A5B]/15";
 
@@ -35,7 +89,6 @@ export default function PilotJoin(){
     <main className="min-h-screen bg-[#F4F0E9] text-[#302D28]">
       <div className="mx-auto min-h-screen max-w-[1160px] lg:flex lg:items-center lg:px-6 lg:py-8">
         <div className="grid min-h-screen w-full overflow-hidden bg-[#FFFCF7] shadow-[0_16px_65px_rgba(42,35,25,0.08)] lg:min-h-[750px] lg:grid-cols-[0.9fr_1.1fr] lg:rounded-[28px]">
-
           {/* Restaurant introduction */}
           <section className="relative flex min-h-[260px] flex-col justify-between overflow-hidden bg-[#34382E] px-7 py-7 text-[#F9F4E9] sm:px-10 lg:min-h-full lg:px-12 lg:py-12">
             <div
@@ -81,8 +134,8 @@ export default function PilotJoin(){
               </h1>
 
               <p className="mt-5 max-w-[330px] text-[14px] leading-7 text-[#E0DDCF]/80">
-                We&apos;re happy you&apos;re here. Leave us your details
-                and we&apos;ll help you find your place at the table.
+                We&apos;re happy you&apos;re here. Leave us your details and
+                we&apos;ll help you find your place at the table.
               </p>
             </div>
 
@@ -123,145 +176,156 @@ export default function PilotJoin(){
                 </p>
               </div>
 
-              {availability === null ? <form onSubmit={joinWaitlist} className="space-y-5" aria-busy={loading}>
-                <div>
-                  <label
-                    htmlFor="guest-name"
-                    className="mb-2 block text-[12px] font-semibold text-[#504B42]"
-                  >
-                    Your name
-                  </label>
-                  <input
-                    id="guest-name"
-                    required
-                    autoComplete="name"
-                    maxLength={100}
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    onBlur={() => setNameTouched(true)}
-                    aria-invalid={nameTouched && !isValidFullName(name)}
-                    placeholder="Full name"
-                    className={inputClass}
-                  />
-                  {nameTouched && !isValidFullName(name) && (
-                    <p role="alert" className="mt-2 text-sm text-red-600">
-                      Please enter your name.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="guest-phone"
-                    className="mb-2 block text-[12px] font-semibold text-[#504B42]"
-                  >
-                    Phone number
-                  </label>
-                  <input
-                    id="guest-phone"
-                    required
-                    type="tel"
-                    pattern="01[0125][0-9]{8}"
-                    maxLength={11}
-                    autoComplete="tel"
-                    inputMode="tel"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    placeholder="01XXXXXXXXX"
-                    className={inputClass}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
+              {availability === null ? (
+                <form
+                  onSubmit={joinWaitlist}
+                  className="space-y-5"
+                  aria-busy={loading}
+                >
                   <div>
                     <label
-                      htmlFor="party-size"
-                      className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-[#504B42]"
-                    >
-                      <Users size={14} />
-                      Guests
-                    </label>
-                    <div className="relative">
-                      <select
-                        id="party-size"
-                        value={partySize}
-                        onChange={e => setPartySize(Number(e.target.value))}
-                        className={`${inputClass} appearance-none pr-9`}
-                      >
-                        {Array.from({ length: 30 }, (_, i) => i + 1).map(n => (
-                          <option key={n} value={n}>
-                            {n} {n === 1 ? "guest" : "guests"}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown
-                        size={16}
-                        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#817A6C]"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="seating"
+                      htmlFor="guest-name"
                       className="mb-2 block text-[12px] font-semibold text-[#504B42]"
                     >
-                      Seating preference
+                      Your name
                     </label>
-                    <div className="relative">
-                      <select
-                        id="seating"
-                        value={seatingPreference}
-                        onChange={e => setSeatingPreference(e.target.value as Seating)}
-                        className={`${inputClass} appearance-none pr-9`}
+                    <input
+                      id="guest-name"
+                      required
+                      autoComplete="name"
+                      maxLength={100}
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      onBlur={() => setNameTouched(true)}
+                      aria-invalid={nameTouched && !isValidFullName(name)}
+                      placeholder="Full name"
+                      className={inputClass}
+                    />
+                    {nameTouched && !isValidFullName(name) && (
+                      <p role="alert" className="mt-2 text-sm text-red-600">
+                        Please enter your name.
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="guest-phone"
+                      className="mb-2 block text-[12px] font-semibold text-[#504B42]"
+                    >
+                      Phone number
+                    </label>
+                    <input
+                      id="guest-phone"
+                      required
+                      type="tel"
+                      pattern="01[0125][0-9]{8}"
+                      maxLength={11}
+                      autoComplete="tel"
+                      inputMode="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="01XXXXXXXXX"
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label
+                        htmlFor="party-size"
+                        className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-[#504B42]"
                       >
-                        <option value="indoor">Indoor</option>
-                        <option value="outdoor">Outdoor</option>
-                      </select>
-                      <ChevronDown
-                        size={16}
-                        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#817A6C]"
-                      />
+                        <Users size={14} />
+                        Guests
+                      </label>
+                      <div className="relative">
+                        <select
+                          id="party-size"
+                          value={partySize}
+                          onChange={(e) => setPartySize(Number(e.target.value))}
+                          className={`${inputClass} appearance-none pr-9`}
+                        >
+                          {Array.from({ length: 30 }, (_, i) => i + 1).map(
+                            (n) => (
+                              <option key={n} value={n}>
+                                {n} {n === 1 ? "guest" : "guests"}
+                              </option>
+                            ),
+                          )}
+                        </select>
+                        <ChevronDown
+                          size={16}
+                          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#817A6C]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="seating"
+                        className="mb-2 block text-[12px] font-semibold text-[#504B42]"
+                      >
+                        Seating preference
+                      </label>
+                      <div className="relative">
+                        <select
+                          id="seating"
+                          value={seatingPreference}
+                          onChange={(e) =>
+                            setSeatingPreference(e.target.value as Seating)
+                          }
+                          className={`${inputClass} appearance-none pr-9`}
+                        >
+                          <option value="indoor">Indoor</option>
+                          <option value="outdoor">Outdoor</option>
+                        </select>
+                        <ChevronDown
+                          size={16}
+                          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#817A6C]"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-start gap-2.5 rounded-xl bg-[#F4F1E9] px-4 py-3.5">
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#E2E5D9] text-[#526347]">
-                    <Check size={12} />
-                  </span>
-                  <p className="text-[12px] leading-5 text-[#777367]">
-                    We&apos;ll use your details to manage your place in the
-                    queue. Seating preferences depend on availability.
-                  </p>
-                </div>
-
-                {error && (
-                  <div
-                    role="alert"
-                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700"
-                  >
-                    {error}
+                  <div className="flex items-start gap-2.5 rounded-xl bg-[#F4F1E9] px-4 py-3.5">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#E2E5D9] text-[#526347]">
+                      <Check size={12} />
+                    </span>
+                    <p className="text-[12px] leading-5 text-[#777367]">
+                      We&apos;ll use your details to manage your place in the
+                      queue. Seating preferences depend on availability.
+                    </p>
                   </div>
-                )}
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="group flex w-full items-center justify-center gap-3 rounded-xl bg-[#34382E] px-5 py-4 text-[14px] font-semibold text-[#FFF9EC] transition hover:bg-[#424938] disabled:cursor-wait disabled:opacity-60"
-                >
-                  {loading ? "Joining the waitlist..." : "Join the waitlist"}
-                  {!loading && (
-                    <ArrowRight
-                      size={17}
-                      className="transition-transform group-hover:translate-x-1"
-                    />
+                  {error && (
+                    <div
+                      role="alert"
+                      className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700"
+                    >
+                      {error}
+                    </div>
                   )}
-                </button>
-              </form> : <p role="status">{availability ?? 'Checking availability…'}</p>}
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="group flex w-full items-center justify-center gap-3 rounded-xl bg-[#34382E] px-5 py-4 text-[14px] font-semibold text-[#FFF9EC] transition hover:bg-[#424938] disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {loading ? "Joining the waitlist..." : "Join the waitlist"}
+                    {!loading && (
+                      <ArrowRight
+                        size={17}
+                        className="transition-transform group-hover:translate-x-1"
+                      />
+                    )}
+                  </button>
+                </form>
+              ) : (
+                <p role="status">{availability ?? "Checking availability…"}</p>
+              )}
 
               <div className="mt-9 flex items-center justify-center gap-5 border-t border-[#EAE4DA] pt-6 text-[12px] text-[#777064]">
-
                 <a
                   href="https://www.facebook.com/mobistroegypt/"
                   target="_blank"

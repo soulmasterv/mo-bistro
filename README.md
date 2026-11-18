@@ -4,7 +4,9 @@ A single-restaurant waitlist and seating website: guest registration/tracking, R
 
 ## Source and environments
 
-Development is on `feature/mo-bistro-ui-rebuild`. Preview and Production require different databases and credentials. Never infer that a Vercel build applies SQL migrations. General WhatsApp defaults to disabled/simulation; do not change live-send flags while validating core workflows.
+Pilot is deployed from `Development`; Advanced is deployed from `preview`. Each environment uses a separate database branch and credentials; see [database environments](docs/database-environments.md). Never infer that a Vercel build applies SQL migrations. General WhatsApp defaults to disabled/simulation; do not change live-send flags while validating core workflows.
+
+See [Pilot code organization](docs/pilot-code-organization.md) for its UI, polling, data, and messaging boundaries. Older Advanced compatibility modules and tests remain in this branch; their presence does not enable those features in Pilot.
 
 Latest plan reconciliation and verification: `docs/stabilization-readiness-20261013.md`. Missing Preview customer-window table procedure: `docs/preview-window-migration-procedure.md` (prepared only, separate approval required).
 
@@ -27,11 +29,10 @@ Use the same supported Node runtime for dependency installation and build. If th
 The following is the proposed schema sequence for an EMPTY, approved isolated database. This sequence has not been executed against Neon by this implementation. Check results with `docs/core-schema-preflight.sql`. Do not run every dated repair file automatically.
 
 1. `migrations/001_postgres_schema.sql`
-2. `migrations/002_licensing.sql`
-3. `migrations/20261010_guest_manual_eta.sql`
-4. `migrations/20261012_staff_schema_repair.sql` (PINs, waiter role, shifts)
-5. `migrations/20261012_simple_inventory.sql` (named/area requests and anonymous inventory)
-6. `migrations/20261013_core_support.sql` (QR permits, request limits and integration-independent seating time)
+2. `migrations/20261010_guest_manual_eta.sql`
+3. `migrations/20261012_staff_schema_repair.sql` (PINs, waiter role, shifts)
+4. `migrations/20261012_simple_inventory.sql` (named/area requests and anonymous inventory)
+5. `migrations/20261013_core_support.sql` (QR permits, request limits and integration-independent seating time)
 
 Provision the initial manager through a reviewed administrative procedure using the existing salted credential format. No default password/account is created by this guide.
 

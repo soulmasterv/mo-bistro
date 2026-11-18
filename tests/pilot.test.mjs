@@ -56,7 +56,7 @@ test('Confirmed staff cancellation and guest leave remove parties immediately', 
  } finally { await db.close(); }
 });
 test('Undo countdown uses database time even when the reception device clock is ahead',()=>{
- const {observedPartyTime}=load('src/components/pilot/queue.tsx');const server=Date.parse('2026-10-17T12:00:00Z');
+ const {observedPartyTime}=load('src/lib/pilot/queue.ts');const server=Date.parse('2026-10-17T12:00:00Z');
  const party={server_now:new Date(server).toISOString(),received_at:server+28000};
  assert.equal(observedPartyTime(party,server+28000),server);
  assert.equal(observedPartyTime(party,server+30000),server+2000);
