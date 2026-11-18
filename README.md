@@ -4,9 +4,9 @@ A single-restaurant waitlist and seating website: guest registration/tracking, R
 
 ## Source and environments
 
-Development is on `feature/mo-bistro-ui-rebuild`. Preview and Production require different databases and credentials. Never infer that a Vercel build applies SQL migrations. General WhatsApp defaults to disabled/simulation; do not change live-send flags while validating core workflows.
+Advanced Preview is on `preview`; Pilot is on `Development`. Their Neon databases are separate direct children of Production. See [database environments](docs/database-environments.md) for the current mapping. Never infer that a Vercel build applies SQL migrations. General WhatsApp defaults to disabled/simulation; do not change live-send flags while validating core workflows.
 
-Latest plan reconciliation and verification: `docs/stabilization-readiness-20261013.md`. Missing Preview customer-window table procedure: `docs/preview-window-migration-procedure.md` (prepared only, separate approval required).
+See [code organization](docs/code-organization.md) for the current source layout and local checks. Older planning and verification notes remain in dated documents, including `docs/stabilization-readiness-20261013.md`; they are historical records rather than the current deployment mapping.
 
 Migration-backed QA harness preparation and current test evidence: `docs/migration-backed-harness-readiness.md`.
 
@@ -27,11 +27,10 @@ Use the same supported Node runtime for dependency installation and build. If th
 The following is the proposed schema sequence for an EMPTY, approved isolated database. This sequence has not been executed against Neon by this implementation. Check results with `docs/core-schema-preflight.sql`. Do not run every dated repair file automatically.
 
 1. `migrations/001_postgres_schema.sql`
-2. `migrations/002_licensing.sql`
-3. `migrations/20261010_guest_manual_eta.sql`
-4. `migrations/20261012_staff_schema_repair.sql` (PINs, waiter role, shifts)
-5. `migrations/20261012_simple_inventory.sql` (named/area requests and anonymous inventory)
-6. `migrations/20261013_core_support.sql` (QR permits, request limits and integration-independent seating time)
+2. `migrations/20261010_guest_manual_eta.sql`
+3. `migrations/20261012_staff_schema_repair.sql` (PINs, waiter role, shifts)
+4. `migrations/20261012_simple_inventory.sql` (named/area requests and anonymous inventory)
+5. `migrations/20261013_core_support.sql` (QR permits, request limits and integration-independent seating time)
 
 Provision the initial manager through a reviewed administrative procedure using the existing salted credential format. No default password/account is created by this guide.
 
@@ -48,7 +47,7 @@ The canonical confirmation key is `approval_required`. Existing `require_confirm
 - Mock-only checks: `node --test tests/core-stabilization.test.mjs tests/next-guest.test.mjs tests/regressions.test.mjs tests/whatsapp-customer-window.test.mjs tests/whatsapp-preview-test.test.mjs tests/whatsapp-webhook-failure.test.mjs tests/whatsapp-webhook-verification.test.mjs`.
 - `tests/browser-workflows.test.mjs` renders actual components with synthetic APIs; this is not a deployed Preview/database test.
 - Existing `tests/postgres-workflows.test.mjs` and `tests/whatsapp.test.mjs` use in-memory PGlite. They do not prove Neon connection/lock behavior.
-- `tests/isolated-postgres-concurrency.test.mjs` is a distinct opt-in real PostgreSQL harness. Its database cases remain skipped without an explicitly approved dedicated target; pure safety-gate assertions still run. Use a secure config-file argument without environment changes, as documented in `docs/isolated-postgres-concurrency-plan.md`. Existing dedicated test URL/ack variables remain supported. Only an empty, verified `mo_bistro_qa_*` database is accepted; mo_bistro_2 and app URL matches are refused. It applies the six documented core migrations unchanged to public, then uses synthetic fixtures. It closes connections without dropping schemas/databases; a populated database cannot be reused. No actual PostgreSQL run occurred during harness preparation.
+- `tests/isolated-postgres-concurrency.test.mjs` is a distinct opt-in real PostgreSQL harness. Its database cases remain skipped without an explicitly approved dedicated target; pure safety-gate assertions still run. Use a secure config-file argument without environment changes, as documented in `docs/isolated-postgres-concurrency-plan.md`. Existing dedicated test URL/ack variables remain supported. Only an empty, verified `mo_bistro_qa_*` database is accepted; mo_bistro_2 and app URL matches are refused. It applies the five documented core migrations unchanged to public, then uses synthetic fixtures. It closes connections without dropping schemas/databases; a populated database cannot be reused. No actual PostgreSQL run occurred during harness preparation.
 
 ## Workflows and operational limitations
 
@@ -56,7 +55,7 @@ All guests shows waiting/called only; Seated has its own tab. Managers configure
 
 Public and staff PostgreSQL creation share the capacity lock. Walk-ins remain staff-confirmed, receive a one-time private tracking-link/QR handoff, and start without WhatsApp permissions. Staff cannot set customer opt-ins. Guest subscriptions still require an actual verified incoming WhatsApp reply. A token lost after the creation response cannot be recovered from its database hash; do not expose a token through guest listing or public lookup.
 
-ETA editing is inside guest details; restaurant-wide estimated wait remains separate. Next-guest suggestions are distinct across areas within one read-only snapshot but are advisory, not reservations. Shifts are planning information, not sign-in restrictions. Public lookup returns only whether an active registration exists for an exact Egyptian mobile number; it cannot recover private tracking access and still reveals limited presence information.
+ETA editing is inside guest details; restaurant-wide estimated wait remains separate. Next-guest suggestions are distinct across areas within one read-only snapshot but are advisory, not reservations. Public lookup returns only whether an active registration exists for an exact Egyptian mobile number; it cannot recover private tracking access and still reveals limited presence information.
 
 Demo generation and diagnostic pages are allowed only in explicit development/Preview environments. Production refuses them server-side. Operational pages retain the neutral palette.
 

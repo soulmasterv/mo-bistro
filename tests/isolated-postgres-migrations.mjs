@@ -5,7 +5,6 @@ import { ACK } from "./isolated-postgres-target.mjs";
 
 export const MIGRATION_SEQUENCE = Object.freeze([
   "001_postgres_schema.sql",
-  "002_licensing.sql",
   "20261010_guest_manual_eta.sql",
   "20261012_staff_schema_repair.sql",
   "20261012_simple_inventory.sql",

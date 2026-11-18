@@ -104,7 +104,7 @@ test('combined snapshot reuses five reads, matches both inventory modes, and per
 });
 test('combined endpoint denies anonymous and waiter before any database work',async()=>{
  for(const staff of [null,{role:'waiter'}]){
-  const route=load('src/app/api/reception/dashboard/route.ts',{'@/lib/staff-auth':{currentStaff:async()=>staff},'@/lib/reception-snapshot':{receptionSnapshot:()=>{throw Error('must not read');}}});
+  const route=load('src/app/api/reception/dashboard/route.ts',{'@/lib/db':{},'@/lib/staff-auth':{currentStaff:async()=>staff},'@/lib/reception-snapshot':{receptionSnapshot:()=>{throw Error('must not read');}}});
   assert.equal((await route.GET()).status,403);
  }
 });

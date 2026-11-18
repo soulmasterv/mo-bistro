@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { currentStaff } from "@/lib/staff-auth";
 import { rejectCrossOrigin } from "@/lib/guest-api-security";
 import { getPostgres } from "@/lib/postgres-db";
+import { databaseErrorCode } from "@/lib/database-errors";
 
 export const runtime = "nodejs";
 
@@ -23,25 +24,25 @@ export async function POST(
   if (originError) return originError;
 
 
-  if (!await waiterEnabled()) return NextResponse.json({ error: "Waiter workspace is disabled." }, { status: 404 });
-  if (process.env.MO_BISTRO_DB !== "postgres") {
-    return NextResponse.json(
-      { error: "Table requests require PostgreSQL" },
-      { status: 503 }
-    );
-  }
-
-  const { id } = await context.params;
-  const tableId = Number(id);
-
-  if (!Number.isSafeInteger(tableId) || tableId <= 0) {
-    return NextResponse.json(
-      { error: "Invalid table ID" },
-      { status: 400 }
-    );
-  }
-
   try {
+    if (!await waiterEnabled()) return NextResponse.json({ error: "Waiter workspace is disabled." }, { status: 404 });
+    if (process.env.MO_BISTRO_DB !== "postgres") {
+      return NextResponse.json(
+        { error: "Table requests require PostgreSQL" },
+        { status: 503 }
+      );
+    }
+
+    const { id } = await context.params;
+    const tableId = Number(id);
+
+    if (!Number.isSafeInteger(tableId) || tableId <= 0) {
+      return NextResponse.json(
+        { error: "Invalid table ID" },
+        { status: 400 }
+      );
+    }
+
     const sql = getPostgres();
 
     const result = await sql.begin(async (tx) => {
@@ -88,7 +89,7 @@ export async function POST(
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    console.error("Table request failed:", error);
+    console.error("Table request failed:", databaseErrorCode(error) ?? "unavailable");
 
     return NextResponse.json(
       { error: "Unable to submit table request" },

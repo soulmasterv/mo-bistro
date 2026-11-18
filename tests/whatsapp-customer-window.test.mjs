@@ -40,7 +40,7 @@ test("almost-ready has default window text without a configured template or text
  assert.match(h.calls[0].text.body,/Hi Guest/);
  assert.match(h.calls[0].text.body,/booking #1/);
  assert.match(h.calls[0].text.body,/reception will confirm/);
- assert.match(h.calls[0].text.body,/UNSUBSCRIBE or STOP/);
+ assert.doesNotMatch(h.calls[0].text.body,/UNSUBSCRIBE|STOP/);
  assert.equal(h.state.status,'sent');
  const closed=setup({open:false,env:{WHATSAPP_ALMOST_READY_TEXT:undefined}});
  await closed.service.deliverNotification('notification-id',1);
@@ -48,16 +48,16 @@ test("almost-ready has default window text without a configured template or text
  assert.equal(closed.state.status,'skipped');
 });
 
-test("subscribed confirmation sends a thank-you once without asking the guest to subscribe again",async()=>{
+test("subscribed confirmation acknowledges the waitlist once without another subscription prompt",async()=>{
  const h=setup({booking:{kind:'confirmation'}});
  await h.service.deliverNotification('notification-id',1);
  await h.service.deliverNotification('notification-id',1);
  assert.equal(h.calls.length,1);
  assert.equal(h.calls[0].type,'text');
- assert.match(h.calls[0].text.body,/Thanks for booking with Mo Bistro, Guest!/);
+ assert.match(h.calls[0].text.body,/You're on the Mo Bistro waitlist/);
  assert.match(h.calls[0].text.body,/booking #1/);
- assert.match(h.calls[0].text.body,/subscribed to WhatsApp updates/);
- assert.match(h.calls[0].text.body,/UNSUBSCRIBE or STOP/);
+ assert.match(h.calls[0].text.body,/We'll message you here when your table is nearly ready/);
+ assert.doesNotMatch(h.calls[0].text.body,/UNSUBSCRIBE|STOP/);
  assert.ok(!h.calls[0].text.body.includes('SUBSCRIBE 1'));
  assert.ok(!h.calls[0].text.body.includes('{'));
 });
@@ -72,7 +72,7 @@ test("review due after seating sends one placeholder reply button, with no URL",
  assert.equal(payload.biz_opaque_callback_data,'notification-id');
  assert.equal(payload.interactive.type,'button');
  assert.match(payload.interactive.body.text,/review page is coming soon/);
- assert.match(payload.interactive.body.text,/UNSUBSCRIBE or STOP/);
+ assert.doesNotMatch(payload.interactive.body.text,/UNSUBSCRIBE|STOP/);
  assert.equal(payload.interactive.action.buttons.length,1);
  assert.equal(payload.interactive.action.buttons[0].type,'reply');
  assert.equal(payload.interactive.action.buttons[0].reply.id,'review_placeholder');
@@ -85,7 +85,7 @@ test("review due after seating sends one placeholder reply button, with no URL",
  await closed.service.deliverNotification('notification-id',1);
  assert.equal(closed.calls.length,0);
  assert.equal(closed.state.status,'skipped');
- const long=setup({booking,env:{WHATSAPP_REVIEW_TEXT:'x'.repeat(1024)}});
+ const long=setup({booking,env:{WHATSAPP_REVIEW_TEXT:'x'.repeat(1025)}});
  await long.service.deliverNotification('notification-id',1);
  assert.equal(long.calls.length,0);
  assert.equal(long.state.status,'skipped');

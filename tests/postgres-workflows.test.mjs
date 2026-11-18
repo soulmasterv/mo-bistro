@@ -455,6 +455,7 @@ test(
 test("Manager workspace selector is visible only to Managers", () => {
   const { renderToStaticMarkup } = requireDependency("react-dom/server");
   const Component = load("src/components/workspace-header.tsx", {
+    "@/components/confirmation-provider": { useConfirmation: () => async () => false },
     "next/link": ({ children, ...props }) =>
       requireDependency("react").createElement("a", props, children),
   }).default;

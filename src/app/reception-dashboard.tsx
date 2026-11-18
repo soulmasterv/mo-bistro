@@ -1,5 +1,6 @@
 "use client";
-import { calledLabel } from "@/lib/called-label";
+import ReceptionGuestCard from "@/components/reception/guest-card";
+import { deriveReceptionQueue, type ReceptionGuest as Guest, type GuestAction as Action } from "@/lib/reception-queue";
 import {checkReception,receptionRead,refreshReception,watchReception} from "@/lib/reception-feed";
 
 import { useConfirmation } from "@/components/confirmation-provider";
@@ -11,66 +12,23 @@ import ReceptionTableRequests from "@/components/reception-table-requests";
 import GuestDetailSheet from "@/components/guest-detail-sheet";
 import SeatGuestModal from "@/components/seat-guest-modal";
 
-import { guestDialHref } from "@/lib/guest-phone";
 import TableAvailability from "@/components/table-availability";
 import RestaurantWaitSlider from "@/components/restaurant-wait-slider";
 import { useStaffDialog } from "@/lib/use-staff-dialog";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { QRCodeSVG } from "qrcode.react";
+import RegistrationQrDialog from "@/components/reception/registration-qr-dialog";
 import { createPortal } from "react-dom";
 import {
   Users,
-  CheckCircle2,
   Plus,
-  Phone,
-  Bell,
   Search,
   QrCode,
   ArrowUp,
-  ArrowUpRight,
   XCircle,
   RefreshCw,
   Armchair,
 } from "lucide-react";
-
-type GuestStatus = "waiting" | "called" | "seated" | "no_show" | "cancelled";
-
-type Guest = {
-  called_at?: string | null;
-  id: number;
-  name: string;
-  phone: string;
-  party_size: number;
-  seating_preference: "indoor" | "outdoor" | "any";
-  status: GuestStatus;
-  confirmed: number;
-  confirmation_required?: boolean;
-  source: string;
-  created_at: string;
-  eta_at?: string | null;
-  fits_available?: boolean;
-};
-
-type Action = "call" | "seat" | "no_show" | "cancel" | "confirm";
-
-function elapsedWait(guest: Guest, clock: number) {
-  if (guest.status === "seated") return "—";
-  const joined = new Date(guest.created_at).getTime();
-  if (!clock || !Number.isFinite(joined)) return "—";
-  const minutes = Math.max(0, Math.floor((clock - joined) / 60000));
-  return minutes >= 60
-    ? `${Math.floor(minutes / 60)}h ${minutes % 60}m`
-    : `${minutes} min`;
-}
-
-const labels: Record<GuestStatus, string> = {
-  waiting: "Waiting",
-  called: "Called",
-  seated: "Seated",
-  no_show: "No-show",
-  cancelled: "Cancelled",
-};
 
 export default function Home() {
   const confirmAction = useConfirmation();
@@ -102,9 +60,7 @@ export default function Home() {
   const [trackingUrl,setTrackingUrl]=useState("");
   const addDialog = useRef<HTMLDivElement>(null);
   useStaffDialog(showAdd, addDialog, () => setShowAdd(false));
-  const qrDialog = useRef<HTMLDivElement>(null);
   const [showQR, setShowQR] = useState(false);
-  useStaffDialog(showQR, qrDialog, () => setShowQR(false));
   const [headerTools, setHeaderTools] = useState<HTMLElement | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   useEffect(() => {
@@ -118,8 +74,6 @@ export default function Home() {
     const timer = window.setTimeout(() => setHeaderTools(document.getElementById("reception-header-tools")), 0);
     return () => window.clearTimeout(timer);
   }, []);
-  const [registrationUrl, setRegistrationUrl] = useState("");
-  const [copyMessage, setCopyMessage] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [party, setParty] = useState(2);
@@ -174,29 +128,9 @@ export default function Home() {
     };
   }, [loadGuests]);
 
-  async function refreshQR() {
-    try {
-      const response = await fetch("/api/qr", { cache: "no-store" });
-      if (!response.ok) throw new Error("Unable to load QR code");
-      const data = await response.json();
-      setRegistrationUrl(data.url);
-    } catch {
-      setRegistrationUrl("");
-    }
-  }
-
-  async function openQR() {
-    setCopyMessage("");
-    setRegistrationUrl("");
+  function openQR() {
     setShowQR(true);
-    await refreshQR();
   }
-
-  useEffect(() => {
-    if (!showQR) return;
-    const timer = window.setInterval(refreshQR, 15000);
-    return () => window.clearInterval(timer);
-  }, [showQR]);
 
   async function performAction(id: number, action: Action) {
     if (busy || actionInFlight.current) return;
@@ -272,20 +206,7 @@ export default function Home() {
     }
   }
 
-  const waiting = guests.filter((g) => g.status === "waiting").length;
-  const called = guests.filter((g) => g.status === "called").length;
-  const seated = guests.filter((g) => g.status === "seated").length;
-  const active = guests.filter((g) => ["waiting", "called"].includes(g.status));
-  const queueGuests = guests.filter((g) =>
-    ["waiting", "called", "seated"].includes(g.status),
-  );
-  const filtered = queueGuests.filter(
-    (g) =>
-      `${g.name} ${g.phone}`.toLowerCase().includes(search.toLowerCase()) &&
-      (queueFilter === "all"
-        ? g.status === "waiting" || g.status === "called"
-        : g.status === queueFilter),
-  );
+  const { waiting, seated, active, queueGuests, filtered, positions } = deriveReceptionQueue(guests, search, queueFilter);
 
   const selectedGuest = queueGuests.find((guest) => guest.id === openGuestMenu);
   return (
@@ -299,11 +220,6 @@ export default function Home() {
         </button>
       </nav>
       <div className="bistro-container">
-        <section
-          className="bistro-notification-center"
-          aria-label="Service notifications"
-        >
-        </section>
         <header className="bistro-page-heading">
           <div>
             <p className="bistro-eyebrow">GUEST EXPERIENCE / RECEPTION</p>
@@ -349,50 +265,6 @@ export default function Home() {
             </button>
           </div>, headerTools) : null}
         </header>
-        <section className="bistro-stat-grid" aria-label="Service statistics">
-          {[
-            {
-              label: "Waiting guests",
-              value: waiting,
-              caption: "Waiting for a table",
-              icon: Users,
-              tone: "gold",
-            },
-            {
-              label: "Called guests",
-              value: called,
-              caption: "On their way to reception",
-              icon: Bell,
-              tone: "blue",
-            },
-            {
-              label: "Seated guests",
-              value: seated,
-              caption: "Currently seated",
-              icon: CheckCircle2,
-              tone: "green",
-            },
-            {
-              label: "Active parties",
-              value: active.length,
-              caption: "In today’s live queue",
-              icon: Users,
-              tone: "forest",
-            },
-          ].map((stat) => (
-            <article
-              className={`bistro-stat bistro-stat-${stat.tone}`}
-              key={stat.label}
-            >
-              <div className="bistro-stat-top">
-                <span>{stat.label}</span>
-                <stat.icon size={18} />
-              </div>
-              <strong>{guestsLoaded ? stat.value.toString().padStart(2, "0") : "—"}</strong>
-              <p>{stat.caption}</p>
-            </article>
-          ))}
-        </section>
         {error && (
           <div role="alert" className="bistro-alert">
             <span>{error}</span>
@@ -464,144 +336,20 @@ export default function Home() {
               aria-label="Guest queue"
               tabIndex={0}
             >
-              {filtered.map((guest) => {
-                const position =
-                  (guest.status === "seated" ? queueGuests.filter((g) => g.status === "seated") : active).findIndex((g) => g.id === guest.id) + 1;
-                const dialHref = guestDialHref(guest.phone);
-                return (
-                  <article
-                    key={guest.id}
-                    className={`bistro-guest-card ${guest.status === "called" ? "is-called" : ""} ${active[0]?.id === guest.id ? "is-next-guest" : ""}`}
-                  >
-                    <div className="bistro-guest-main">
-                      <span
-                        className="bistro-position"
-                        aria-label={"Queue position " + position}
-                      >
-                        {position.toString().padStart(2, "0")}
-                      </span>
-                      <div className="bistro-guest-copy">
-                        <h3>
-                          <button
-                            type="button"
-                            className="queue-guest-name"
-                            aria-label={"Guest details for " + guest.name}
-                            onClick={() => setOpenGuestMenu(guest.id)}
-                          >
-                            {guest.name}
-                          </button>
-                          {guest.fits_available&&<span className="queue-next-badge">Table fits</span>}
-                          {active[0]?.id === guest.id && <span className="queue-next-badge" aria-label="Next guest">Next</span>}
-                        </h3>
-                        <p>
-                          <Users size={13} /> {guest.party_size} guests{" "}
-                          <span>·</span>{" "}
-                          {guest.seating_preference === "any"
-                            ? "Any seating"
-                            : guest.seating_preference === "indoor"
-                              ? "Indoor"
-                              : "Outdoor"}
-                        </p>
-                        {guest.status === "called" && (
-                          <span className="queue-called-marker">{calledLabel(guest.called_at, queueClock)}</span>
-                        )}
-                      </div>
-                      <span
-                        className={`bistro-status ${guest.status === "called" ? "status-called" : guest.status === "seated" ? "status-seated" : "status-waiting"}`}
-                      >
-                        <i />
-                        {guest.status === "waiting"
-                          ? "Waiting"
-                          : labels[guest.status]}
-                      </span>
-                    </div>
-                    <div className="reception-row-facts">
-                      <span>
-                        <Users size={14} /> {guest.party_size}
-                      </span>
-                      <span>
-                        {guest.seating_preference === "any"
-                          ? "Any"
-                          : guest.seating_preference === "indoor"
-                            ? "Indoor"
-                            : "Outdoor"}
-                      </span>
-                      <span>{elapsedWait(guest, queueClock)}</span>
-                      <span
-                        className={`reception-status-pill pill-${guest.status}`}
-                      >
-                        {labels[guest.status]}
-                      </span>
-                    </div>
-                    <div className="bistro-guest-bottom">
-                      <span className="bistro-muted queue-guest-confirmation">
-                        {guest.confirmation_required === false ? (
-                          "Booking active"
-                        ) : guest.confirmed === 1 ? (
-                          <>
-                            <CheckCircle2 size={14} /> Confirmed booking
-                          </>
-                        ) : (
-                          <>Awaiting confirmation</>
-                        )}
-                        {guest.eta_at && (
-                          <>
-                            {" "}
-                            · ETA{" "}
-                            {new Date(guest.eta_at).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </>
-                        )}
-                      </span>
-                      <div className="bistro-guest-actions">
-                        {dialHref ? (
-                          <a
-                            href={dialHref}
-                            aria-label={"Call " + guest.name}
-                            className="bistro-button bistro-button-secondary"
-                          >
-                            <Phone size={15} /> Call
-                          </a>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled
-                            aria-label={"No callable phone number for " + guest.name}
-                            className="bistro-button bistro-button-secondary"
-                          >
-                            <Phone size={15} /> Call
-                          </button>
-                        )}
-                        <button
-                          disabled={busy || guest.status === "seated"}
-                          onClick={() => void performAction(guest.id, "seat")}
-                          aria-label={"Seat " + guest.name}
-                          className="bistro-button"
-                        >
-                          Seat <ArrowUpRight size={15} />
-                        </button>
-                        <div className="bistro-guest-menu" data-guest-menu>
-                          <button
-                            type="button"
-                            className="bistro-icon-button"
-                            aria-label={"More actions for " + guest.name}
-                            aria-expanded={openGuestMenu === guest.id}
-                            onClick={() =>
-                              setOpenGuestMenu((current) =>
-                                current === guest.id ? null : guest.id,
-                              )
-                            }
-                          >
-                            ···
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
+              {filtered.map(guest => (
+                <ReceptionGuestCard
+                  key={guest.id}
+                  guest={guest}
+                  position={positions.get(guest.id) ?? 0}
+                  isNext={active[0]?.id === guest.id}
+                  busy={busy}
+                  menuOpen={openGuestMenu === guest.id}
+                  clock={queueClock}
+                  onDetails={() => setOpenGuestMenu(guest.id)}
+                  onSeat={() => void performAction(guest.id, "seat")}
+                  onToggleMenu={() => setOpenGuestMenu(current => current === guest.id ? null : guest.id)}
+                />
+              ))}
               {!guestsLoaded && <p role="status">{error ? "Waitlist unavailable. Please refresh." : "Loading waitlist…"}</p>}
               {guestsLoaded && filtered.length === 0 && (
                 <div className="bistro-empty">
@@ -703,80 +451,7 @@ export default function Home() {
           </div>,
           document.body,
         )}
-      {showQR &&
-        createPortal(
-          <div
-            ref={qrDialog}
-            tabIndex={-1}
-            role="dialog"
-            aria-labelledby="qr-heading"
-            aria-describedby="qr-instructions"
-            aria-modal="true"
-            aria-label="Guest registration QR code"
-            className="bistro-dialog-scope bistro-qr-overlay fixed inset-0 z-[9999] flex h-[100dvh] w-full items-center justify-center overflow-y-auto bg-black/80 p-4 text-white"
-          >
-            <div className="bistro-qr-card my-auto w-full max-w-md rounded-3xl border border-white/10 bg-[#17202A] p-5 text-center shadow-2xl sm:p-7">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#C5A77B]">
-                Welcome to the table
-              </p>
-              <h2
-                id="qr-heading"
-                className="text-3xl font-semibold tracking-tight"
-              >
-                Mo Bistro
-              </h2>
-              <p id="qr-instructions" className="mt-2 text-sm text-slate-400">
-                Scan this QR code to join the waitlist.
-              </p>
-
-              <div className="mx-auto my-6 w-fit max-w-full rounded-2xl bg-white p-4 sm:p-6">
-                {registrationUrl ? (
-                  <QRCodeSVG
-                    value={registrationUrl}
-                    size={220}
-                    level="M"
-                    marginSize={4}
-                    title="Mo Bistro waitlist QR code"
-                    className="h-auto max-w-full"
-                  />
-                ) : (
-                  <div className="flex h-[220px] w-[220px] items-center justify-center text-center text-sm text-slate-600">
-                    Loading QR code... If it does not appear, close and reopen.
-                  </div>
-                )}
-              </div>
-
-              <label className="block text-xs text-slate-400">Registration link
-                <input aria-label="Registration link" readOnly value={registrationUrl} onFocus={event => event.currentTarget.select()} className="mt-2 w-full rounded-lg border border-white/20 bg-transparent p-3" />
-              </label>
-              {copyMessage && <p role="status" className="mt-2 text-xs">{copyMessage}</p>}
-
-              <div className="mt-6 flex gap-3">
-                <button
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(registrationUrl);
-                      setCopyMessage("Registration link copied.");
-                    } catch {
-                      setCopyMessage("Automatic copying is unavailable. Select and copy the registration link above.");
-                    }
-                  }}
-                  disabled={!registrationUrl}
-                  className="flex-1 rounded-xl border border-white/20 p-3 text-sm hover:bg-white/10 disabled:opacity-40"
-                >
-                  Copy link
-                </button>
-                <button
-                  onClick={() => setShowQR(false)}
-                  className="flex-1 rounded-xl bg-[#C5A77B] p-3 text-sm font-semibold text-[#101820] hover:bg-[#D8BC91]"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )}
+      {showQR && <RegistrationQrDialog onClose={() => setShowQR(false)} />}
 
       {showAdd && (
         <div className="bistro-dialog-scope fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4">

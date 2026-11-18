@@ -22,22 +22,22 @@ export async function POST(request: Request) {
   if (originError) return originError;
 
 
-  if (!await waiterEnabled()) return NextResponse.json({ error: "Waiter workspace is disabled." }, { status: 404 });
-  if (process.env.MO_BISTRO_DB !== "postgres") {
-    return NextResponse.json({ error: "PostgreSQL required" }, { status: 503 });
-  }
-
-  const body = await request.json().catch(() => null);
-  const area = body?.area;
-
-  if (area !== "indoor" && area !== "outdoor") {
-    return NextResponse.json(
-      { error: "Invalid seating area" },
-      { status: 400 },
-    );
-  }
-
   try {
+    if (!await waiterEnabled()) return NextResponse.json({ error: "Waiter workspace is disabled." }, { status: 404 });
+    if (process.env.MO_BISTRO_DB !== "postgres") {
+      return NextResponse.json({ error: "PostgreSQL required" }, { status: 503 });
+    }
+
+    const body = await request.json().catch(() => null);
+    const area = body?.area;
+
+    if (area !== "indoor" && area !== "outdoor") {
+      return NextResponse.json(
+        { error: "Invalid seating area" },
+        { status: 400 },
+      );
+    }
+
     const sql = getPostgres();
 
     const result = await sql.begin(async (tx) => {

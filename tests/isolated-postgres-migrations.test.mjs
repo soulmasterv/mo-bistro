@@ -72,9 +72,9 @@ test("bootstrap executes exact documented migration bytes in order",async()=>{
   assert.ok(mock.calls.indexOf(mock.calls.find(q=>q.includes("AS relations")))>0);
 });
 test("migration failure rolls back that transaction, stops sequence and does not drop data",async()=>{
-  const mock=bootstrapMock({}, {},2);
+  const mock=bootstrapMock({}, {},1);
   await assert.rejects(initializeQa(mock.sql,target),/20261010_guest_manual_eta.sql failed \(42P01\)/);
-  assert.equal(mock.writes.length,4);
+  assert.equal(mock.writes.length,3);
   assert.equal(mock.writes.at(-1),"ROLLBACK");
   assert.ok(mock.calls.at(-1).includes("pg_advisory_unlock"));
 });

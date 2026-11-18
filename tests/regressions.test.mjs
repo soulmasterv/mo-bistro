@@ -80,7 +80,8 @@ for (const role of ["manager", "reception", "waiter"]) {
       const route = h.route("management/staff");
       const body = { username: "employee", role, credential: "test-password" };
       assert.equal((await route.POST(request("POST", body))).status, 201);
-      assert.deepEqual(h.queries[0].values, ["employee", role, "test-hash"]);
+      assert.deepEqual(h.queries[0].values, ["employee"]);
+      assert.deepEqual(h.queries[1].values, ["employee", role, "test-hash"]);
       h.state.query = () => {
         throw { code: "23505" };
       };
@@ -436,7 +437,7 @@ test("Guest cancellation and staff queue actions do not depend on confirmation",
 test("Reception request polling skips overlaps and ignores an aborted late response", async () => {
   const callbacks = [],
     states = [],
-    pending = [];
+    pending = [], events = [];
   const react = {
     useState(initial) {
       const index = states.length;
@@ -467,8 +468,14 @@ test("Reception request polling skips overlaps and ignores an aborted late respo
         refreshReception: async () => {},
       },
     },
+    {
+      window: { dispatchEvent: event => events.push(event) },
+      CustomEvent: class {
+        constructor(type, options) { this.type = type; this.detail = options.detail; }
+      },
+    },
   ).default;
-  Component();
+  Component({ open: false });
   const refresh = callbacks[0];
   const old = refresh();
   await refresh();
@@ -483,7 +490,9 @@ test("Reception request polling skips overlaps and ignores an aborted late respo
   pending[0].resolve(Response.json([{ id: 99, table_id: 5 }]));
   await old;
   assert.equal(states[0].length, 0);
-  assert.equal(states[2].size, 0);
+  assert.equal(states[1].length, 0);
+  assert.equal(states[7], "");
+  assert.equal(events[0].detail, 0);
 });
 
 test("Both Reception table views expose Clear Table only for occupied tables", () => {
@@ -541,82 +550,28 @@ test("Both Reception table views expose Clear Table only for occupied tables", (
   }
 });
 
-test("Reception queue badges and QR dialog contain accessible Mo Bistro copy", () => {
+test("Reception guest cards and QR dialog retain accessible controls", () => {
+  const React = requireDependency("react");
   const { renderToStaticMarkup } = requireDependency("react-dom/server");
-  let index = 0;
-  const guests = [
-    {
-      id: 1,
-      name: "Test Called",
-      phone: "",
-      party_size: 2,
-      status: "called",
-      confirmed: 0,
-      seating_preference: "any",
-    },
-    {
-      id: 2,
-      name: "Test Uncalled",
-      phone: "",
-      party_size: 2,
-      status: "waiting",
-      confirmed: 0,
-      seating_preference: "any",
-    },
-  ];
-  const values = [
-    guests,
-    true, // loaded waitlist
-    null,
-    "",
-    "all",
-    null,
-    false,
-    "", // tracking handoff
-    true, // QR dialog
-    null, // header portal
-    [], // next guest recommendations
-    "https://bistro.test/join",
-    "", // copied-link message
-    "", // name
-    "",
-    2,
-    "any",
-    false,
-    "",
-    "",
-  ];
-  const react = {
-    ...requireDependency("react"),
-    useState: (initial) => [
-      index < values.length ? values[index++] : initial,
-      () => {},
-    ],
-    useRef: (initial) => ({ current: initial }),
-    useEffect() {},
-    useCallback: (fn) => fn,
-  };
-  const mocks = { react, "react-dom": { createPortal: (value) => value }, "@/components/confirmation-provider": {useConfirmation:()=>async()=>false} };
-  for (const component of [
-    "reception-table-requests",
-    "table-ready-notifications",
-    "seat-guest-modal",
-    "table-availability",
-    "restaurant-wait-slider",
-  ])
-    mocks["@/components/" + component] = () => null;
-  const Component = load("src/app/reception-dashboard.tsx", mocks, {
-    document: { body: {} },
-  }).default;
-  const markup = renderToStaticMarkup(Component());
-  assert.match(markup, /Mo Bistro/);
-  assert.match(markup, /Scan this QR code to join the waitlist\./);
-  assert.match(markup, /role="dialog"/);
-  assert.match(markup, /aria-modal="true"/);
-  assert.match(markup, /aria-describedby="qr-instructions"/);
-  assert.match(markup, /Uncalled/);
+  const Card = load("src/components/reception/guest-card.tsx").default;
+  const guest = { id: 1, name: "Test Guest", phone: "01000000001", party_size: 2,
+    status: "called", confirmed: 1, seating_preference: "any", created_at: "2026-11-18T10:00:00Z" };
+  const markup = renderToStaticMarkup(React.createElement(Card, { guest, position: 1,
+    isNext: true, busy: false, menuOpen: false, clock: Date.parse("2026-11-18T10:05:00Z"),
+    onDetails() {}, onSeat() {}, onToggleMenu() {} }));
+  assert.match(markup, /aria-label="Next guest"/);
+  assert.match(markup, /aria-label="Call Test Guest"/);
+  assert.match(markup, /aria-label="Seat Test Guest"/);
   assert.match(markup, />Called</);
   assert.ok(!markup.includes("Restaurant Concierge"));
+  const Dialog = load("src/components/reception/registration-qr-dialog.tsx",
+    { "react-dom": { createPortal: value => value } }, { document: { body: {} } }).default;
+  const qr = renderToStaticMarkup(React.createElement(Dialog, { onClose() {} }));
+  assert.match(qr, /Mo Bistro/);
+  assert.match(qr, /Scan this QR code to join the waitlist\./);
+  assert.match(qr, /role="dialog"/);
+  assert.match(qr, /aria-modal="true"/);
+  assert.match(qr, /aria-describedby="qr-instructions"/);
 });
 
 test("Staff account operations retain authentication after licensing removal", async () => {

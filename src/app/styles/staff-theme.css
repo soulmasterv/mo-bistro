@@ -1,0 +1,326 @@
+/* Minimal staff workspaces: neutral surfaces, compact typography, no decoration. */
+.bistro-app,
+.bistro-dialog-scope {
+  --ink: #252525;
+  --muted: #697366;
+  --paper: #f5f4ef;
+  --line: #dedfd5;
+  --staff-surface: #fffdf9;
+  --staff-soft: #eee9de;
+  --staff-action: #252525;
+  --staff-inverse: #fffdf9;
+}
+html[data-theme="dark"] :is(.bistro-app, .bistro-dialog-scope) {
+  --ink: #f5f3ed;
+  --muted: #b6b4ad;
+  --paper: #101111;
+  --line: #2c2e2f;
+  --staff-surface: #171919;
+  --staff-soft: #202222;
+  --staff-action: #d6b681;
+  --staff-inverse: #293126;
+}
+.bistro-workspace-header {
+  background: #fffdf9;
+  color: #252525;
+  border-bottom: 1px solid #dedfd5;
+}
+html[data-theme="dark"] .bistro-workspace-header {
+  background: #171919;
+  color: #f5f3ed;
+  border-color: #2c2e2f;
+}
+.bistro-workspace-header .workspace-menu {
+  background: #fffdf9;
+  color: #252525;
+  border-color: #dedfd5;
+  box-shadow: 0 4px 16px #0001;
+}
+html[data-theme="dark"] .bistro-workspace-header .workspace-menu {
+  background: #202222;
+  color: #f5f3ed;
+  border-color: #2c2e2f;
+}
+.bistro-workspace-header .workspace-switch {
+  color: inherit;
+  border-color: #8885;
+  background: transparent;
+}
+.bistro-header-subtitle {
+  color: #697366;
+  letter-spacing: 0;
+  font-size: 11px;
+}
+html[data-theme="dark"] .bistro-header-subtitle {
+  color: #b6b4ad;
+}
+.bistro-header-inner {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.bistro-container {
+  padding-top: 24px;
+}
+.bistro-page-heading {
+  margin-bottom: 24px;
+}
+.bistro-page-heading h1 {
+  font-size: 28px;
+  line-height: 1.25;
+  letter-spacing: -0.6px;
+  font-weight: 600;
+}
+.bistro-page-heading > div > p:last-child {
+  margin-top: 6px;
+  font-size: 13px;
+}
+.bistro-eyebrow,
+.bistro-nav-note,
+.bistro-page-footer,
+.bistro-avatar,
+.bistro-table-visual {
+  display: none;
+}
+.bistro-panel,
+.bistro-stat,
+.bistro-guest-card,
+.bistro-table-card,
+.bistro-area-card,
+.bistro-management-overview > article,
+.bistro-management-nav {
+  background: var(--staff-surface);
+  color: var(--ink);
+  border-color: var(--line);
+  border-radius: 10px;
+  box-shadow: none;
+}
+.bistro-stat strong {
+  font-size: 28px;
+  letter-spacing: -0.5px;
+  margin: 10px 0 0;
+  color: var(--ink);
+}
+.bistro-stat p {
+  display: none;
+}
+.bistro-stat-forest .bistro-stat-top {
+  color: var(--muted);
+}
+.bistro-stat-grid {
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.bistro-stat {
+  padding: 16px 18px;
+}
+.bistro-stat-top,
+.bistro-stat-top svg {
+  color: var(--muted);
+}
+.bistro-panel h2,
+.bistro-group-heading h2 {
+  font-size: 18px;
+  letter-spacing: -0.3px;
+}
+.bistro-panel-heading {
+  padding: 16px 20px;
+  border-color: var(--line);
+}
+.bistro-queue-controls {
+  padding: 12px 20px;
+  gap: 8px;
+}
+.bistro-guest-list {
+  padding: 4px 20px 16px;
+}
+.bistro-guest-card:hover {
+  box-shadow: none;
+}
+.bistro-guest-card.is-called {
+  background: var(--staff-surface);
+}
+.bistro-guest-main {
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+.bistro-button,
+.bistro-button:hover:not(:disabled),
+html[data-theme="dark"] .bistro-button {
+  background: var(--staff-action);
+  color: var(--staff-inverse);
+  border-color: var(--staff-action);
+  border-radius: 8px;
+  box-shadow: none;
+}
+.bistro-button-secondary,
+.bistro-button-secondary:hover:not(:disabled),
+html[data-theme="dark"] .bistro-button-secondary,
+.bistro-icon-button {
+  background: var(--staff-surface);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.bistro-search,
+.bistro-tabs button[aria-pressed="true"] {
+  background: var(--staff-soft);
+  border-color: var(--line);
+  color: var(--ink);
+}
+.bistro-management-nav {
+  padding: 12px;
+}
+.bistro-management-nav a {
+  margin: 0;
+  padding: 12px;
+  color: var(--ink);
+  border-radius: 6px;
+}
+.bistro-floor-grid {
+  gap: 14px;
+}
+.bistro-table-card h3 {
+  margin-top: 20px;
+  font-size: 18px;
+}
+.bistro-table-card > button {
+  margin-top: 16px;
+}
+.bistro-dialog-scope > div {
+  border-radius: 12px;
+  box-shadow: 0 8px 30px #0002;
+}
+.bistro-dialog-scope .bistro-qr-card {
+  background-image: none;
+}
+.bistro-qr-card #qr-heading {
+  font-family: inherit;
+  font-size: 28px;
+  letter-spacing: -0.5px;
+}
+.bistro-notification-center {
+  margin-bottom: 20px;
+}
+.bistro-notification-center .bistro-readiness-heading {
+  padding: 12px 16px;
+  background: var(--staff-surface);
+  border-color: var(--line);
+  flex-wrap: nowrap;
+}
+.bistro-notification-center .bistro-readiness-heading h2 {
+  font-size: 15px;
+}
+.bistro-notification-center .bistro-readiness-heading p {
+  font-size: 12px;
+}
+.bistro-notification-center .bistro-readiness-heading > button {
+  width: auto;
+  flex-shrink: 0;
+  background: var(--staff-soft) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+  font-size: 13px;
+}
+.bistro-notification-center .bistro-request-panel {
+  margin-top: 8px;
+  max-height: 50dvh;
+  overflow-y: auto;
+}
+.bistro-table-notices {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.bistro-table-notice {
+  border: 1px solid var(--line);
+  border-left: 3px solid #6386bd;
+  background: var(--staff-surface);
+  color: var(--ink);
+  padding: 12px 16px;
+  border-radius: 8px;
+}
+.bistro-workspace-header svg {
+  color: currentColor;
+}
+html[data-theme="light"] .bistro-workspace-header [class*="text-white"] {
+  color: #252525;
+}
+@media (max-width: 600px) {
+  .bistro-notification-center .bistro-readiness-heading {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .bistro-notification-center .bistro-readiness-heading > button {
+    min-height: 44px;
+  }
+  .bistro-page-heading h1 {
+    font-size: 24px;
+  }
+}
+
+/* Preserve readable action contrast in nested legacy staff controls. */
+html[data-theme="dark"]
+  .bistro-app
+  .bistro-button:not(.bistro-button-secondary),
+html[data-theme="dark"]
+  .bistro-dialog-scope
+  .bistro-button:not(.bistro-button-secondary) {
+  background: #d6b681;
+  color: #293126;
+  border-color: #d6b681;
+}
+html[data-theme="dark"] .bistro-app .bistro-button-secondary,
+html[data-theme="dark"] .bistro-dialog-scope .bistro-button-secondary {
+  background: #171919;
+  color: #f5f3ed;
+  border-color: #494949;
+}
+:is(.bistro-app, .bistro-dialog-scope)
+  :is([class*="bg-[#C5A77B]"], [class*="bg-[#D6B681]"]) {
+  background-color: var(--staff-action) !important;
+  color: var(--staff-inverse) !important;
+  border-color: var(--staff-action) !important;
+}
+:is(.bistro-app, .bistro-dialog-scope)
+  :is([class*="bg-[#C5A77B]"], [class*="bg-[#D6B681]"])
+  [class*="text-white"] {
+  color: var(--staff-inverse) !important;
+}
+.bistro-management-content > section,
+.bistro-settings-group > section,
+.bistro-settings-group > div > section {
+  border-radius: 10px;
+  box-shadow: none;
+}
+.bistro-workspace-header .workspace-signout {
+  color: inherit;
+}
+
+html[data-theme="dark"]
+  :is(.bistro-app, .bistro-dialog-scope)
+  .bistro-button:not(.bistro-button-secondary) {
+  background-color: #d6b681 !important;
+  color: #293126 !important;
+  border-color: #d6b681 !important;
+}
+html[data-theme="dark"]
+  :is(.bistro-app, .bistro-dialog-scope)
+  .bistro-button-secondary {
+  background-color: #171919 !important;
+  color: #f5f3ed !important;
+  border-color: #494949 !important;
+}
+
+/* Reception summaries support the queue instead of dominating the viewport. */
+@media (max-width: 600px) {
+}
+
+.bistro-notification-center:empty {
+  display: none;
+}
+
+/* Guest booking retains its original light palette regardless of staff theme. */
+html[data-theme="guest-light"] {
+  --background: #f4f0e9;
+  --foreground: #302d28;
+  color-scheme: light;
+}

@@ -56,5 +56,5 @@ test('Detailed lifecycle: public join, call, seating, waiter readiness, approval
 test('Invalid public phone receives format-specific feedback before any SQL',async()=>{
  const h=harness();h.mocks['@/lib/qr-origin']={isAllowedQROrigin:()=>true};
  const response=await h.route('join').POST(request('POST',{name:'Synthetic Guest',phone:'123',party_size:2}));
- assert.equal(response.status,400);assert.match((await response.json()).error,/11-digit Egyptian mobile/);assert.equal(h.queries.length,0);
+ assert.equal(response.status,400);assert.match((await response.json()).error,/Egyptian mobile number.*\+20/);assert.equal(h.queries.length,0);
 });

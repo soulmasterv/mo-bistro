@@ -160,13 +160,11 @@ export default function ReceptionTableRequests({ open }: { open: boolean }) {
 
       if (!tablesResponse.ok)
         throw new Error("Unable to load occupied tables for area requests.");
-      if (tablesResponse.ok) {
-        const tableData = await tablesResponse.json();
-        if (!controller.signal.aborted)
-          setTables(
-            Array.isArray(tableData) ? tableData : (tableData.tables ?? []),
-          );
-      }
+      const tableData = await tablesResponse.json();
+      if (!controller.signal.aborted)
+        setTables(
+          Array.isArray(tableData) ? tableData : (tableData.tables ?? []),
+        );
       if (!controller.signal.aborted) setError("");
     } catch (err) {
       if (!controller.signal.aborted)
@@ -180,9 +178,14 @@ export default function ReceptionTableRequests({ open }: { open: boolean }) {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    const initial = window.setTimeout(() => void refresh(), 0);
     const unsubscribe=watchReception(()=>void refresh());
-    return () => { unsubscribe();refreshController.current?.abort();refreshController.current=null; };
+    return () => {
+      window.clearTimeout(initial);
+      unsubscribe();
+      refreshController.current?.abort();
+      refreshController.current=null;
+    };
   }, [refresh]);
 
   useEffect(() => {

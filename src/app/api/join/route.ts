@@ -13,6 +13,7 @@ import { whatsappEnabled } from "@/lib/whatsapp/policy";
 import { z } from "zod";
 import { egyptianMobilePattern, normalizeEgyptianMobile } from "@/lib/guest-phone";
 import db from "@/lib/db";
+import { readSchedule, scheduleState } from "@/lib/waitlist-schedule";
 import {
   initializeTracking,
   newTrackingToken,
@@ -50,8 +51,6 @@ const schema = z.object({
   whatsapp_feedback_consent: z.boolean().default(false),
 });
 
-import {readSchedule,scheduleState} from "@/lib/waitlist-schedule";
-
 export async function POST(request: Request) {
   if (!isAllowedQROrigin(request)) {
     return NextResponse.json(
@@ -65,8 +64,6 @@ export async function POST(request: Request) {
 
 
   try {
-    const closedMessage = scheduleState(await readSchedule());
-    if (closedMessage) return NextResponse.json({error:closedMessage},{status:409});
     const body = schema.safeParse(await request.json());
 
     if (!body.success) {
@@ -77,6 +74,9 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+
+    const closedMessage = scheduleState(await readSchedule());
+    if (closedMessage) return NextResponse.json({error:closedMessage},{status:409});
 
     const setting = async (key: string, fallback: string) =>
       process.env.MO_BISTRO_DB === "postgres"
