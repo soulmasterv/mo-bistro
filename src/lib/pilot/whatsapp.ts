@@ -32,7 +32,7 @@ export async function deliverPilotCall(id:string) {
  WHERE id=${id} AND status IN ('pending','scheduled') RETURNING party_id`;
  if(!claimed.length)return;
  await sql.begin(async tx=>{
-  const [party]=await tx`SELECT * FROM public.pilot_parties WHERE id=${claimed[0].party_id} FOR UPDATE`;
+  const [party]=await tx`SELECT * FROM public.guests WHERE id=${claimed[0].party_id} FOR UPDATE`;
   if(party?.pending_exit_at){
    await tx`UPDATE public.pilot_ready_messages SET status='pending',attempts=attempts-1,publish_retry_at=${party.pending_exit_at},publish_lease_until=NULL,updated_at=NOW() WHERE id=${id}`;
    return;
@@ -62,7 +62,7 @@ export async function deliverPilotCall(id:string) {
    }
   }
   await tx`UPDATE public.pilot_ready_messages SET status=${state},last_error=${error},provider_message_id=${messageId},updated_at=NOW() WHERE id=${id}`;
-  if(state==='sent')await tx`UPDATE public.pilot_parties SET status='called',called_at=clock_timestamp(),informed_via='whatsapp_accepted' WHERE id=${party.id} AND status='waiting'`;
+  if(state==='sent')await tx`UPDATE public.guests SET status='called',called_at=clock_timestamp(),informed_via='whatsapp_accepted' WHERE id=${party.id} AND status='waiting'`;
  });
 }
 function safeTestPhone(){try{return normalizePhone(process.env.WHATSAPP_TEST_RECIPIENT||'');}catch{return null;}}

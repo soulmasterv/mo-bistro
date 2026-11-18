@@ -40,7 +40,7 @@ export async function POST(request: Request) {
           const text = message.text.body.trim();
           const phone = "0" + message.from.slice(2);
           if (isStop(text)) {
-            await sql`UPDATE public.pilot_parties SET whatsapp_consent_at=NULL,whatsapp_inbound_after_opt_in_at=NULL
+            await sql`UPDATE public.guests SET whatsapp_consent_at=NULL,whatsapp_inbound_after_opt_in_at=NULL
               WHERE phone=${phone} AND whatsapp_consent_at < ${new Date(received.getTime() + 1000)}`;
             continue;
           }
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
           const id = Number(ticket?.[1]);
           if (!Number.isSafeInteger(id) || id < 1) continue;
           await sql.begin(async tx => {
-            const matched = await tx`UPDATE public.pilot_parties
+            const matched = await tx`UPDATE public.guests
               SET whatsapp_inbound_after_opt_in_at=GREATEST(whatsapp_inbound_after_opt_in_at,${received})
               WHERE id=${id} AND phone=${phone} AND status='waiting'
                 AND whatsapp_consent_at IS NOT NULL AND whatsapp_consent_at < ${new Date(received.getTime()+1000)}

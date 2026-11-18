@@ -5,7 +5,7 @@ import { createHmac } from 'node:crypto';
 import {load,harness,request,context,requireDependency} from './handler-harness.mjs';
 const {PGlite}=requireDependency('@electric-sql/pglite');
 function adapter(db){const sql=async(strings,...values)=>{let q='';strings.forEach((s,i)=>{q+=s;if(i<values.length)q+='$'+(i+1);});return(await db.query(q,values)).rows;};sql.begin=cb=>db.transaction(tx=>cb(adapter(tx)));return sql;}
-async function setup(){const db=new PGlite();await db.exec(fs.readFileSync('migrations/20261016_queue_pilot.sql','utf8'));await db.exec(fs.readFileSync('migrations/20261016_pilot_reception_actions.sql','utf8'));await db.exec(fs.readFileSync('migrations/20261017_pilot_measurement.sql','utf8'));await db.exec('CREATE TABLE whatsapp_contact_preferences(phone text PRIMARY KEY,opted_out_at timestamptz); CREATE TABLE whatsapp_customer_windows(phone text,phone_number_id text,last_inbound_at timestamptz);');const h=harness({actor:{id:1,username:'OmarMohsen',role:'manager'}});h.mocks['@/lib/postgres-db']={getPostgres:()=>adapter(db)};
+async function setup(){const db=new PGlite();await db.exec(fs.readFileSync('migrations/20261016_queue_pilot.sql','utf8'));await db.exec(fs.readFileSync('migrations/20261016_pilot_reception_actions.sql','utf8'));await db.exec(fs.readFileSync('migrations/20261017_pilot_measurement.sql','utf8'));await db.exec(fs.readFileSync('migrations/20261118_standardize_guests.sql','utf8'));await db.exec('CREATE TABLE whatsapp_contact_preferences(phone text PRIMARY KEY,opted_out_at timestamptz); CREATE TABLE whatsapp_customer_windows(phone text,phone_number_id text,last_inbound_at timestamptz);');const h=harness({actor:{id:1,username:'OmarMohsen',role:'manager'}});h.mocks['@/lib/postgres-db']={getPostgres:()=>adapter(db)};
  const config=load('src/lib/pilot/config.ts');h.mocks['./config']=config;
  h.mocks['next/server']={after:()=>{},NextResponse:{json:(body,init)=>Response.json(body,init)}};
  h.mocks['@/lib/pilot/whatsapp']={publishPilotCalls:async()=>{}};
@@ -91,7 +91,7 @@ test('Failures stay Waiting; definite rejection retries once, unknown acceptance
   const job=(await db.query('SELECT id FROM pilot_ready_messages')).rows[0].id;
   assert.equal((await store.partyStatus(party.token)).status,'waiting');
   await sender.deliverPilotCall(job);assert.equal((await store.partyStatus(party.token)).status,'waiting');
-  assert.equal((await db.query('SELECT called_at FROM pilot_parties')).rows[0].called_at,null);
+  assert.equal((await db.query('SELECT called_at FROM guests')).rows[0].called_at,null);
   const retryId='11111111-1111-4111-8111-111111111112';
   assert.ok((await store.transition(party.id,'retry',undefined,retryId)).success);
   await store.transition(party.id,'retry',undefined,retryId);
@@ -100,8 +100,8 @@ test('Failures stay Waiting; definite rejection retries once, unknown acceptance
   assert.equal((await store.transition(party.id,'retry',undefined,'11111111-1111-4111-8111-111111111113')).status,409);
   const callId='11111111-1111-4111-8111-111111111114';
   await store.transition(party.id,'phone_call',undefined,callId);await store.transition(party.id,'phone_call',undefined,callId);
-  let row=(await db.query('SELECT * FROM pilot_parties')).rows[0];assert.equal(row.phone_call_taps,1);assert.equal(row.status,'waiting');
-  await store.transition(party.id,'guest_informed');row=(await db.query('SELECT * FROM pilot_parties')).rows[0];
+  let row=(await db.query('SELECT * FROM guests')).rows[0];assert.equal(row.phone_call_taps,1);assert.equal(row.status,'waiting');
+  await store.transition(party.id,'guest_informed');row=(await db.query('SELECT * FROM guests')).rows[0];
   assert.equal(row.status,'called');assert.equal(row.informed_via,'staff_confirmed');assert.ok(row.called_at);
   await sender.deliverPilotCall(retryId);assert.equal(sends,2);
   const exported=(await store.exportRows())[0];assert.equal(exported.notification_attempts,2);assert.equal(exported.notification_outcomes,'failed | unknown');
@@ -111,11 +111,11 @@ test('Reception can seat a waiting party or confirm an in-person conversation wi
  const {db,store}=await setup();try{
   const first=await store.createParty({...input,whatsapp_consent:false},'walk_in');
   assert.ok((await store.transition(first.id,'seated')).success);
-  let row=(await db.query('SELECT * FROM pilot_parties WHERE id=$1',[first.id])).rows[0];
+  let row=(await db.query('SELECT * FROM guests WHERE id=$1',[first.id])).rows[0];
   assert.equal(row.status,'seated');assert.equal(row.called_at,null);assert.equal(row.phone_call_taps,0);
   const second=await store.createParty({...input,whatsapp_consent:false},'walk_in');
   assert.ok((await store.transition(second.id,'guest_informed')).success);
-  row=(await db.query('SELECT * FROM pilot_parties WHERE id=$1',[second.id])).rows[0];
+  row=(await db.query('SELECT * FROM guests WHERE id=$1',[second.id])).rows[0];
   assert.equal(row.status,'called');assert.equal(row.informed_via,'staff_confirmed');assert.equal(row.phone_call_taps,0);
   assert.equal((await db.query('SELECT count(*)::integer AS n FROM pilot_ready_messages')).rows[0].n,0);
   const pending=await store.transition(second.id,'remove','guest_cancelled');assert.ok(pending.undo_token);
@@ -127,23 +127,23 @@ test('All four reasons work from either active state; duplicates remain stored b
  const {db,store}=await setup();try{
   for(const state of ['waiting','called'])for(const reason of ['guest_cancelled','left_unannounced','no_response','duplicate_test']){
    const p=await store.createParty(input,'qr');
-   if(state==='called')await db.query("UPDATE pilot_parties SET status='called',called_at=clock_timestamp() WHERE id=$1",[p.id]);
+   if(state==='called')await db.query("UPDATE guests SET status='called',called_at=clock_timestamp() WHERE id=$1",[p.id]);
    const pending=await store.transition(p.id,'remove',reason);assert.ok(pending.undo_token);
    await store.undoExit(p.id,pending.undo_token);assert.equal((await store.partyStatus(p.token)).status,state);
    await store.transition(p.id,'remove',reason);
-   await db.query("UPDATE pilot_parties SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[p.id]);
+   await db.query("UPDATE guests SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[p.id]);
    await store.finalizePendingExits();
-   const row=(await db.query('SELECT * FROM pilot_parties WHERE id=$1',[p.id])).rows[0];assert.equal(row.exit_state,state);assert.equal(row.exit_reason,reason);
+   const row=(await db.query('SELECT * FROM guests WHERE id=$1',[p.id])).rows[0];assert.equal(row.exit_state,state);assert.equal(row.exit_reason,reason);
   }
-  assert.equal((await db.query('SELECT count(*)::int n FROM pilot_parties')).rows[0].n,8);
+  assert.equal((await db.query('SELECT count(*)::int n FROM guests')).rows[0].n,8);
   const rows=await store.exportRows();assert.equal(rows.length,6);assert.doesNotMatch(store.csv(rows),/duplicate_test|Synthetic Guest|01000000001/);
  }finally{await db.close();}
 });
 test('Opt-in is idempotent and export distinguishes choice from observed inbound without exposing personal data',async()=>{
  const {db,h,store}=await setup();try{
   const p=await store.createParty({...input,whatsapp_consent:false},'qr');await store.enableReadyAlert(p.token);
-  const first=(await db.query('SELECT whatsapp_consent_at FROM pilot_parties')).rows[0].whatsapp_consent_at;
-  await store.enableReadyAlert(p.token);assert.equal(String((await db.query('SELECT whatsapp_consent_at FROM pilot_parties')).rows[0].whatsapp_consent_at),String(first));
+  const first=(await db.query('SELECT whatsapp_consent_at FROM guests')).rows[0].whatsapp_consent_at;
+  await store.enableReadyAlert(p.token);assert.equal(String((await db.query('SELECT whatsapp_consent_at FROM guests')).rows[0].whatsapp_consent_at),String(first));
   assert.equal((await store.partyStatus(p.token)).whatsapp_reply_observed,false);
   await db.query("INSERT INTO whatsapp_customer_windows VALUES('201000000001','123',clock_timestamp())");
   assert.equal((await store.partyStatus(p.token)).whatsapp_reply_observed,false,'wrong business must not count');
@@ -166,16 +166,16 @@ test('Pilot records lifecycle, arrival position, source, private status and anon
  assert.equal((await db.query('SELECT count(*)::int n FROM pilot_ready_messages')).rows[0].n,0);
  const action=h.route('pilot/parties/[id]');
  assert.equal((await action.PATCH(request('PATCH',{action:'call'}),context(first.id))).status,200);
- const called=(await db.query('SELECT called_at FROM pilot_parties WHERE id=$1',[first.id])).rows[0].called_at;
+ const called=(await db.query('SELECT called_at FROM guests WHERE id=$1',[first.id])).rows[0].called_at;
  await action.PATCH(request('PATCH',{action:'call'}),context(first.id));
- assert.equal(String((await db.query('SELECT called_at FROM pilot_parties WHERE id=$1',[first.id])).rows[0].called_at),String(called));
+ assert.equal(String((await db.query('SELECT called_at FROM guests WHERE id=$1',[first.id])).rows[0].called_at),String(called));
  assert.equal((await db.query('SELECT count(*)::int n FROM pilot_ready_messages')).rows[0].n,1);
  assert.equal((await store.partyStatus(first.token)).status,'waiting');assert.equal(called,null);
  await store.transition(first.id,'phone_call',undefined,'11111111-1111-4111-8111-111111111111');await db.query("UPDATE pilot_ready_messages SET status='failed' WHERE party_id=$1",[first.id]);await store.transition(first.id,'guest_informed');
  assert.equal((await store.partyStatus(second.token)).position,1);
  await action.PATCH(request('PATCH',{action:'seated'}),context(first.id));
  await action.PATCH(request('PATCH',{action:'left'}),context(second.id));
- await db.query("UPDATE pilot_parties SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[second.id]);
+ await db.query("UPDATE guests SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[second.id]);
  assert.equal((await action.PATCH(request('PATCH',{action:'call'}),context(first.id))).status,409);
  assert.equal((await store.listQueue()).length,0);
  const rows=await store.exportRows();assert.ok(rows[0].joined_at&&rows[0].called_at&&rows[0].seated_at);assert.ok(rows[1].left_at);assert.equal(rows[1].source,'walk_in');
@@ -199,8 +199,8 @@ test('Ready sender is consent-gated and claims each Call at most once',async()=>
  const party=await store.createParty(input,'qr');await store.transition(party.id,'call');const id=(await db.query('SELECT id FROM pilot_ready_messages')).rows[0].id;
  await db.query("INSERT INTO whatsapp_customer_windows VALUES('201000000001','123',clock_timestamp())");
  await sender.deliverPilotCall(id);await sender.deliverPilotCall(id);assert.equal(sends,1);assert.equal(payloads[0].type,'text');assert.match(payloads[0].text.body,/your table is ready/);
- const accepted=(await db.query('SELECT status,called_at,informed_via FROM pilot_parties WHERE id=$1',[party.id])).rows[0];assert.equal(accepted.status,'called');assert.ok(accepted.called_at);assert.equal(accepted.informed_via,'whatsapp_accepted');
- await store.transition(party.id,'left');await db.query("UPDATE pilot_parties SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[party.id]);const next=await store.createParty({...input,whatsapp_consent:false},'qr');await store.transition(next.id,'call');const job=(await db.query('SELECT id FROM pilot_ready_messages WHERE party_id=$1',[next.id])).rows[0].id;
+ const accepted=(await db.query('SELECT status,called_at,informed_via FROM guests WHERE id=$1',[party.id])).rows[0];assert.equal(accepted.status,'called');assert.ok(accepted.called_at);assert.equal(accepted.informed_via,'whatsapp_accepted');
+ await store.transition(party.id,'left');await db.query("UPDATE guests SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[party.id]);const next=await store.createParty({...input,whatsapp_consent:false},'qr');await store.transition(next.id,'call');const job=(await db.query('SELECT id FROM pilot_ready_messages WHERE party_id=$1',[next.id])).rows[0].id;
  await sender.deliverPilotCall(job);assert.equal(sends,1);assert.equal((await db.query('SELECT last_error FROM pilot_ready_messages WHERE id=$1',[job])).rows[0].last_error,'guest_not_opted_in');
  }finally{await db.close();}});
 test('Removal has a durable five-second undo, keeps timestamps on undo, and records distinct outcomes',async()=>{
@@ -212,14 +212,14 @@ test('Removal has a durable five-second undo, keeps timestamps on undo, and reco
  assert.equal((await api.PATCH(request('PATCH',{action:'notify'}),context(party.id))).status,409);
  assert.equal((await api.PATCH(request('PATCH',{action:'undo',undo_token:'11111111-1111-4111-8111-111111111111'}),context(party.id))).status,409);
  assert.equal((await api.PATCH(request('PATCH',{action:'undo',undo_token:pending.undo_token}),context(party.id))).status,200);
- let row=(await db.query('SELECT * FROM pilot_parties WHERE id=$1',[party.id])).rows[0];assert.equal(row.status,'waiting');assert.equal(row.left_at,null);assert.equal(row.exit_reason,null);
+ let row=(await db.query('SELECT * FROM guests WHERE id=$1',[party.id])).rows[0];assert.equal(row.status,'waiting');assert.equal(row.left_at,null);assert.equal(row.exit_reason,null);
  assert.equal((await api.PATCH(request('PATCH',{action:'notify'}),context(party.id))).status,200);
- await db.query("UPDATE pilot_parties SET status='called',called_at=clock_timestamp() WHERE id=$1",[party.id]);
+ await db.query("UPDATE guests SET status='called',called_at=clock_timestamp() WHERE id=$1",[party.id]);
  const noShow=await(await api.PATCH(request('PATCH',{action:'remove',reason:'no_response'}),context(party.id))).json();
- assert.equal((await store.listQueue()).length,1);await db.query("UPDATE pilot_parties SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[party.id]);
+ assert.equal((await store.listQueue()).length,1);await db.query("UPDATE guests SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[party.id]);
  assert.equal((await api.PATCH(request('PATCH',{action:'undo',undo_token:noShow.undo_token}),context(party.id))).status,409);
  assert.equal((await store.listQueue()).length,0);row=(await store.exportRows())[0];assert.equal(row.exit_reason,'no_response');assert.equal(row.exit_state,'called');assert.ok(row.called_at&&row.left_at);
- const second=await store.createParty(input,'qr');await store.transition(second.id,'remove','guest_cancelled');await db.query("UPDATE pilot_parties SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[second.id]);
+ const second=await store.createParty(input,'qr');await store.transition(second.id,'remove','guest_cancelled');await db.query("UPDATE guests SET pending_exit_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1",[second.id]);
  const csv=store.csv(await store.exportRows());assert.match(csv,/no_response/);assert.match(csv,/guest_cancelled/);assert.doesNotMatch(csv,/Synthetic Guest|01000000001/);
  }finally{await db.close();}
 });
