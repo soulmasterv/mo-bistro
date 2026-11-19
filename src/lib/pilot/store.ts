@@ -3,6 +3,7 @@ import "server-only";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { getPostgres } from "@/lib/postgres-db";
+import { queuePilotBookingMessage } from "@/lib/pilot/booking-messages";
 
 export const PartyInput = z
   .object({
@@ -179,8 +180,15 @@ export async function transition(
           status: 409,
         };
       await tx`INSERT INTO public.pilot_ready_messages(id,party_id,status,last_error) VALUES(${eventId || randomUUID()},${id},${party.whatsapp_consent_at ? "pending" : "skipped"},${party.whatsapp_consent_at ? null : "guest_not_opted_in"})`;
-    } else
+    } else {
       await tx`UPDATE public.guests SET status='seated',seated_at=clock_timestamp() WHERE id=${id}`;
+      if (
+        party.whatsapp_consent_at &&
+        party.whatsapp_inbound_after_opt_in_at &&
+        party.whatsapp_seated_consent_at
+      )
+        await queuePilotBookingMessage(tx, id, "seated");
+    }
     return { success: true };
   });
 }
@@ -238,7 +246,7 @@ export function readyAlertLink(id: number) {
     "",
   );
   return /^[1-9]\d{7,14}$/.test(number)
-    ? `https://wa.me/${number}?text=${encodeURIComponent(`Please send my table-ready message for Mo Bistro pilot ticket #${id}.`)}`
+    ? `https://wa.me/${number}?text=${encodeURIComponent(`I'd like to receive booking updates for Mo Bistro pilot ticket #${id}.`)}`
     : null;
 }
 export async function exportRows() {

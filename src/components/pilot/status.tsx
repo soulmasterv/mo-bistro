@@ -243,7 +243,7 @@ export default function PilotStatus() {
                 {status === "waiting" && (
                   <section
                     className="guest-whatsapp-card pilot-status-whatsapp space-y-3 rounded-xl"
-                    aria-label="WhatsApp table-ready alert"
+                    aria-label="WhatsApp updates"
                   >
                     <p>
                       {party.whatsapp_reply_observed
@@ -252,8 +252,8 @@ export default function PilotStatus() {
                     </p>
                     <p className="guest-small-note">
                       {party.whatsapp_reply_observed
-                        ? "We'll message you here when your table is ready."
-                        : "Get one WhatsApp alert when your table is ready."}
+                        ? "You'll receive updates for this booking."
+                        : "Get table-ready and seating updates for this booking."}
                     </p>
                     {!party.whatsapp_consent && (
                       <button

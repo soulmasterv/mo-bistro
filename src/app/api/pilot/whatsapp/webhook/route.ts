@@ -6,6 +6,13 @@ import {
   whatsappPhoneId,
 } from "@/lib/whatsapp/kapso";
 import { isStop, whatsappEnabled } from "@/lib/whatsapp/policy";
+import { after } from "next/server";
+import {
+  queuePilotBookingMessage,
+  dispatchPilotBookingMessages,
+} from "@/lib/pilot/booking-messages";
+
+export const maxDuration = 30;
 
 export async function POST(request: Request) {
   const business = whatsappPhoneId();
@@ -42,6 +49,7 @@ export async function POST(request: Request) {
 
   try {
     const sql = getPostgres();
+    const subscribed = new Set<number>();
     for (const entry of payload.entry) {
       if (!Array.isArray(entry?.changes)) continue;
       for (const change of entry.changes) {
@@ -71,12 +79,17 @@ export async function POST(request: Request) {
           const text = message.text.body.trim();
           const phone = "0" + message.from.slice(2);
           if (isStop(text)) {
-            await sql`UPDATE public.guests SET whatsapp_consent_at=NULL,whatsapp_inbound_after_opt_in_at=NULL
+            await sql`UPDATE public.guests SET whatsapp_consent_at=NULL,whatsapp_inbound_after_opt_in_at=NULL,whatsapp_seated_consent_at=NULL
               WHERE phone=${phone} AND whatsapp_consent_at < ${new Date(received.getTime() + 1000)}`;
             continue;
           }
 
+          const bookingUpdates =
+            /^I['’]d like to receive booking updates for Mo Bistro pilot ticket #(\d+)\.$/i.exec(
+              text,
+            );
           const ticket =
+            bookingUpdates ||
             /^Please send my table-ready message for Mo Bistro pilot ticket #(\d+)\.$/i.exec(
               text,
             );
@@ -89,14 +102,28 @@ export async function POST(request: Request) {
                 AND whatsapp_consent_at IS NOT NULL AND whatsapp_consent_at < ${new Date(received.getTime() + 1000)}
               RETURNING id`;
             if (!matched.length) return;
+            if (bookingUpdates)
+              await tx`UPDATE public.guests SET whatsapp_seated_consent_at=COALESCE(whatsapp_seated_consent_at,${received}) WHERE id=${id}`;
             await tx`INSERT INTO public.whatsapp_customer_windows(phone,phone_number_id,last_inbound_at)
               VALUES (${message.from},${business},${received})
               ON CONFLICT (phone,phone_number_id) DO UPDATE
               SET last_inbound_at=GREATEST(whatsapp_customer_windows.last_inbound_at,EXCLUDED.last_inbound_at)`;
+            await queuePilotBookingMessage(tx, id, "subscription");
+            subscribed.add(id);
           });
         }
       }
     }
+    if (subscribed.size)
+      after(async () => {
+        for (const id of subscribed) {
+          try {
+            await dispatchPilotBookingMessages(id);
+          } catch {
+            console.error("Pilot subscription reply deferred");
+          }
+        }
+      });
     return Response.json({ received: true });
   } catch {
     return Response.json(

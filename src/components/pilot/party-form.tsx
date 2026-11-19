@@ -110,8 +110,8 @@ export default function PartyForm({
             onChange={(e) => setConsent(e.target.checked)}
           />
           <span>
-            Send me one WhatsApp message when reception calls my party. No
-            marketing. Reply STOP to unsubscribe.
+            Send me WhatsApp booking updates, including table-ready and seating
+            updates. No marketing. Reply STOP to unsubscribe.
           </span>
         </label>
       )}
