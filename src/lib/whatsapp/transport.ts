@@ -6,7 +6,8 @@ import { SchedulerError } from "@/lib/whatsapp/scheduler-error";
 
 export function templatePayload(job: { id: string; kind: NotificationKind; guest_id: number },
   booking: { phone: string; name: string; eta_at?: Date | null }, code: string) {
-  const keys: Record<NotificationKind, string> = {
+  if (job.kind === "seated") throw new Error("Seated notifications require an open text window");
+  const keys: Record<Exclude<NotificationKind,"seated">, string> = {
     confirmation: "WHATSAPP_CONFIRMATION_TEMPLATE", almost_ready: "WHATSAPP_ALMOST_READY_TEMPLATE",
     review: "WHATSAPP_REVIEW_TEMPLATE",
     eta_update: "WHATSAPP_ETA_UPDATE_TEMPLATE",

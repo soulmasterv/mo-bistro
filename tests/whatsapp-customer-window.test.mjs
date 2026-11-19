@@ -26,6 +26,28 @@ test("open verified window sends existing event as text once and logs delivery",
  assert.equal(h.calls.length,1);assert.equal(h.calls[0].type,"text");assert.match(h.calls[0].text.body,/booking 1/);assert.equal(h.state.status,"sent");assert.ok(h.queries.some(q=>q.q.includes("INSERT INTO whatsapp_delivery_logs")));
  const proof=h.queries.find(q=>q.q.includes("FROM whatsapp_customer_windows"));assert.deepEqual(Array.from(proof.values),["201000000000","1234"]);assert.match(proof.q,/24 hours/);assert.match(proof.q,/last_inbound_at<=clock_timestamp/);
 });
+
+test('seated courtesy sends once only to a subscribed seated guest',async()=>{
+ const h=setup({booking:{kind:'seated',guest_status:'seated',seated_at:new Date(),eta_at:null,feedback_consent:false}});
+ await h.service.deliverNotification('notification-id',1);
+ await h.service.deliverNotification('notification-id',1);
+ assert.equal(h.calls.length,1);
+ assert.equal(h.calls[0].text.body,"You're seated. Enjoy your meal at Mo Bistro!");
+ assert.equal(h.state.status,'sent');
+ for(const booking of [{subscribed_at:null},{confirmation_consent:false},{unsubscribed_at:new Date()},{opted_out_at:new Date()},{guest_status:'called'},{seated_at:null},{seated_at:new Date(Date.now()-16*60_000)}]){
+  const denied=setup({booking:{kind:'seated',guest_status:'seated',seated_at:new Date(),eta_at:null,...booking}});
+  await denied.service.deliverNotification('notification-id',1);
+  assert.equal(denied.calls.length,0);
+ }
+});
+
+test('seated courtesy never falls back to a template outside the permitted text window',async()=>{
+ for(const options of [{open:false,template:true},{env:{WHATSAPP_WINDOW_TEXT_ENABLED:'false'},template:true},{env:{WHATSAPP_TEST_RECIPIENT:'201000000009'}},{env:{WHATSAPP_MODE:'test'}}]){
+  const h=setup({...options,booking:{kind:'seated',guest_status:'seated',seated_at:new Date(),eta_at:null}});
+  await h.service.deliverNotification('notification-id',1);
+  assert.equal(h.calls.length,0);
+ }
+});
 test("expired window falls back only to configured applicable template",async()=>{
  const h=setup({open:false,template:true});await h.service.deliverNotification("notification-id",1);assert.equal(h.calls[0].type,"template");
  const skip=setup({open:false});await skip.service.deliverNotification("notification-id",1);assert.equal(skip.calls.length,0);assert.equal(skip.state.status,"skipped");assert.ok(skip.queries.some(q=>q.values.includes("customer_window_closed_template_unconfigured")));

@@ -37,6 +37,7 @@ await database.exec(
 );
 await database.exec(fs.readFileSync("migrations/20261012_whatsapp_preview_test.sql", "utf8"));
 await database.exec(fs.readFileSync("migrations/20261013_whatsapp_customer_windows.sql", "utf8"));
+await database.exec(fs.readFileSync("migrations/20261119_whatsapp_seated.sql", "utf8"));
 function sqlAdapter(executor) {
   const sql = async (strings, ...values) => {
     const query = strings.reduce(
@@ -1197,4 +1198,40 @@ test("new ETA migration queues immutable time updates, reschedules alerts, dedup
   await sql`DELETE FROM guests WHERE id=${b.id}`;
   assert.equal((await sql`SELECT request_id FROM guest_eta_changes WHERE guest_id=${b.id}`).length,0);
   assert.equal(networkCalls,0);
+});
+
+test('seating queues one immediate courtesy independently of review consent and scheduler availability',async()=>{
+ await reset();
+ await database.exec(fs.readFileSync('migrations/20261119_whatsapp_seated.sql','utf8'));
+ const savedEnv={...env};
+ try{
+  const b=await booking();
+  env.WHATSAPP_WINDOW_TEXT_ENABLED='true';
+  await webhook.processMetaWebhook(envelope(inbound(b,randomUUID(),{timestamp:String(Math.floor(Date.now()/1000))})));
+  await sql`INSERT INTO seating_settings(key,value) VALUES('table_view_mode','detailed') ON CONFLICT(key) DO UPDATE SET value='detailed'`;
+  await sql`UPDATE whatsapp_notifications SET status='skipped' WHERE guest_id=${b.id}`;
+  await sql`INSERT INTO restaurant_tables(name,seats,area) VALUES('Courtesy table',4,'indoor')`;
+  const seating=load('src/lib/seating-postgres.ts');
+  await seating.assignTablePostgres(b.id,1);
+  assert.equal((await jobs('seated')).length,1);
+  assert.equal((await jobs('review')).length,0);
+  await assert.rejects(seating.assignTablePostgres(b.id,1));
+  await sql.begin(tx=>service.scheduleSeated(tx,b.id));
+  env.WHATSAPP_MODE='live';env.WHATSAPP_ALLOW_LIVE_SEND='true';env.WHATSAPP_WINDOW_TEXT_ENABLED='true';
+  env.VERCEL_ENV='preview';env.WHATSAPP_TEST_RECIPIENT=b.phone;
+  env.META_WHATSAPP_ACCESS_TOKEN='synthetic-token';env.META_GRAPH_API_VERSION='v24.0';
+  const bodies=[];
+  transportFetch=async(url,options)=>{
+   networkCalls++;assert.match(url,/graph\.facebook\.com/);
+   bodies.push(JSON.parse(options.body));return Response.json({messages:[{id:'wamid.seated'}]});
+  };
+  await service.dispatchOutbox();await service.dispatchOutbox();
+  assert.equal(bodies.length,1);
+  assert.equal(bodies[0].text.body,"You're seated. Enjoy your meal at Mo Bistro!");
+  const [job]=await jobs('seated');assert.equal(job.status,'sent');
+  await sql.begin(tx=>service.scheduleSeated(tx,b.id));
+  await service.dispatchOutbox();assert.equal(bodies.length,1);
+ }finally{
+  for(const key of Object.keys(env))delete env[key];Object.assign(env,savedEnv);
+ }
 });

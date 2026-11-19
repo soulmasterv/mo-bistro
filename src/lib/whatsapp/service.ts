@@ -71,6 +71,16 @@ export async function scheduleAlmostReady(tx: TransactionSql, guestId: number, e
   } else await tx`UPDATE whatsapp_notifications SET status='skipped',revision=revision+1,updated_at=NOW()
     WHERE guest_id=${guestId} AND kind='almost_ready' AND status IN ('pending','scheduled')`;
 }
+/** Created by the seating transaction only; late subscriptions do not backfill it. */
+export async function scheduleSeated(tx: TransactionSql, guestId: number) {
+  if (!whatsappEnabled()) return;
+  const [consent] = await tx`SELECT subscribed_at,unsubscribed_at,confirmation_consent FROM whatsapp_booking_consents WHERE guest_id=${guestId}`;
+  if (!consent?.subscribed_at || consent.unsubscribed_at || !consent.confirmation_consent) return;
+  // Never rearm a completed, skipped, or uncertain seating message.
+  await tx`INSERT INTO whatsapp_notifications(id,guest_id,kind,due_at)
+    VALUES(${randomUUID()},${guestId},'seated',NOW())
+    ON CONFLICT (guest_id,kind) WHERE kind NOT IN ('eta_update','almost_ready') DO NOTHING`;
+}
 export async function scheduleReview(tx: TransactionSql, guestId: number, seated: Date) {
   if (!whatsappEnabled()) return;
   const due = dueTime("review", seated);
@@ -99,8 +109,13 @@ export async function dispatchOutbox() {
     WHERE id IN (SELECT id FROM whatsapp_notifications WHERE status='pending'
       AND (publish_lease_until IS NULL OR publish_lease_until<NOW())
       ORDER BY due_at LIMIT 25 FOR UPDATE SKIP LOCKED)
-    RETURNING id,revision,due_at`;
+    RETURNING id,revision,due_at,kind`;
   for (const job of jobs) {
+    // Seating is an immediate courtesy message, not a delayed scheduler task.
+    if (job.kind === 'seated' && new Date(job.due_at).getTime() <= Date.now()) {
+      await deliverNotification(job.id,job.revision);
+      continue;
+    }
     try {
       const result = await publishJob(job.id, job.revision, new Date(job.due_at));
       await sql`UPDATE whatsapp_notifications SET status='scheduled',qstash_message_id=${result.messageId},

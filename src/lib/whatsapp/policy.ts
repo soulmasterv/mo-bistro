@@ -1,6 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
-export type NotificationKind = "confirmation" | "almost_ready" | "review" | "eta_update";
+export type NotificationKind = "confirmation" | "almost_ready" | "review" | "eta_update" | "seated";
 export const CONSENT_VERSION = "whatsapp-v2-2026-10-12";
 export function whatsappEnabled() {
   return process.env.WHATSAPP_ENABLED === "true" && process.env.MO_BISTRO_DB === "postgres";
@@ -67,6 +67,8 @@ export function eligible(row: Eligibility) {
   if (row.opted_out_at || row.unsubscribed_at) return false;
   if (row.kind === "confirmation") return row.confirmation_consent && ["waiting", "called"].includes(row.guest_status);
   if (!row.subscribed_at) return false;
+  if (row.kind === "seated") return row.confirmation_consent && row.guest_status === "seated" &&
+    !!row.seated_at && new Date(row.seated_at).getTime() > Date.now()-15*60_000;
   if (row.kind === "review") return row.feedback_consent && row.guest_status === "seated" && !!row.seated_at;
   return ["waiting", "called"].includes(row.guest_status) && !!row.eta_at;
 }

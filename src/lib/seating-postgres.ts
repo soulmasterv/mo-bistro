@@ -2,7 +2,7 @@ import { WorkflowError } from "@/lib/workflow-error";
 import "server-only";
 import { getPostgres } from "@/lib/postgres-db";
 import { whatsappEnabled } from "@/lib/whatsapp/policy";
-import { scheduleReview } from "@/lib/whatsapp/service";
+import { scheduleReview, scheduleSeated } from "@/lib/whatsapp/service";
 import { setActivityActor } from "@/lib/staff-activity";
 
 export async function getAssignableTablesPostgres(guestId: number) {
@@ -48,7 +48,10 @@ export async function assignTablePostgres(guestId: number, tableId: number, acto
     await tx`UPDATE restaurant_tables SET status='occupied',updated_at=CURRENT_TIMESTAMP WHERE id=${tableId}`;
     const [seated] = await tx`UPDATE guests SET status='seated',table_id=${tableId},
       seated_at=COALESCE(seated_at,NOW()),updated_at=CURRENT_TIMESTAMP WHERE id=${guestId} RETURNING seated_at`;
-    if (whatsappEnabled()) await scheduleReview(tx,guestId,new Date(seated.seated_at));
+    if (whatsappEnabled()) {
+      await scheduleSeated(tx,guestId);
+      await scheduleReview(tx,guestId,new Date(seated.seated_at));
+    }
     await tx`INSERT INTO seating_history(guest_id,table_id) VALUES (${guestId},${tableId})`;
     return { success: true, guest_id: guestId, table_id: tableId };
   });

@@ -46,6 +46,8 @@ export async function sendWindowNotification(
       return { state: "skipped", error: "preview_recipient_not_configured" };
     }
   }
+  if (!customerWindowEnabled() && job.kind === "seated")
+    return { state: "skipped", error: "window_text_disabled" };
   if (!customerWindowEnabled())
     return sendTemplate(templatePayload(job, booking, code));
   const business = whatsappPhoneId();
@@ -65,6 +67,7 @@ export async function sendWindowNotification(
     almost_ready: "WHATSAPP_ALMOST_READY",
     review: "WHATSAPP_REVIEW",
     eta_update: "WHATSAPP_ETA_UPDATE",
+    seated: "WHATSAPP_SEATED",
   }[job.kind];
   const subscribedConfirmation = job.kind === "confirmation" && !!booking.subscribed_at;
   const text = subscribedConfirmation
@@ -73,6 +76,8 @@ export async function sendWindowNotification(
     ? "Mo Bistro update: we expect your table to be ready in about {eta_minutes} minutes. Reception will confirm when your table is ready."
     : job.kind === "almost_ready"
     ? "Hi {name}, your table for Mo Bistro booking #{booking_id} is expected to be ready in about 10 minutes. Please stay nearby; reception will confirm when your table is ready."
+    : job.kind === "seated"
+    ? "You're seated. Enjoy your meal at Mo Bistro!"
     : job.kind === "review"
     ? "Thank you for joining us at Mo Bistro, {name}! We hope you're enjoying your visit. Our review page is coming soon."
     : undefined);
@@ -121,6 +126,8 @@ export async function sendWindowNotification(
       biz_opaque_callback_data: job.id,
     });
   }
+  if (job.kind === "seated")
+    return { state: "skipped", error: "customer_service_window_closed" };
   try {
     return await sendTemplate(templatePayload(job, booking, code));
   } catch {
