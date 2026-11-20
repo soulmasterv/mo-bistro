@@ -84,6 +84,12 @@ test('combined snapshot reuses five reads, matches both inventory modes, and per
   await db.exec("INSERT INTO staff_users(username,role,credential_hash) VALUES('Synthetic','manager','test'); INSERT INTO restaurant_tables(name,seats,area,status) VALUES('Indoor',4,'indoor','free'),('Outdoor',2,'outdoor','occupied'); INSERT INTO guests(name,phone,party_size,seating_preference,confirmed) VALUES('Small','01000000001',2,'indoor',1),('Large','01000000002',8,'outdoor',1); INSERT INTO table_ready_requests(table_id,requested_by) SELECT id,1 FROM restaurant_tables WHERE name='Outdoor'; INSERT INTO seating_settings(key,value) VALUES('table_view_mode','detailed') ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value;");
   const sql=adapter(db,queries),h=harness();h.mocks['@/lib/postgres-db']={getPostgres:()=>sql};const snapshot=load('src/lib/reception-snapshot.ts',h.mocks);
   const detailed=await snapshot.receptionSnapshot();assert.equal(detailed.guests.length,2);assert.equal(detailed.requests[0].table_name,'Outdoor');assert.equal(detailed.next.areas[0].guest.name,'Small');
+  await db.exec("INSERT INTO guests(name,phone,party_size,status) SELECT 'History '||n,'011'||lpad(n::text,8,'0'),2,CASE WHEN n%2=0 THEN 'cancelled' ELSE 'no_show' END FROM generate_series(1,1000) n; INSERT INTO guests(name,phone,party_size,status) VALUES('Called','01200000001',2,'called'),('Seated','01200000002',2,'seated');");
+  const withHistory=await snapshot.receptionSnapshot();
+  assert.deepEqual(withHistory.guests.map(g=>g.name),['Small','Large','Called','Seated']);
+  assert.equal(withHistory.next.areas[0].guest.name,'Small');
+  queries.length=0;
+  await snapshot.receptionSnapshot();
   assert.equal(queries.filter(q=>/^SELECT/.test(q.trim())).length,4);assert.equal(queries.filter(q=>q.includes('FROM guests g')).length,1);assert.equal(queries.filter(q=>q.includes('FROM restaurant_tables')).length,1);
   assert.ok(queries.every(q=>!q.includes('pilot_')&&!/\b(?:UPDATE|INSERT|DELETE)\b/.test(q)));
   await db.exec("UPDATE seating_settings SET value='simple' WHERE key='table_view_mode'");queries.length=0;

@@ -16,7 +16,8 @@ export async function receptionSnapshot(){
   const required=resolveConfirmation({approval_required:value('approval_required'),require_confirmation:value('require_confirmation')});
   const rawGuests=await tx`SELECT g.id,g.name,g.phone,g.party_size,g.seating_preference,g.status,g.confirmed,g.table_id,
    g.created_at,g.updated_at,to_jsonb(g)->>'eta_at' AS eta_at,
-   to_jsonb(g)->>'called_at' AS called_at FROM guests g ORDER BY g.created_at,g.id`;
+   to_jsonb(g)->>'called_at' AS called_at FROM guests g
+   WHERE g.status IN ('waiting','called','seated') ORDER BY g.created_at,g.id`;
   const tables=await tx`SELECT id,name,seats,area,status,updated_at FROM restaurant_tables
    WHERE (to_jsonb(restaurant_tables)->>'advanced_archived_at') IS NULL ORDER BY id`;
   const pools=mode==='simple'?await tx`SELECT area,total_tables,occupied_tables,max_party_size,
@@ -24,8 +25,9 @@ export async function receptionSnapshot(){
   const rawRequests=await tx`SELECT r.id,COALESCE(to_jsonb(r)->>'inventory_mode','detailed') AS inventory_mode,
    r.table_id,NULLIF(to_jsonb(r)->>'area','') AS request_area,r.status,r.requested_at,COALESCE(u.username,'Staff') AS requested_by
    FROM table_ready_requests r LEFT JOIN staff_users u ON u.id=r.requested_by WHERE r.status='pending' ORDER BY r.requested_at,r.id`;
+  const tablesById=new Map(tables.map(table=>[table.id,table]));
   const requests=rawRequests.map(r=>{
-   const table=tables.find(t=>t.id===r.table_id),area=table?.area??r.request_area;
+   const table=tablesById.get(r.table_id),area=table?.area??r.request_area;
    return {...r,table_name:table?.name??(area?area[0].toUpperCase()+area.slice(1)+' area':null),area,seats:table?.seats??null};
   });
   const blocked=mode==='simple'&&tables.some(t=>t.status==='occupied');
